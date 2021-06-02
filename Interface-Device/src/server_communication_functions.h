@@ -29,13 +29,14 @@ if (Ethernet.begin(mac) == 0) {
  
 }
 
-void UDP_send_CAN() {
-    Serial.println("Sending CAN Frame over UDP: Unfinished")
+void UDP_send_CAN(int channel, int channel_index, UDP_CAN_Package) {
+    Serial.println("Sending CAN Frame over UDP: Unfinished");
 
 }
 
-void UDP_receive_CAN() {
-    Serial.println("Receiving CAN Frame over UDP: Unfinished")
+int UDP_receive_CAN() {
+    Serial.println("Receiving CAN Frame over UDP: Unfinished");
+    return 1;
 }
 
 struct UDP_CAN_Package{
