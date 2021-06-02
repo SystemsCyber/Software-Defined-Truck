@@ -40,6 +40,7 @@ int UDP_receive_CAN() {
 }
 
 struct UDP_CAN_Package{
+    int channel;
     int index;
     char arb_ID[4];
     int dlc;
