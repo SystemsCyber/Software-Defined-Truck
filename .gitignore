@@ -1,2 +1,15 @@
 .vs
 .vscode
+Carla/CarlaUE4
+Carla/Co-Simulation
+Carla/Engine
+Carla/HDMaps
+Carla/Plugins
+Carla/PythonAPI/carla
+Carla/PythonAPI/examples
+Carla/PythonAPI/util
+Carla/CarlaUE4.exe
+Carla/CHANGELOG
+Carla/Dockerfile
+Carla/LICENSE
+Carla/README
