@@ -1,0 +1,38 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "SSS3 POST Schema",
+    "description": "POST Schema for SSS3 devices.",
+    "type": "object",
+    "examples": [
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/0"
+            },
+            "ECUs": {
+                "$ref": "ECUCollection.json/#/examples/0"
+            }
+        },
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/1"
+            },
+            "ECUs": {
+                "$ref": "ECUCollection.json/#/examples/1"
+            }
+        }
+    ],
+    "required": [
+        "MAC",
+        "ECUs"
+    ],
+    "properties": {
+        "MAC": {
+            "$ref": "SSS3MAC.json"
+        },
+        "ECUs": {
+            "title": "Attached ECUs",
+            "description": "The ECU(s) attached to the registering SSS3.",
+            "$ref": "AttachedECUs.json"
+        }
+    }
+}

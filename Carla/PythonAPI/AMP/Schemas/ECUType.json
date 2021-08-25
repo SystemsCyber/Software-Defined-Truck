@@ -1,0 +1,53 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "ECU Type",
+    "description": "The type of ECU. MUST match one of the items in the 'enum' property. There is no difference between the Unit or Module ending, they are simply included for completeness. If an ECU type ending in Module is chosen, the Unit varient will be displayed instead.",
+    "type": "array",
+    "default": ["ECU", "Electronic Control Unit"],
+    "examples": [
+        ["ECU", "Electronic Control Unit"],
+        ["ECM", "Engine Control Module"],
+        ["BCM", "Body Control Module"]
+    ],
+    "maxItems": 2,
+    "minItems": 2,
+    "items": {
+        "type":"string"
+    },
+    "enum": [
+        ["ECU", "Electronic Control Unit"],
+        ["ECM", "Electronic Control Module"],
+        ["ECU", "Engine Control Unit"],
+        ["ECM", "Engine Control Module"],
+        ["BCU", "Body Control Unit"],
+        ["BCM", "Body Control Module"],
+        ["CCU", "Climate Control Unit"],
+        ["CCM", "Climate Control Module"],
+        ["BCU", "Brake Control Unit"],
+        ["BCM", "Brake Control Module"],
+        ["EBCU", "Electronic Brake Control Unit"],
+        ["EBCM", "Electronic Brake Control Module"],
+        ["ICU", "Infotainment Control Unit"],
+        ["ICM", "Infotainment Control Module"],
+        ["PSU", "Power Steering Unit"],
+        ["PSM", "Power Steering Module"],
+        ["PCU", "Powertrain Control Unit"],
+        ["PCM", "Powertrain Control Module"],
+        ["SCU", "Suspension Control Unit"],
+        ["SCM", "Suspension Control Module"],
+        ["SCU", "Seat Control Unit"],
+        ["SCM", "Seat Control Module"],
+        ["SCU", "Speed Control Unit"],
+        ["SCM", "Speed Control Module"],
+        ["TCU", "Transmission Control Unit"],
+        ["TCM", "Transmission Control Module"],
+        ["TCU", "Telematics Control Unit"],
+        ["TCM", "Telematics Control Module"],
+        ["DCU", "Door Control Unit"],
+        ["DCM", "Door Control Module"],
+        ["PSCU", "Power Steering Control Unit"],
+        ["PSCM", "Power Steering Control Module"],
+        ["HMI", "Human Machine Interface"],
+        ["BMS", "Battery Management System"]
+    ]
+}

@@ -209,7 +209,8 @@ bool EthernetCarla::sendConfig(unsigned long *lastAttempt)
         memcpy(&config.attachedDevice, &_config.attachedDevice, sizeof(_config.attachedDevice));
         Serial.println("complete.");
         Serial.print("Sending configuration message... ");
-        _controller.write(reinterpret_cast<uint8_t *>(&config), sizeof(config));
+        // _controller.write(reinterpret_cast<uint8_t *>(&config), sizeof(config));
+        _controller.write("POST * HTTP/1.1\r\nKeep-Alive: True\r\n\r\nHello from the SSS3");
         _controller.flush();
         Serial.println("complete.");
         return false;

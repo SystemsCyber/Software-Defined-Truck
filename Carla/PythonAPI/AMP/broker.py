@@ -1,18 +1,94 @@
-import multiprocessing as mp
+from http import HTTPStatus
+import queue
 import socket
-import struct
+import os
 import time
 import sys
 import selectors
-import queue
+import ipaddress
+from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
-from collections.abc import Callable
-from typing import Tuple, Dict, Union, List
-from SSS3_Handle import SSS3Handle
-from CARLA_Handle import CARLAHandle
+from typing import Tuple, Dict, Union, List, Optional
+from types import SimpleNamespace
+from io import BytesIO
+from SSS3Handle import SSS3Handle
+from ClientHandle import ClientHandle
+from Device import Device
+
+"""TODO Notes:
+    - We need to set the keep alive function on the teensy.
+    - We need to close connections if they don't register their device within a
+      few seconds after connecting.
+    - We don't need to scan the multicast address range because we can bind to a
+      specific interface via socket options.
+    - Use the built in socket keep alive options to send "heartbeats" to the
+      devices. Refer to this for more information:
+      https://stackoverflow.com/questions/12248132/how-to-change-tcp-keepalive-timer-using-python-script
+      and https://docs.microsoft.com/en-us/windows/win32/winsock/so-keepalive
+      
+    - Send error when protocol/method not supported. Use
+      HTTPStatus.NOT_IMPLEMENTED.
+    - Add error checking for IndexError when using Regex
+    - When recving or sending timeout should be calculated dynamically.
+        - From:
+          https://www.geeksforgeeks.org/algorithm-for-dynamic-time-out-timer-calculation/
+            - Use Karn's Modification with Jacob's Algorithm to dynamically
+              calculate timeout and when to retransmit.
+        - Sockets don't expose ack so we can either make sure that we respond to messages so that both sides can calculate RTT or we can send pings. Unfortunately the 
+        - | ==================== Ignore ================== |
+        - Sockets don't expose ack so instead of sending multiple messages we
+          can get this information by pinging the device.
+        - Be careful:
+            - Don't use os.system. Use the safer alternative -> subprocess
+            - Use subprocess.popen as it spawns another process to do this
+              operation so that it doesn't slow down the main thread.
+            - If you use subprocess to run the ping command make sure to set the
+              shell argument to false.
+            - Don't use the pure python ping library because root is required on
+              linux to create ICMP sockets.
+            - No matter the method of doing this make sure that
+            - Example:
+                import os
+                import subprocess
+                
+                number_of_messages = "-n" if os.name == 'nt' else "-c"
+                host = "www.google.com"
+
+                ping = subprocess.Popen(
+                    ["ping", number_of_messages, "4", host],
+                    stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE
+                )
+
+                out, error = ping.communicate()
+                print out
+        - | ============================================= |
+    - When sending make sure to use send all and possibly flush as well.
+    - Send any errors that are raised via parsing, sending, or receiving.
+    - Use a token bucket algorithm to rate limit clients and devices.
+    - From:
+        https://stackoverflow.com/questions/667508/whats-a-good-rate-limiting-algorithm
+        rate = 5.0; // unit: messages
+        per  = 8.0; // unit: seconds
+        allowance = rate; // unit: messages
+        last_check = now(); // floating-point, e.g. usec accuracy. Unit: seconds
+
+        when (message_received):
+        current = now();
+        time_passed = current - last_check;
+        last_check = current;
+        allowance += time_passed * (rate / per);
+        if (allowance > rate):
+            allowance = rate; // throttle
+        if (allowance < 1.0):
+            discard_message();
+        else:
+            forward_message();
+            allowance -= 1.0;
+    - 
+"""
 
 # Type Aliases
-LOCKTYPE = mp.Lock
 SOCKTYPE = socket.socket
 if sys.version_info >= (3, 9):
     MCAST_IP_ENTRY = (str, None | SOCKTYPE)
@@ -25,7 +101,7 @@ if sys.version_info >= (3, 9):
     SAFE_ENTRY = MCAST_IP_ENTRY | SSS3_ENTRY | CARLA_CLIENT
     SOCK_DICT = dict[str, SOCKTYPE]
     SAFE_INDEX = (int, int | str | None)
-    CONN_HANDLE = (SOCKTYPE, (str, str))
+    CONN_HANDLE = (SOCKTYPE, (str, int))
 else:
     MCAST_IP_ENTRY = Tuple[str, Union[None, SOCKTYPE]]
     MCAST_IPS = List[MCAST_IP_ENTRY]
@@ -37,225 +113,207 @@ else:
     SAFE_ENTRY = Union[MCAST_IP_ENTRY, SSS3_ENTRY, CARLA_CLIENT]
     SOCK_DICT = Dict[str, SOCKTYPE]
     SAFE_INDEX = Tuple[int, Union[int, str, None]]
-    CONN_HANDLE = Tuple[SOCKTYPE, Tuple[str, str]]
+    CONN_HANDLE = Tuple[SOCKTYPE, Tuple[str, int]]
 
 
-class Broker:
+class Broker(BaseHTTPRequestHandler):
+
+    # ==================== Initialization ====================
+
     def __init__(self, _host_port=41660, _carla_port=41664, _can_port=41665) -> None:
         self.host_port = _host_port
         self.carla_port = _carla_port
         self.can_port = _can_port
-        self.sss3_mac = bytes.fromhex("DEADBE")
-        print("Broker Server Initializing...")
-        print(f'\tHost Port: {self.host_port}')
-        print(f'\tCarla Port: {self.carla_port}')
-        print(f'\tCan Port: {self.can_port}')
+        self.__log_init()
+        self.__log_message("")
         self.sel = selectors.DefaultSelector()
-        self.multicast_IPs = []
-        self.multicast_IP_lock = mp.Lock()
-        self.SSS3s = []
-        self.SSS3_lock = mp.Lock()
-        self.carla_clients = []
-        self.carla_client_lock = mp.Lock()
-        self.free_mcast_address = False
-        self.__init_mcast_ips()
+        self.multicast_IPs = self.__init_multicast_ip_list()
+        self.blacklist_ips = []
+        self.SSS3s = SSS3Handle(self.sel, self.blacklist_ips)
+        self.CLIENTs = ClientHandle(self.sel, self.blacklist_ips)
 
-    # ==================== Thread-Safe List Operations ====================
+    def __init_multicast_ip_list(self):
+        multicast_ips = []
+        for ip in ipaddress.ip_network('239.255.0.0/16'):
+            multicast_ips.append({
+                "ip": ip,
+                "available": False,
+                "sockets": []
+            })
+        return multicast_ips
 
-    def safe_add(safe_list: SAFE_LIST, lock: LOCKTYPE, entry: SAFE_ENTRY) -> None:
-        with lock.acquire():
-            safe_list.append(entry)
+    def __log_message(self, format, *args):
+        sys.stderr.write("%s - - [%s] %s\n" %
+                         ("SYSTEM",
+                          self.log_date_time_string(),
+                          format%args))
 
-    def safe_remove(safe_list: SAFE_LIST, lock: LOCKTYPE, entry: SAFE_ENTRY) -> None:
-        with lock.acquire():
-            for i in range(len(safe_list)):
-                if safe_list[i][0] == entry[0]:  # Only compare MACs
-                    del safe_list[i]
+    def __log_init(self) -> None:
+        msg = f"Broker initializing with these settings:\n"
+        msg += f"\tHost Address: {socket.gethostname()}\n"
+        msg += f"\tHost Port: {self.host_port}\n"
+        msg += f"\tCarla Port: {self.carla_port}\n"
+        msg += f"\tCAN Port: {self.can_port}\n"
+        self.__log_message(msg)
 
-    def safe_get(safe_list: SAFE_LIST, lock: LOCKTYPE, compare) -> SAFE_ENTRY:
-        with lock.acquire():
-            for i in range(len(safe_list)):
-                if compare(i):
-                    return i
-
-    def safe_modify(safe_list: SAFE_LIST, lock: LOCKTYPE, safe_index: SAFE_INDEX, value) -> None:
-        with lock.acquire():
-            if safe_index[1]:
-                safe_list[safe_index[0]] = value
-            else:
-                safe_list[safe_index[0]][safe_index[1]] = value
-
-    # ==================== Multicast Address Opterations ====================
-
-    def scanMulticastAddresses(self) -> None:
-        for a in range(255, 0, -1):
-            for b in range(255, 0, -1):
-                mcast_grp = "239.255." + str(a) + "." + str(b)
-                sock_pair = socket.socketpair(
-                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-                sock_dict = {"carla": sock_pair[0], "can": sock_pair[1]}
-                self.__set_mcast_options(mcast_grp, sock_dict)
-                free = self.__check_mcast_address(sock_dict)
-                index = (((255 - a) * 255) + (255-b), 1)
-                self.safe_modify(self.multicast_IPs,
-                                 self.multicast_IP_lock, index, free)
-
-    def __set_mcast_options(self, mcast_grp, socks: SOCK_DICT) -> None:
-        for key, sock in socks.items():
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
-            sock.bind((mcast_grp, self[key + "_port"]))
-            mreq = struct.pack("4sl", socket.inet_aton(mcast_grp),
-                               socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP,
-                            socket.IP_ADD_MEMBERSHIP, mreq)
-            sock.settimeout(1)  # Listen for 1 second.
-
-    def __check_mcast_address(self, socks: SOCK_DICT) -> bool:
-        for sock in socks.values():
-            try:
-                sock.recv(1)
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-                return False
-            except socket.timeout:  # Timing out means mcast addr is free
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-        return True  # Times out for all addresses in dictionary
-
-    def __init_mcast_ips(self) -> None:
-        for a in range(255, 0, -1):
-            for b in range(255, 0, -1):
-                self.multicast_IPs.append(
-                    ("239.255." + str(a) + "." + str(b), False, None))
-
-    # ==================== Server / Broker Opterations ====================
+    # ==================== Main Server Functions ====================
 
     def listen(self):
-        listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listening_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listening_socket.bind((socket.gethostname(), self.host_port))
-        listening_socket.listen()
-        listening_socket.setblocking(False)
-        self.sel.register(listening_socket, selectors.EVENT_READ, data=None)
+        lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        lsock.bind((socket.gethostname(), self.host_port))
+        lsock.listen()
+        lsock.setblocking(False)
+        data = SimpleNamespace(callback=self.__accept)
+        self.sel.register(lsock, selectors.EVENT_READ, data=data)
         print(f'Listening on: {socket.gethostname()}:{self.host_port}')
-        # process = mp.Process(target=self.__wait_for_connection, args=(
-        #                      listening_socket,), daemon=True)
-        # process.start()
         self.__wait_for_connection()
 
     def __wait_for_connection(self) -> None:
         while True:
-            # with self.SSS3_lock.acquire() as sl, self.carla_client_lock.acquire() as cl:
-            connection_events = self.sel.select(timeout=1)
-            for key, mask in connection_events:
-                if mask & selectors.EVENT_READ:
-                    self.__handle_read_events(key)
-                elif mask & selectors.EVENT_WRITE:
-                    self.__handle_write_events(key)
-            self.__check_heartbeats(self.SSS3s)
-            self.__check_heartbeats(self.carla_clients)
+            try:
+                connection_events = self.sel.select(timeout=1)
+                for key, mask in connection_events:
+                    self._key = key
+                    callback = key.data.callback
+                    callback(key)
+                self.__drop_loose_connections()
+            except TimeoutError:
+                continue
+            except KeyboardInterrupt:
+                return
 
-    def __handle_read_events(self, key: selectors.SelectorKey) -> None:
-        # No data associated with the connection so it's new.
-        if key.data is None:
-            self.__accept_connection(key.fileobj)
-        elif not hasattr(key.data, 'mac'):
-            self.__register_device(key)
-        elif key.data.type == "SSS3":
-            print(f'Received Heartbeat from: {key.data.mac}.')
-            key.data.heartbeat = time.time()
-        elif (key.data.type == "CARLA Client") and (key.data.start):
-            key.data.send_device_list(self.SSS3s)
+    def __drop_loose_connections(self) -> None:
+        """Loose connections are accepted connections from devices that don't
+        register within 5 seconds of connecting."""
+        sel_map = self.sel.get_map()
+        for fd in sel_map:
+            key = sel_map[fd]
+            not_accepted = hasattr(key.data, "accept_by") and (
+                key.data.MAC == "unknown")
+            if not_accepted and (key.data.accept_by < time.time()):
+                self.__shutdown_connection(key)
 
-    def __handle_write_events(self, key: selectors.SelectorKey) -> None:
-        pass
-
-    def __accept_connection(self, listening_socket: SOCKTYPE) -> None:
-        conn, addr = listening_socket.accept()
+    def __accept(self, key: selectors.SelectorKey) -> None:
+        """Takes a new connection from the listening socket and assigns it its
+        own socket. Then registers it with the selectors using the READ mask.
+        """
+        conn, addr = key.fileobj.accept()
         conn.setblocking(False)
-        print(f'New connection from: {addr[0]}:{str(addr[1])}')
-        self.sel.register(conn, selectors.EVENT_READ, data=addr)
-
-    def __register_device(self, key: selectors.SelectorKey) -> None:
-        mac = self.__getData(key.fileobj, key.data, 6)
-        if not mac:
-            return
-        if mac[0:3] == self.sss3_mac:
-            device = self.__getData(key.fileobj, key.data, 32)
-            if device:
-                newData = SSS3Handle(key.data, device, mac)
-                newkey = self.sel.modify(key.fileobj, selectors.EVENT_READ, data=newData)
-                self.SSS3s.append(newkey)
-                self.__print_registration(newkey)
-        elif mac[0:3] != self.sss3_mac:
-            start = self.__getData(key.fileobj, key.data, 1)
-            if start:
-                newData = CARLAHandle(key.data, start, mac)
-                newkey = self.sel.modify(key.fileobj, selectors.EVENT_WRITE, data=newData)
-                self.carla_clients.append(newkey)
-                self.__print_registration(newkey)
-
-    def __getData(self, sock: SOCKTYPE, addr, num_bytes: int) -> Union[bytes, None]:
-        raw_data = sock.recv(num_bytes)
-        if (not raw_data) or (len(raw_data) < num_bytes):
-            print(
-                f'TCP closing command received from {addr[0]}. Closing connection...')
-            self.sel.unregister(sock)
-            sock.close()
-            return None
+        if addr[0] in self.blacklist_ips:
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
         else:
-            return raw_data
+            self.__set_keepalive(conn, 300000, 300000)
+            print(f'New connection from: {addr[0]}:{str(addr[1])}')
+            data = Device(self.__read, addr)
+            self.sel.register(conn, selectors.EVENT_READ, data=data)
 
-    def __print_registration(self, key: selectors.SelectorKey) -> None:
-        print(f'New {key.data.type} connected:')
-        print(f'\tIP: {key.data.addr}')
-        print(f'\tPort: {key.data.port}')
-        print(f'\tMAC: {key.data.mac}')
-        if key.data.type == "SSS3":
-            print("Attached Device: ")
-            print(f'\tType: {key.data.attached_device["type"]}')
-            print(f'\tYear: {key.data.attached_device["year"]}')
-            print(f'\tMake: {key.data.attached_device["make"]}')
-            print(f'\tModel: {key.data.attached_device["model"]}')
+    def __set_keepalive(self, conn: SOCKTYPE, idle_sec: int, interval_sec: int) -> None:
+        if os.name == 'nt':
+            conn.ioctl(socket.SIO_KEEPALIVE_VALS, (1, idle_sec, interval_sec))
+        else:
+            conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, idle_sec)
+            conn.setsockopt(socket.IPPROTO_TCP,
+                            socket.TCP_KEEPINTVL, interval_sec)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
 
-    def __check_heartbeats(self, connection_list: List):
-        for conn in connection_list:
-            # 300 seconds is 5 minutes
-            if (time.time() - conn.data.heartbeat) > 300.0:
-                print(f'Havent heard from {str(conn.data.mac)}', end='')
-                print(f'({conn.data.type}) in 5 minutes. Device is ', end='')
-                print("either down or abruptly disconnected.")
-                print("Closing the connection and unregistering the device...")
-                self.sel.unregister(conn.fileobj)
-                conn.fileobj.close()
+    def __read(self, key: selectors.SelectorKey):
+        if not self.__rate_limit(key):
+            try:
+                self._key = key
+                self.client_address = self._key.data.addr
+                self.__handle_request(self._key.fileobj.recv(4096))
+                self.sel.modify(self._key.fileobj,
+                                selectors.EVENT_WRITE, self._key.data)
+            except BlockingIOError:
+                pass
 
-        # def setup_sss3(self, _address: List[str]) -> List[str]:
-        #     successfully_setup = []
-        #     for address in _address:
-        #         # Create Connection automatically tries all dns results for
-        #         # hostname addresses on both IPv4 and IPv6.
-        #         with socket.create_connection(address, 1) as tcp_sock:
-        #             tcp_sock.settimeout(1)
-        #             if self.__send_setup(tcp_sock, address):
-        #                 successfully_setup.append(address)
-        #     return successfully_setup
+    def __rate_limit(self, key: selectors.SelectorKey) -> bool:
+        now = time.time()
+        key.data.allowance += (now - key.data.last_check) * key.data.rate
+        key.data.last_check = now
+        if (key.data.allowance > key.data.rate):
+            key.data.allowance = key.data.rate
+        if (key.data.allowance < 1.0):
+            return True
+        else:
+            key.data.allowance -= 1.0
+            return False
 
-        # def __send_setup(self, tcp_sock: SOCKTYPE, address: ADDR_T, retry=True) -> bool:
-        #     try:
-        #         mcast_ip = socket.inet_aton(self.mcast_ip)
-        #         mcast_packet_size = 20
-        #         setup_message = struct.pack(
-        #             "4sii", mcast_ip, self.carla_port, self.can_port, mcast_packet_size)
-        #         tcp_sock.sendall(setup_message)
-        #         confirmation = tcp_sock.recv(1)
-        #         # True if sss3 setup correctly
-        #         return struct.unpack("?", confirmation)[0]
-        #     except (socket.herror, socket.gaierror, socket.timeout) as err:
-        #         if retry:
-        #             # DNS name assignment or socket closing may need to complete
-        #             time.sleep(1)
-        #             # Retry once
-        #             return self.__send_setup(tcp_sock, address, False)
-        #         else:
-        #             print(f"Error: {err}")
-        #             raise
+    def __handle_request(self, message: bytes) -> None:
+        with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
+            self.handle_one_request()
+            self.end_headers()
+            self.wfile.seek(0)
+            self._key.data.outgoing_messages.put(self.wfile.read())
+            self._key.data.callback = self.__write
+            self._key.data.close_connection = self.close_connection
+
+    def do_GET(self):
+        self.__method_poxy()
+
+    def do_HEAD(self):
+        self.__method_poxy()
+
+    def do_POST(self):
+        self.__method_poxy()
+
+    def do_PUT(self):
+        self.__method_poxy()
+
+    def do_DELETE(self):
+        self.__method_poxy()
+
+    def do_OPTIONS(self):
+        self.__method_poxy()
+
+    def do_CONNECT(self):
+        self.__method_poxy()
+
+    def do_TRACE(self):
+        self.__method_poxy()
+
+    def __method_poxy(self):
+        list_name = self.path[1:].upper() + "s"
+        try:
+            device_list = getattr(self, list_name)
+        except AttributeError:
+            self.send_error(HTTPStatus.NOT_FOUND)
+        try:
+            method_handle = getattr(device_list, 'do_' + self.command.upper())
+            self.send_response(method_handle(self._key, self.rfile))
+        except AttributeError:
+            self.send_error(HTTPStatus.NOT_IMPLEMENTED)
+
+    def __write(self, key: selectors.SelectorKey):
+        try:
+            while True:
+                message = key.data.outgoing_messages.get_nowait()
+                key.fileobj.sendall(message)
+        except queue.Empty:
+            key.data.callback = self.__read
+            self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
+        except InterruptedError:
+            key.data.close_connection = True
+        except BlockingIOError:
+            pass
+        finally:
+            if key.data.close_connection:
+                self.__shutdown_connection(key)
+
+    def __shutdown_connection(self, key: selectors.SelectorKey):
+        # Stop monitoring the socket
+        self.sel.unregister(key.fileobj)
+        # Close the socket
+        key.fileobj.shutdown(socket.SHUT_RDWR)
+        key.fileobj.close()
+
+def main():
+    broker = Broker()
+    broker.listen()
+
+
+if __name__ == "__main__":
+    main()
