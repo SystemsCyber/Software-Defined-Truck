@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import Dict, Tuple, List
 import json
 import jsonschema
+import os
 from collections import namedtuple
 
 SEL = selectors.SelectorKey
@@ -14,8 +15,13 @@ class SSS3Handle:
         self.sel = sel
         self.blacklist_ips = blacklist_ips
         self.ECU = namedtuple("ECU", ["type", "year", "make", "model", "sn"])
-        with open("SSS3Registration.json", 'rb') as registration_schema:
-            self.registration_schema = json.load(registration_schema)
+        base_dir = os.path.abspath(os.getcwd())
+        schema_dir = os.path.join(base_dir, "Schemas")
+        registration_schema_path = os.path.join(schema_dir, "SSS3POST.json")
+        with open(registration_schema_path, 'rb') as registration_schema:
+            schema = json.load(registration_schema)
+        resolver = jsonschema.RefResolver('file:///' + schema_dir.replace("\\", "/") + '/', schema)
+        self.registration_schema = jsonschema.Draft7Validator(schema, resolver=resolver)
 
     def do_GET(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
         if self.__device_is_registered(key):
@@ -23,6 +29,30 @@ class SSS3Handle:
             return HTTPStatus.FOUND
         else:
             return HTTPStatus.PRECONDITION_FAILED
+
+    def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        wfile.write(self.registration_schema)
+        return HTTPStatus.FOUND
+
+    def do_POST_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+        data = json.load(rfile)
+        try:
+            self.registration_schema.validate(data)
+            return self.__register(key, data)
+        except jsonschema.ValidationError:
+            self.close_connection = True
+            return HTTPStatus.BAD_REQUEST
+    
+    def do_PUT_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+        return self.do_POST_register(key, rfile)
+    
+    def do_DELETE_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        self.close_connection = True
+        return HTTPStatus.NOT_IMPLEMENTED
+
+    def do_DELETE_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        self.close_connection = True
+        return HTTPStatus.NOT_IMPLEMENTED
 
     def __device_is_registered(self, key: SEL) -> bool:
         sel_map = self.sel.get_map()
@@ -51,15 +81,6 @@ class SSS3Handle:
     def __is_free(self, key: SEL) -> bool:
         return not key.in_use
 
-    def do_POST(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
-        data = json.load(rfile)
-        try:
-            jsonschema.validate(data, self.registration_schema)
-            return self.__register(key, data)
-        except jsonschema.ValidationError:
-            self.close_connection = True
-            return HTTPStatus.BAD_REQUEST
-
     def __register(self, key: SEL, data: Dict) -> HTTPStatus:
         key.data.MAC = data["MAC"]
         key.data.type = "SSS3"
@@ -70,7 +91,7 @@ class SSS3Handle:
                 i["year"],
                 i["make"],
                 i["model"],
-                i["s/n"]
+                i["sn"]
             ))
         registration_check = self.__check_registration(key)
         if registration_check == HTTPStatus.ACCEPTED:
@@ -90,14 +111,17 @@ class SSS3Handle:
         if old_key.fd == new_key.fd:
             # Same Connection and same MAC might mean the SSS3 is updating its
             # ECUs or it got rebooted.
-            if old_key.data.MAC == new_key.data.MAC:
-                return HTTPStatus.ALREADY_REPORTED
+            # if old_key.data.MAC == new_key.data.MAC:
+            #     return HTTPStatus.ALREADY_REPORTED
             # Trying to change MAC address is not allowed and connection will be
             # dropped and device will be banned.
-            else:
+            # else:
+            if old_key.data.MAC != new_key.data.MAC:
                 self.blacklist_ips.append(new_key.data.addr[0])
                 self.close_connection = True
                 return HTTPStatus.FORBIDDEN
+            else:
+                return HTTPStatus.ACCEPTED
         else:
             return self.__check_duplicates(old_key, new_key)
 

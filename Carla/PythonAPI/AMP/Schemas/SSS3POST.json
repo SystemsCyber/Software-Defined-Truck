@@ -32,7 +32,7 @@
         "ECUs": {
             "title": "Attached ECUs",
             "description": "The ECU(s) attached to the registering SSS3.",
-            "$ref": "AttachedECUs.json"
+            "$ref": "ECUCollection.json"
         }
     }
 }

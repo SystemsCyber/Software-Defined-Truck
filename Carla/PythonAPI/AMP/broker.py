@@ -276,13 +276,16 @@ class Broker(BaseHTTPRequestHandler):
         self.__method_poxy()
 
     def __method_poxy(self):
-        list_name = self.path[1:].upper() + "s"
+        second_slash = self.path.find('/', 1)
+        list_name = self.path[1:second_slash].upper() + "s"
         try:
             device_list = getattr(self, list_name)
         except AttributeError:
             self.send_error(HTTPStatus.NOT_FOUND)
+        verb_name = '_' + self.path[(second_slash + 1):].lower()
+        method_name = 'do_' + self.command.upper() + verb_name
         try:
-            method_handle = getattr(device_list, 'do_' + self.command.upper())
+            method_handle = getattr(device_list, method_name)
             self.send_response(method_handle(self._key, self.rfile))
         except AttributeError:
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)

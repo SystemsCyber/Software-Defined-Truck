@@ -11,10 +11,14 @@ class ClientHandle:
     def __init__(self, sel: selectors.DefaultSelector, blacklist_ips: List) -> None:
         self.sel = sel
         self.blacklist_ips = blacklist_ips
-        with open("ClientRegistration.json", 'rb') as registration_schema:
+        with open("Schemas\ClientPOST.json", 'rb') as registration_schema:
             self.registration_schema = json.load(registration_schema)
 
-    def do_POST(self, key: SEL, rfile: BytesIO) -> None:
+    def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        wfile.write(self.registration_schema)
+        return HTTPStatus.FOUND
+
+    def do_POST_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
         data = json.load(rfile)
         try:
             jsonschema.validate(data, self.registration_schema)
@@ -22,6 +26,20 @@ class ClientHandle:
         except jsonschema.ValidationError:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
+    
+    def do_PUT_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+        return self.do_POST_register(key, rfile)
+    
+    def do_DELETE_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        self.close_connection = True
+        return HTTPStatus.NOT_IMPLEMENTED
+
+    def do_POST_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        return HTTPStatus.NOT_IMPLEMENTED
+
+    def do_DELETE_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+        self.close_connection = True
+        return HTTPStatus.NOT_IMPLEMENTED
 
     def __register(self, key: SEL, data: Dict) -> HTTPStatus:
         key.data.MAC = data["MAC"]
