@@ -1,6 +1,6 @@
 .vs
 .vscode
-.log
+*.log
 Carla/CarlaUE4
 Carla/Co-Simulation
 Carla/Engine

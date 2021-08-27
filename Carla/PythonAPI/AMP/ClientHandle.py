@@ -5,7 +5,7 @@ import selectors
 from io import BytesIO
 from typing import Tuple, List, Dict
 import logging
-from HelperMethods import Schema, Registration
+from HelperMethods import Schema, Device
 
 SEL = selectors.SelectorKey
 
@@ -15,6 +15,7 @@ class ClientHandle:
         self.blacklist_ips = blacklist_ips
         self.registration_schema = Schema.compile_schema("ClientRegistration.json")
         self.request_schema = Schema.compile_schema("ClientRequest.json")
+        self.session_schema = Schema.compile_schema("SessionInformation.json")
 
     def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
         wfile.write(self.registration_schema)
@@ -39,8 +40,8 @@ class ClientHandle:
     def do_POST_session(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
         data = json.load(rfile)
         try:
-            self.registration_schema.validate(data)
-            return self.__register(key, data)
+            self.request_schema.validate(data)
+            return self.__initiate_session_request(key, data)
         except jsonschema.ValidationError:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
@@ -52,7 +53,6 @@ class ClientHandle:
     def __register(self, key: SEL, data: Dict) -> HTTPStatus:
         key.data.MAC = data["MAC"]
         key.data.type = "CLIENT"
-
         registration_check = self.__check_registration(key)
         if registration_check == HTTPStatus.ACCEPTED:
             self.__log_registration(key)
@@ -62,11 +62,8 @@ class ClientHandle:
         sel_map = self.sel.get_map()
         self.duplicates = [key]
         for fd in sel_map:
-            if self.__not_listening_socket(sel_map[fd]):
+            if Device.is_not_listening_socket(sel_map[fd]):
                 return self.__check_already_registered(sel_map[fd], key)
-
-    def __not_listening_socket(self, key: SEL) -> bool:
-        return hasattr(key.data, "MAC")
 
     def __check_already_registered(self, old_key: SEL, new_key: SEL) -> HTTPStatus:
         if old_key.fd == new_key.fd:
@@ -100,6 +97,35 @@ class ClientHandle:
             return HTTPStatus.CONFLICT
         else:
             return HTTPStatus.ACCEPTED
+
+    def __initiate_session_request(self, key: SEL, requested: Dict):
+        if requested["MAC"] != key.data.MAC:
+            self.blacklist_ips.append(key.data.addr[0])
+            self.close_connection = True
+            return HTTPStatus.FORBIDDEN
+        else:
+            members = self.__gather_requested_devices()
+            if len(members) > 1:
+                mcast_pair = self.__find_mcast_pair()
+                self.__notify_session_members(members, mcast_pair)
+                return HTTPStatus.CREATED
+            return HTTPStatus.CONFLICT
+
+    def __gather_requested_devices(self, key: SEL, requested: Dict):
+        available = Device.get_available_ECUs(self.sel)
+        members = [str(key.fd)]
+        for fd in requested["ECUs"].keys():
+            if fd in available:
+                members.append(fd)
+            else:
+                return []
+        return members
+
+    def __find_mcast_pair(self):
+        return
+
+    def __notify_session_members(self, members):
+        return
 
     def __log_registration(self, key: SEL) -> None:
         msg = f'\nNew {key.data.type} connected:\n'

@@ -1,0 +1,39 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "Session Information",
+    "description": "The session information will contain the multicast addresses for Carla and Can traffic.",
+    "type": "object",
+    "examples": [
+        {
+            "CARLA_MCAST": {
+                "$ref": "MulticastIP.json/#/examples/0"
+            },
+            "CAN_MCAST": {
+                "$ref": "MulticastIP.json/#/examples/1"
+            }
+        },
+        {
+            "CARLA_MCAST": {
+                "$ref": "MulticastIP.json/#/examples/2"
+            },
+            "CAN_MCAST": {
+                "$ref": "MulticastIP.json/#/examples/3"
+            }
+        }
+    ],
+    "required": [
+        "CARLA_MCAST",
+        "CAN_MCAST"
+    ],
+    "properties": {
+        "GROUP_ID": {
+            "$ref": "SessionGroupID.json"
+        },
+        "CARLA_MCAST": {
+            "$ref": "MulticastIP.json"
+        },
+        "CAN_MCAST": {
+            "$ref": "MulticastIP.json"
+        }
+    }
+}
