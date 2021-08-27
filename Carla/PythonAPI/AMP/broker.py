@@ -14,6 +14,9 @@ from io import BytesIO
 from SSS3Handle import SSS3Handle
 from ClientHandle import ClientHandle
 from Device import Device
+import logging
+from logging.handlers import TimedRotatingFileHandler
+from HelperMethods import ColoredConsoleHandler
 
 """TODO Notes:
     - We need to set the keep alive function on the teensy.
@@ -121,16 +124,34 @@ class Broker(BaseHTTPRequestHandler):
     # ==================== Initialization ====================
 
     def __init__(self, _host_port=41660, _carla_port=41664, _can_port=41665) -> None:
+        self.__setup_logging()
         self.host_port = _host_port
         self.carla_port = _carla_port
         self.can_port = _can_port
         self.__log_init()
-        self.__log_message("")
         self.sel = selectors.DefaultSelector()
         self.multicast_IPs = self.__init_multicast_ip_list()
         self.blacklist_ips = []
         self.SSS3s = SSS3Handle(self.sel, self.blacklist_ips)
         self.CLIENTs = ClientHandle(self.sel, self.blacklist_ips)
+
+    def __setup_logging(self):
+        logging.basicConfig(
+            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
+            level=logging.DEBUG,
+            handlers=[
+                TimedRotatingFileHandler(
+                    filename="broker_log.log",
+                    when="midnight",
+                    interval=1,
+                    backupCount=7,
+                    encoding='utf-8'
+                    ),
+                ColoredConsoleHandler()
+                ]
+            )
+        # self.logger = logging.getLogger(__name__)
+        # self.logger.setLevel(logging.DEBUG)
 
     def __init_multicast_ip_list(self):
         multicast_ips = []
@@ -142,11 +163,19 @@ class Broker(BaseHTTPRequestHandler):
             })
         return multicast_ips
 
-    def __log_message(self, format, *args):
-        sys.stderr.write("%s - - [%s] %s\n" %
-                         ("SYSTEM",
-                          self.log_date_time_string(),
-                          format%args))
+    def log_error(self, format, *args):
+        address_string = "SERVER"
+        if hasattr(self, "client_address"):
+            address_string = self.client_address[0]
+        logging.error("%s - - %s\n" %
+                         (address_string, format%args))
+
+    def log_message(self, format, *args):
+        address_string = "SERVER"
+        if hasattr(self, "client_address"):
+            address_string = self.client_address[0]
+        logging.info("%s - - %s\n" %
+                         (address_string, format%args))
 
     def __log_init(self) -> None:
         msg = f"Broker initializing with these settings:\n"
@@ -154,7 +183,7 @@ class Broker(BaseHTTPRequestHandler):
         msg += f"\tHost Port: {self.host_port}\n"
         msg += f"\tCarla Port: {self.carla_port}\n"
         msg += f"\tCAN Port: {self.can_port}\n"
-        self.__log_message(msg)
+        self.log_message(msg)
 
     # ==================== Main Server Functions ====================
 
@@ -187,12 +216,15 @@ class Broker(BaseHTTPRequestHandler):
         """Loose connections are accepted connections from devices that don't
         register within 5 seconds of connecting."""
         sel_map = self.sel.get_map()
-        for fd in sel_map:
-            key = sel_map[fd]
-            not_accepted = hasattr(key.data, "accept_by") and (
-                key.data.MAC == "unknown")
-            if not_accepted and (key.data.accept_by < time.time()):
-                self.__shutdown_connection(key)
+        try:
+            for fd in sel_map:
+                key = sel_map[fd]
+                not_accepted = hasattr(key.data, "accept_by") and (
+                    key.data.MAC == "unknown")
+                if not_accepted and (key.data.accept_by < time.time()):
+                    self.__shutdown_connection(key)
+        except RuntimeError:
+            return
 
     def __accept(self, key: selectors.SelectorKey) -> None:
         """Takes a new connection from the listening socket and assigns it its
@@ -276,19 +308,28 @@ class Broker(BaseHTTPRequestHandler):
         self.__method_poxy()
 
     def __method_poxy(self):
-        second_slash = self.path.find('/', 1)
-        list_name = self.path[1:second_slash].upper() + "s"
+        list_name, method_name = self.__parse_path()
         try:
             device_list = getattr(self, list_name)
         except AttributeError:
             self.send_error(HTTPStatus.NOT_FOUND)
-        verb_name = '_' + self.path[(second_slash + 1):].lower()
-        method_name = 'do_' + self.command.upper() + verb_name
+            return
         try:
             method_handle = getattr(device_list, method_name)
             self.send_response(method_handle(self._key, self.rfile))
         except AttributeError:
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)
+
+    def __parse_path(self):
+        second_slash = self.path.find('/', 1)
+        if second_slash == -1:
+            list_name = self.path[1:].upper() + "s"
+            method_name = 'do_' + self.command.upper()
+        else:
+            list_name = self.path[1:second_slash].upper() + "s"
+            verb_name = '_' + self.path[(second_slash + 1):].lower()
+            method_name = 'do_' + self.command.upper() + verb_name 
+        return list_name, method_name
 
     def __write(self, key: selectors.SelectorKey):
         try:

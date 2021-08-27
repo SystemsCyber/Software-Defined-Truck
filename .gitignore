@@ -1,5 +1,6 @@
 .vs
 .vscode
+.log
 Carla/CarlaUE4
 Carla/Co-Simulation
 Carla/Engine
@@ -14,3 +15,4 @@ Carla/CHANGELOG
 Carla/Dockerfile
 Carla/LICENSE
 Carla/README
+Carla/PythonAPI/AMP/*.log

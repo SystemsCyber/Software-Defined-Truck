@@ -4,8 +4,9 @@ from io import BytesIO
 from typing import Dict, Tuple, List
 import json
 import jsonschema
-import os
+import logging
 from collections import namedtuple
+from HelperMethods import Schema, Registration
 
 SEL = selectors.SelectorKey
 
@@ -15,20 +16,20 @@ class SSS3Handle:
         self.sel = sel
         self.blacklist_ips = blacklist_ips
         self.ECU = namedtuple("ECU", ["type", "year", "make", "model", "sn"])
-        base_dir = os.path.abspath(os.getcwd())
-        schema_dir = os.path.join(base_dir, "Schemas")
-        registration_schema_path = os.path.join(schema_dir, "SSS3POST.json")
-        with open(registration_schema_path, 'rb') as registration_schema:
-            schema = json.load(registration_schema)
-        resolver = jsonschema.RefResolver('file:///' + schema_dir.replace("\\", "/") + '/', schema)
-        self.registration_schema = jsonschema.Draft7Validator(schema, resolver=resolver)
+        self.registration_schema = Schema.compile_schema("SSS3Registration.json")
 
     def do_GET(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
-        if self.__device_is_registered(key):
+        if self.__requester_is_client(key):
             wfile.write(self.__get_available_ECUs())
             return HTTPStatus.FOUND
         else:
             return HTTPStatus.PRECONDITION_FAILED
+    
+    def __requester_is_client(self, key) -> bool:
+        if hasattr(key.data, "MAC") and key.data.MAC != "unknown":
+            return hasattr(key.data, "type") and key.data.type == "CLIENT"
+        else:
+            return False
 
     def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
         wfile.write(self.registration_schema)
@@ -53,14 +54,6 @@ class SSS3Handle:
     def do_DELETE_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
-
-    def __device_is_registered(self, key: SEL) -> bool:
-        sel_map = self.sel.get_map()
-        for fd in sel_map:
-            device = sel_map[fd].data
-            if hasattr(device, "MAC") and device.MAC != "unknown":
-                return True
-        return False
 
     def __get_available_ECUs(self) -> Dict:
         available = {}
@@ -109,10 +102,6 @@ class SSS3Handle:
 
     def __check_already_registered(self, old_key: SEL, new_key: SEL) -> HTTPStatus:
         if old_key.fd == new_key.fd:
-            # Same Connection and same MAC might mean the SSS3 is updating its
-            # ECUs or it got rebooted.
-            # if old_key.data.MAC == new_key.data.MAC:
-            #     return HTTPStatus.ALREADY_REPORTED
             # Trying to change MAC address is not allowed and connection will be
             # dropped and device will be banned.
             # else:
@@ -137,16 +126,15 @@ class SSS3Handle:
             return HTTPStatus.ACCEPTED
 
     def __log_registration(self, key: SEL) -> None:
-        print(f'New {key.data.type} connected:')
-        print(f'\tIP: {key.data.addr[0]}')
-        print(f'\tPort: {key.data.addr[1]}')
-        print(f'\tMAC: {key.data.MAC}')
-        print("\tECUs: ")
+        msg = f'\nNew {key.data.type} connected:\n'
+        msg += f'\tIP: {key.data.addr[0]}\n'
+        msg += f'\tPort: {key.data.addr[1]}\n'
+        msg += f'\tMAC: {key.data.MAC}\n'
+        msg += "\tECUs: \n"
         for i in key.data.ECUs:
-            print(f'\t\tType: {i.type}')
-            print(f'\t\tYear: {i.year}')
-            print(f'\t\tMake: {i.make}')
-            print(f'\t\tModel: {i.model}')
-            print(f'\t\tS/N: {i.sn}')
-            print()
-        print()
+            msg += f'\t\tType: {i.type}\n'
+            msg += f'\t\tYear: {i.year}\n'
+            msg += f'\t\tMake: {i.make}\n'
+            msg += f'\t\tModel: {i.model}\n'
+            msg += f'\t\tS/N: {i.sn}\n'
+        logging.info(msg)
