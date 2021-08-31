@@ -13,15 +13,15 @@ class ClientHandle:
     def __init__(self, sel: selectors.DefaultSelector, blacklist_ips: List) -> None:
         self.sel = sel
         self.blacklist_ips = blacklist_ips
-        self.registration_schema = Schema.compile_schema("ClientRegistration.json")
-        self.request_schema = Schema.compile_schema("ClientRequest.json")
-        self.session_schema = Schema.compile_schema("SessionInformation.json")
+        self.registration_schema, self.registration_schema_file = Schema.compile_schema("ClientRegistration.json")
+        self.request_schema, _ = Schema.compile_schema("ClientRequest.json")
+        self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
 
-    def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
-        wfile.write(self.registration_schema)
+    def do_GET_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+        wfile.write(bytes(json.dumps(self.registration_schema_file), "utf-8"))
         return HTTPStatus.FOUND
 
-    def do_POST_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+    def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         data = json.load(rfile)
         try:
             self.registration_schema.validate(data)
@@ -30,14 +30,14 @@ class ClientHandle:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
     
-    def do_PUT_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
-        return self.do_POST_register(key, rfile)
+    def do_PUT_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+        return self.do_POST_register(key, rfile, wfile)
     
-    def do_DELETE_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
 
-    def do_POST_session(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+    def do_POST_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         data = json.load(rfile)
         try:
             self.request_schema.validate(data)
@@ -46,7 +46,7 @@ class ClientHandle:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
 
-    def do_DELETE_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
 

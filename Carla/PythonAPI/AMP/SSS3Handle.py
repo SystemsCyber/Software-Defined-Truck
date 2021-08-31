@@ -17,21 +17,21 @@ class SSS3Handle:
         self.blacklist_ips = blacklist_ips
         self.ECU = namedtuple("ECU", ["type", "year", "make", "model", "sn"])
         self.session = namedtuple("Session", ["CARLA_MCAST", "CAN_MCAST"])
-        self.registration_schema = Schema.compile_schema("SSS3Registration.json")
-        self.session_schema = Schema.compile_schema("SessionInformation.json")
+        self.registration_schema, _ = Schema.compile_schema("SSS3Registration.json")
+        self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
 
-    def do_GET(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_GET(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         if Device.is_client(key):
             wfile.write(Device.get_available_ECUs(self.sel))
             return HTTPStatus.FOUND
         else:
             return HTTPStatus.PRECONDITION_FAILED
 
-    def do_GET_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_GET_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         wfile.write(self.registration_schema)
         return HTTPStatus.FOUND
 
-    def do_POST_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
+    def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         data = json.load(rfile)
         try:
             self.registration_schema.validate(data)
@@ -40,14 +40,14 @@ class SSS3Handle:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
     
-    def do_PUT_register(self, key: SEL, rfile: BytesIO) -> HTTPStatus:
-        return self.do_POST_register(key, rfile)
+    def do_PUT_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+        return self.do_POST_register(key, rfile, wfile)
     
-    def do_DELETE_register(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
 
-    def do_DELETE_session(self, key: SEL, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
 

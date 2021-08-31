@@ -123,8 +123,9 @@ class Broker(BaseHTTPRequestHandler):
 
     # ==================== Initialization ====================
 
-    def __init__(self, _host_port=41660, _carla_port=41664, _can_port=41665) -> None:
+    def __init__(self, _host_port=80, _carla_port=41664, _can_port=41665) -> None:
         self.__setup_logging()
+        self.protocol_version = "HTTP/1.1"
         self.host_port = _host_port
         self.carla_port = _carla_port
         self.can_port = _can_port
@@ -176,6 +177,25 @@ class Broker(BaseHTTPRequestHandler):
             address_string = self.client_address[0]
         logging.info("%s - - %s\n" %
                          (address_string, format%args))
+
+    # Overriding the parent's function because they did it wrong
+    def end_headers(self):
+        """Send the blank line ending the MIME headers."""
+        self.wfile.seek(0)
+        message_body = self.wfile.read()
+        self.wfile.seek(0)
+        self.send_header("content-length", str(len(message_body)))
+        if self.request_version != 'HTTP/0.9':
+            self._headers_buffer.append(b"\r\n")
+            self.flush_headers(message_body)
+
+    # Overriding the parent's function because they did it wrong
+    def flush_headers(self, message_body=b""):
+        if hasattr(self, '_headers_buffer'):
+            headers = b"".join(self._headers_buffer)
+            self.wfile.write(headers)
+            self.wfile.write(message_body)
+            self._headers_buffer = []
 
     def __log_init(self) -> None:
         msg = f"Broker initializing with these settings:\n"
@@ -261,6 +281,9 @@ class Broker(BaseHTTPRequestHandler):
                                 selectors.EVENT_WRITE, self._key.data)
             except BlockingIOError:
                 pass
+            except ConnectionResetError as cre:
+                key.data.close_connection = True
+                self.log_error(f'{cre}')
 
     def __rate_limit(self, key: selectors.SelectorKey) -> bool:
         now = time.time()
@@ -316,7 +339,9 @@ class Broker(BaseHTTPRequestHandler):
             return
         try:
             method_handle = getattr(device_list, method_name)
-            self.send_response(method_handle(self._key, self.rfile))
+            self.send_response(method_handle(self._key, self.rfile, self.wfile))
+            if not self.close_connection:
+                self.send_header("connection", "keep-alive")
         except AttributeError:
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)
 

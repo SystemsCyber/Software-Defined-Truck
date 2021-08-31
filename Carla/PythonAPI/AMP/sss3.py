@@ -7,6 +7,7 @@ import os
 import re
 from typing import Union, Tuple, List, Dict, Optional
 from frame import Frame
+import requests
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -25,45 +26,21 @@ else:
 
 
 class SSS3:
-    """SSS3 communication utility in conjunction with the CARLA simulator
+    """SSS3 communication utility in conjunction with the CARLA simulator"""
 
-    Multicast allocation notes: 
-        The multicast address range assigned for "Organization IPv4 Local Scope
-        use" is 239.255.0.0/16. As such we must stay in this range.
-        Unfortunately we still may run into conflicts, so upon creation of the
-        SSS3 object it will allocate two multicast address and ports that are to
-        the best of its ability, considered free to use.
-    """
-
-    def __init__(self, _address: ADDR_LIST, _mcast_address: Optional[str] = None) -> RETURN_ADDR_T:
-        """
-        Parameters
-        ----------
-        List of addresses (ip, port) of SSS3s.
-        Optional - Multicast address for SSS3s to use.
-
-        Returns
-        -------
-        The list of addresses of SSS3s that were setup correctly. If no SSS3s
-        were setup correctly then an empty list is returned.
-        """
-        self.address = _address
+    def __init__(self, _server_address = socket.gethostname()) -> None:
         self.carla_port = 41664
         self.can_port = 41665
         self.frame = Frame()
         self.dropped_messages = 0
         self.timeouts = 0
         self.seq_miss_match = 0
-        if _mcast_address:
-            self.mcast_ip = _mcast_address
-            sock_pair = socket.socketpair(
-                socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-            self.socks = {"carla": sock_pair[0], "can": sock_pair[1]}
-            self.__set_mcast_options(_mcast_address, self.socks)
-        else:
-            self.mcast_ip, self.socks = self.__allocate_mcast_addr()
-        # TODO add functions to maintain hold on multicast address
-        return self.__setup_sss3(_address)
+        self.__register(_server_address)
+
+    def __register(self, _server_address: str) -> None:
+        controller = requests.Session()
+        response = controller.get("http://192.168.1.141:80/client/register", headers={'host': 'www.example.com'}, stream=False)
+        print(response.text)
 
     def send(self, control) -> None:
         message = self.frame.pack(control)
@@ -140,7 +117,7 @@ class SSS3:
                 continue
         return True  # Times out for all addresses in dictionary
 
-    def __setup_sss3(self, _address: ADDR_LIST) -> RETURN_ADDR_T:
+    def __setup_sss3(self, _address: ADDR_LIST):
         source_addr = (self.__find_source_address(), _address[0][1])
         successfully_setup = []
         for address in _address:
@@ -189,3 +166,7 @@ class SSS3:
             else:
                 print(f"Error: {err}")
                 raise
+
+
+if __name__ == '__main__':
+    sss3object = SSS3()

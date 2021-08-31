@@ -16,7 +16,7 @@ class Schema:
         with open(schema_path, 'rb') as schema_file:
             schema = json.load(schema_file)
         resolver = jsonschema.RefResolver('file:///' + schema_dir.replace("\\", "/") + '/', schema)
-        return jsonschema.Draft7Validator(schema, resolver=resolver)
+        return jsonschema.Draft7Validator(schema, resolver=resolver), schema
 
     @staticmethod
     def find_schema_folder():
