@@ -7,7 +7,11 @@ import os
 import re
 from typing import Union, Tuple, List, Dict, Optional
 from frame import Frame
-import requests
+import selectors
+from types import SimpleNamespace
+from getmac import get_mac_address as gma
+import json
+import http.client
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -35,12 +39,95 @@ class SSS3:
         self.dropped_messages = 0
         self.timeouts = 0
         self.seq_miss_match = 0
-        self.__register(_server_address)
+        self.sel = selectors.DefaultSelector()
+        if self.__connect_to_server(_server_address):
+            self.__set_keepalive(self.ctrl.sock, 300000, 300000)
+            self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
+            # self.__register(gma())
+            self.__register("00:0C:29:DE:AD:BE")
 
-    def __register(self, _server_address: str) -> None:
-        controller = requests.Session()
-        response = controller.get("http://192.168.1.141:80/client/register", headers={'host': 'www.example.com'}, stream=False)
-        print(response.text)
+    def __connect_to_server(self, _server_address: str):
+        try:
+            self.ctrl = http.client.HTTPConnection(_server_address)
+        except http.client.GATEWAY_TIMEOUT:
+            print("something about gateway timeout")
+            return self.__retry_connect_to_server(_server_address)
+        except http.client.REQUEST_TIMEOUT:
+            print("Something about request timeout")
+            return self.__retry_connect_to_server(_server_address)
+        else:
+            print("Something about successfully connecting to server")
+            return True
+
+    def __retry_connect_to_server(self, _server_address: str):
+        print("Something about retrying connection to server")
+        try:
+            self.ctrl = http.client.HTTPConnection(_server_address)
+        except http.client.GATEWAY_TIMEOUT:
+            print("something about gateway timeout")
+            print("something about server being unreachable")
+            return False
+        except http.client.REQUEST_TIMEOUT:
+            print("Something about request timeout")
+            print("Something about server being unreachable")
+            return False
+        else:
+            print("Something about successfully connecting to server")
+            return True
+    
+    def __set_keepalive(self, conn: socket.socket, idle_sec: int, interval_sec: int) -> None:
+        if os.name == 'nt':
+            conn.ioctl(socket.SIO_KEEPALIVE_VALS, (1, idle_sec, interval_sec))
+        else:
+            conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, idle_sec)
+            conn.setsockopt(socket.IPPROTO_TCP,
+                            socket.TCP_KEEPINTVL, interval_sec)
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
+
+    def __wait_for_socket(self, timeout=None):
+        try:
+            if self.sel.select(timeout=timeout):
+                return True
+        except TimeoutError:
+            print("Log something about server being disconnected")
+            return False
+        except KeyboardInterrupt:
+            return False
+    
+    def __send_registration(self, registration: str) -> http.client.HTTPResponse:
+        try:
+            self.ctrl.request("POST", "/client/register", registration)
+            self.sel.modify(self.ctrl.sock, selectors.EVENT_READ)
+        except http.client.HTTPException as httpe:
+            self.__handle_connection_errors(httpe)
+        else:
+            if self.__wait_for_socket():
+                return self.ctrl.getresponse()
+
+    def __register(self, mac: str) -> None:
+        registration = json.dumps({"MAC": mac})
+        print("Something about sending registration")
+        self.response = self.__send_registration(registration)
+        if self.response.status == 202:
+            print("something about being successfully registered")
+        else:
+            print("Something about unable to register or server rejected registration")
+            print("The response code for why the registration was rejected.")
+
+    def __handle_connection_errors(self, error):
+        pass
+
+    def get_available_devices(self):
+        try:
+            print("something about requesting available devices.")
+            self.ctrl.request("GET", "/sss3")
+        except http.client.HTTPException as httpe:
+            self.__handle_connection_errors(httpe)
+        else:
+            if self.__wait_for_socket():
+                self.response = self.ctrl.getresponse()
+                return self.response
 
     def send(self, control) -> None:
         message = self.frame.pack(control)
@@ -74,28 +161,6 @@ class SSS3:
             print(
                 f'Sequence number miss match. Total: {self.seq_miss_match}')
 
-    def __allocate_mcast_addr(self) -> MCAST_SOCKS:
-        try:
-            return self.__test_mcast_addr_range()
-        except OSError as err:
-            print(f"OS error: {err}")
-            raise
-        except Exception as err:
-            print(f"Error: {err}")
-            raise
-
-    def __test_mcast_addr_range(self) -> MCAST_SOCKS:
-        for a in range(255, 0, -1):
-            for b in range(255, 0, -1):
-                mcast_grp = "239.255." + str(a) + "." + str(b)
-                sock_pair = socket.socketpair(
-                    socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-                sock_dict = {"carla": sock_pair[0], "can": sock_pair[1]}
-                self.__set_mcast_options(mcast_grp, sock_dict)
-                if self.__check_mcast_address(sock_dict):
-                    return mcast_grp, sock_dict
-        raise Exception("No available multicast address could be found.")
-
     def __set_mcast_options(self, mcast_grp, socks: SOCK_DICT) -> None:
         for key, sock in socks.items():
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
@@ -105,17 +170,6 @@ class SSS3:
             sock.setsockopt(socket.IPPROTO_IP,
                             socket.IP_ADD_MEMBERSHIP, mreq)
             sock.settimeout(0.4)
-
-    def __check_mcast_address(self, socks: SOCK_DICT) -> bool:
-        for sock in socks.values():
-            try:
-                sock.recv(1)
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-                return False
-            except socket.timeout:  # Timing out means mcast addr is free
-                continue
-        return True  # Times out for all addresses in dictionary
 
     def __setup_sss3(self, _address: ADDR_LIST):
         source_addr = (self.__find_source_address(), _address[0][1])

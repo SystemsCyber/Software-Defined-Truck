@@ -22,11 +22,14 @@ class ClientHandle:
         return HTTPStatus.FOUND
 
     def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        data = json.load(rfile)
         try:
+            data = json.load(rfile)
             self.registration_schema.validate(data)
             return self.__register(key, data)
         except jsonschema.ValidationError:
+            self.close_connection = True
+            return HTTPStatus.BAD_REQUEST
+        except json.decoder.JSONDecodeError:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
     
@@ -38,14 +41,17 @@ class ClientHandle:
         return HTTPStatus.NOT_IMPLEMENTED
 
     def do_POST_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        data = json.load(rfile)
         try:
+            data = json.loads(rfile)
             self.request_schema.validate(data)
             return self.__initiate_session_request(key, data)
         except jsonschema.ValidationError:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
-
+        except json.decoder.JSONDecodeError:
+            self.close_connection = True
+            return HTTPStatus.BAD_REQUEST
+    
     def do_DELETE_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.close_connection = True
         return HTTPStatus.NOT_IMPLEMENTED
