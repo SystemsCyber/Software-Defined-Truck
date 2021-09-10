@@ -199,18 +199,18 @@ bool EthernetCarla::sendConfig(unsigned long *lastAttempt)
     if (_controller.connect(_config.serverIP, _config.serverPort))
     {
         Serial.println("connected.");
-        Serial.print("Generating configuration message... ");
-        struct device_config
-        {
-            uint8_t mac[6];
-            struct LoadConfiguration::DEVICE attachedDevice;
-        } config;
-        memcpy(config.mac, _config.mac.data(), sizeof(config.mac));
-        memcpy(&config.attachedDevice, &_config.attachedDevice, sizeof(_config.attachedDevice));
-        Serial.println("complete.");
+        // Serial.print("Generating configuration message... ");
+        // struct device_config
+        // {
+        //     uint8_t mac[6];
+        //     struct LoadConfiguration::DEVICE attachedDevice;
+        // } config;
+        // memcpy(config.mac, _config.mac.data(), sizeof(config.mac));
+        // memcpy(&config.attachedDevice, &_config.attachedDevice, sizeof(_config.attachedDevice));
+        // Serial.println("complete.");
         Serial.print("Sending configuration message... ");
         // _controller.write(reinterpret_cast<uint8_t *>(&config), sizeof(config));
-        _controller.write("POST * HTTP/1.1\r\nKeep-Alive: True\r\n\r\nHello from the SSS3");
+        _controller.write("POST /sss3/register HTTP/1.1\r\nConnection: keep-alive\r\n\r\n" + config.config_as_string);
         _controller.flush();
         Serial.println("complete.");
         return false;
@@ -252,7 +252,7 @@ bool EthernetCarla::checkForCommand()
     }
     else
     {
-        heartbeat();
+        // heartbeat();
     }
     return false;
 }

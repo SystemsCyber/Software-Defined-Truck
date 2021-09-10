@@ -25,6 +25,8 @@ public:
 
     std::array<uint8_t, 6> mac;
     IPAddress serverIP;
+    StaticJsonDocument<256> config;
+    String config_as_string;
     char FQDN[256]; // FQDN can be up to 255 characters long.
     unsigned int serverPort;
 

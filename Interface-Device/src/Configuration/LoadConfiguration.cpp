@@ -9,12 +9,12 @@
 LoadConfiguration::LoadConfiguration(const char *filename) : _filename(filename)
 {
     File file = initializeSD(filename);
-    StaticJsonDocument<256> config;
     DeserializationError error = deserializeJson(config, file);
     if (error)
     {
         printDefaultSDFormatOnError();
     }
+    serializeJson(config, config_as_string)
     char macPtr[18];
     strncpy(macPtr, config["mac"], (size_t)18);
     mac = stringToByte(macPtr, ":", 16);
