@@ -1,58 +1,54 @@
 #include <Arduino.h>
-#include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <EthernetCarla/EthernetCarla.h>
-#include <Configuration/LoadConfiguration.h>
-#include <Dns.h>
-#include <string>
+#include <HTTPClient/HTTPClient.h>
 
 int EthernetCarla::init()
 {
-    LoadConfiguration config(_filename);
-    _config = config;
-    Serial.println("Setting up Ethernet:");
-    Serial.println("\t-> Initializing the Ethernet shield to use the provided MAC address");
-    Serial.println("\t   and retreving network configuration parameters through DHCP.");
-    int success = ethernetBegin(Ethernet.begin(_config.mac.data()));
-    if (success)
+    int ethernetInitialization = server.init();
+    if (ethernetInitialization)
     {
-        registerWithServer();
+        if (server.enlist())
+        {
+            Serial.println("Successfully registered with the server.");
+            return true;
+        }
+        else
+        {
+            unsuccessfulRegistration();
+        }
     }
-    return success;
+    return false;
 }
 
 int EthernetCarla::monitor(bool verbose)
 {
-    if (checkForCommand())
+    bool CheckForSSE = server.readSSE();
+    if (server.requestError.length() > 0)
     {
-        mcastIP = _mcast.mcastIP;
-        if (_mcast.mcastIP[0] == 0)
-        {
-            stopDataOperations();
-        }
-        else if ((_mcast.carlaPort == 0) || (_mcast.canPort == 0))
-        {
-            Serial.print("Bad command received... discarding.");
-            return 0;
-        }
-        else
-        {
-            startDataOperations();
-        }
+        Serial.println("Bad command received... discarding.");
+    }
+    else if (CheckForSSE && server.requestMethod.equalsIgnoreCase("Post"))
+    {
+        do_POST();
+    }
+    else if (CheckForSSE && server.requestMethod.equalsIgnoreCase("Delete"))
+    {
+        do_DELETE();
     }
     return read(verbose);
 }
 
 int EthernetCarla::read(bool verbose)
 {
-    int packetSize = _carla.parsePacket();
+    int packetSize = carla.parsePacket();
     if (packetSize)
     {
-        _carla.read(_rxBuffer, CARLA_PACKET_SIZE);
+        carla.read(_rxBuffer, CARLA_PACKET_SIZE);
         memcpy(&_frame, _rxBuffer, sizeof(_frame));
         if (verbose)
         {
-            dumpPacket(_rxBuffer, packetSize, _carla.remoteIP());
+            dumpPacket(_rxBuffer, packetSize, carla.remoteIP());
             dumpFrame(_frame);
         }
     }
@@ -66,9 +62,9 @@ int EthernetCarla::write(const char *txBuffer, int size)
 
 int EthernetCarla::write(const char *txBuffer, size_t size)
 {
-    _can.beginPacket(mcastIP, _mcast.canPort);
-    _can.write(txBuffer, size);
-    return _can.endPacket();
+    can.beginPacket(mcastIP, canPort);
+    can.write(txBuffer, size);
+    return can.endPacket();
 }
 
 void EthernetCarla::dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP)
@@ -112,195 +108,67 @@ void EthernetCarla::dumpFrame(CARLA_UDP frame)
     Serial.println(frame.gear);
 }
 
-int EthernetCarla::ethernetBegin(int success)
+void EthernetCarla::unsuccessfulRegistration()
 {
-    if (success) // Ethernet begin returns 0 when successful
+    Serial.println("Server did not accept this devices registration.");
+    if (server.responseError.length() == 0)
     {
-        checkHardware();
-        Serial.println("\t***Successfully configured Ethernet using DHCP.***");
-        Serial.println();
-        Serial.println("Network Configuration:");
-        Serial.print("\tHostname: ");
-        Serial.print("WIZnet");
-        Serial.print(_config.mac[3], HEX);
-        Serial.print(_config.mac[4], HEX);
-        Serial.println(_config.mac[5], HEX);
-        Serial.print("\tIP Address: ");
-        Serial.println(Ethernet.localIP());
-        Serial.print("\tNetmask: ");
-        Serial.println(Ethernet.subnetMask());
-        Serial.print("\tGateway IP: ");
-        Serial.println(Ethernet.gatewayIP());
-        Serial.print("\tDNS Server IP: ");
-        Serial.println(Ethernet.dnsServerIP());
+        Serial.println("Response Code: " + String(server.responseCode));
+        Serial.println("Response Reason: " + server.responseReason);
+        Serial.println("Response Message: " + server.responseMessage);
     }
     else
     {
-        checkHardware();
-        Serial.println("\t***Failed to configure Ethernet using DHCP***");
-        
-    }
-    return success;
-}
-
-void EthernetCarla::checkHardware()
-{
-    Serial.println("\t\t-> Checking for valid Ethernet shield.");
-    if (Ethernet.hardwareStatus() == EthernetNoHardware)
-    {
-        Serial.println("\t\t***Failed to find valid Ethernet shield.***");
-    }
-    else
-    {
-        Serial.println("\t\t***Valid Ethernet shield was detected.***");
-    }
-    checkLink();
-}
-
-void EthernetCarla::checkLink()
-{
-    Serial.println("\t\t-> Checking if Ethernet cable is connected.");
-    if (Ethernet.linkStatus() == LinkOFF)
-    {
-        Serial.println("\t\t***Ethernet cable is not connected or the WIZnet chip was not");
-        Serial.println("\t\t   able to establish a link with the router or switch.***");
-    }
-    else
-    {
-        Serial.println("\t\t***Ethernet cable is connected and a valid link was established.***");
+        Serial.println("Failed to parse server response because " + server.responseError);
     }
 }
 
-void EthernetCarla::registerWithServer()
+void EthernetCarla::do_POST()
 {
-    if (!(_config.FQDN[0] >= '0' && _config.FQDN[0] <= '9'))
-    {
-        DNSClient dns;
-        dns.begin(Ethernet.dnsServerIP());
-        dns.getHostByName(_config.FQDN, _config.serverIP);
-    }
-    unsigned long lastAttempt = 0;
-    const unsigned long retryInterval = 60 * 1000;
-    bool keepTrying = sendConfig(&lastAttempt);
-    while (keepTrying)
-    {
-        if (millis() - lastAttempt > retryInterval)
-        {
-            keepTrying = sendConfig(&lastAttempt);
-        }
-    }
-}
-
-bool EthernetCarla::sendConfig(unsigned long *lastAttempt)
-{
-    Serial.print("Connecting to the Control Server at ");
-    Serial.print(_config.serverIP);
-    Serial.print("... ");
-    if (_controller.connect(_config.serverIP, _config.serverPort))
-    {
-        Serial.println("connected.");
-        // Serial.print("Generating configuration message... ");
-        // struct device_config
-        // {
-        //     uint8_t mac[6];
-        //     struct LoadConfiguration::DEVICE attachedDevice;
-        // } config;
-        // memcpy(config.mac, _config.mac.data(), sizeof(config.mac));
-        // memcpy(&config.attachedDevice, &_config.attachedDevice, sizeof(_config.attachedDevice));
-        // Serial.println("complete.");
-        Serial.print("Sending configuration message... ");
-        // _controller.write(reinterpret_cast<uint8_t *>(&config), sizeof(config));
-        _controller.write("POST /sss3/register HTTP/1.1\r\nConnection: keep-alive\r\n\r\n" + config.config_as_string);
-        _controller.flush();
-        Serial.println("complete.");
-        return false;
-    }
-    else
-    {
-        *lastAttempt = millis();
-        Serial.println("connection failed.");
-        Serial.println("Retrying in 60 seconds.");
-        Serial.println();
-        return true;
-    }
-}
-
-bool EthernetCarla::checkForCommand()
-{
-    Ethernet.maintain(); //Keep current address assigned by DHCP server.
-    if (_controller.available())
-    {
-        int commandSize = _controller.read(setupBuffer, SETUP_PACKET_SIZE);
-        if (commandSize == 16)
-        {
-            Serial.print("New command from: ");
-            Serial.println(_controller.remoteIP());
-            memcpy(&_mcast, setupBuffer, sizeof(_mcast));
-            Serial.println("Acknowledging that the command has been received.");
-            _controller.write((uint8_t)1);
-            return true;
-        }
-        else
-        {
-            discardPacket(_controller, commandSize);
-        }
-    }
-    else if (!_controller.connected())
-    {
-        Serial.println("Lost connection to the Control Server. Trying to re-connect...");
-        registerWithServer();
-    }
-    else
-    {
-        // heartbeat();
-    }
-    return false;
-}
-
-void EthernetCarla::startDataOperations()
-{
-    Serial.println("Data operations starting...");
+    mcastIP = parseIPAddress(server.requestData["IP"]);
+    canPort = server.requestData["CAN_PORT"];
+    carlaPort = server.requestData["CARLA_PORT"];
+    Serial.println("Starting new session...");
     Serial.println("Configuration: ");
     Serial.print("IP: ");
     Serial.println(mcastIP);
     Serial.print("CARLA Port: ");
-    Serial.println(_mcast.carlaPort);
+    Serial.println(carlaPort);
     Serial.print("CAN Port: ");
-    Serial.println(_mcast.canPort);
-    _carla.beginMulticast(mcastIP, _mcast.carlaPort);
-    _can.beginMulticast(mcastIP, _mcast.canPort);
+    Serial.println(canPort);
+    carla.beginMulticast(mcastIP, carlaPort);
+    can.beginMulticast(mcastIP, canPort);
 }
 
-void EthernetCarla::stopDataOperations()
+void EthernetCarla::do_DELETE()
 {
     Serial.print("Data operations shutting down...");
-    _carla.stop();
-    _can.stop();
+    carla.stop();
+    can.stop();
+    mcastIP = IPAddress();
+    canPort = 0;
+    carlaPort = 0;
     Serial.println("complete.");
     Serial.println("Waiting for next setup command.");
 }
 
-void EthernetCarla::heartbeat()
+IPAddress EthernetCarla::parseIPAddress(String IP)
 {
-    if (millis() - _lastHeartbeat > _heartbeatInterval)
+    char IP_c_str[IP.length()];
+    IP.toCharArray(IP_c_str, IP.length());
+    char *tokenized;
+    tokenized = strtok(IP_c_str, ".");
+    uint8_t IPArray[4];
+    int count = 0;
+    while (tokenized != NULL)
     {
-        Serial.print("Sending heartbeat... ");
-        _controller.write(reinterpret_cast<char *>(&_config.mac));
-        _controller.flush();
-        Serial.println("complete.");
-        _lastHeartbeat = millis();
+        if (count > 4)
+        {
+            Serial.println("ERROR received incorrectly formatted IP Address.");
+            return mcastIP;
+        }
+        IPArray[count] = (uint8_t) tokenized;
+        tokenized = strtok(NULL, ".");
     }
-}
-
-void EthernetCarla::discardPacket(EthernetClient &newCommand, int commandSize)
-{
-    Serial.print("A packet has been received from ");
-    Serial.print(newCommand.remoteIP());
-    Serial.println(", but has been discarded due to it being the wrong size.");
-    Serial.print("Packet size received: ");
-    Serial.print(commandSize);
-    Serial.println(" bytes.");
-    Serial.println("Packet size required: ");
-    Serial.print(SETUP_PACKET_SIZE);
-    Serial.println(" bytes.");
+    return IPAddress(IPArray);
 }

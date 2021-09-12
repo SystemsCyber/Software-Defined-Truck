@@ -10,34 +10,23 @@
 
 class LoadConfiguration
 {
-private:
-    const char *_filename;
-
 public:
     // MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
-    struct DEVICE
-    {
-        char type[8];
-        uint16_t year;
-        char make[11];
-        char model[11];
-    } attachedDevice;
-
-    std::array<uint8_t, 6> mac;
+    uint8_t mac[6];
+    String macString;
     IPAddress serverIP;
-    StaticJsonDocument<256> config;
-    String config_as_string;
+    DynamicJsonDocument config;
     char FQDN[256]; // FQDN can be up to 255 characters long.
-    unsigned int serverPort;
 
-    LoadConfiguration() : LoadConfiguration("/config.txt") {}
-    LoadConfiguration(const char *filename);
+    LoadConfiguration();
 
 private:
+    void readMACAddress();
+    void readLowLevelData(uint8_t word, uint8_t loc);
     File initializeSD(const char *filename);
     File fileExists(const char *filename);
     File openFile(const char *filename);
-    void printDefaultSDFormatOnError();
+    bool deserializeConfiguration(File file);
     std::array<uint8_t, 6> stringToByte(char *config, const char *delim, int base);
     void printConfiguration();
 };

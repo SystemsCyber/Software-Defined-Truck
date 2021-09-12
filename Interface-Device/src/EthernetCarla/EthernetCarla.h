@@ -2,36 +2,25 @@
 #define ethernet_carla_h_
 
 #include <Arduino.h>
-#include <Ethernet.h>
 #include <EthernetUdp.h>
-#include <Configuration/LoadConfiguration.h>
-#include <vector>
+#include <HTTPClient/HTTPClient.h>
+#include <IPAddress.h>
 
 #define CARLA_PACKET_SIZE 20
-#define SETUP_PACKET_SIZE 16
 
 class EthernetCarla
 {
 private:
-    struct MCAST_SETUP
-    {
-        uint8_t mcastIP[4]; // IPv4 multicast address
-        int carlaPort;
-        int canPort;
-    } _mcast;
+    HTTPClient server;
+    EthernetUDP carla;      // Multicast socket to receive CARLA frames from.
+    EthernetUDP can;        // Multicast socket to send CAN frames on.
+
     IPAddress mcastIP;
-    const char *_filename;
-    LoadConfiguration _config;
-    unsigned long _lastHeartbeat = 0;
-    const unsigned long _heartbeatInterval = 60 * 1000;
+    int carlaPort;
+    int canPort;
+
 public:
     uint8_t _rxBuffer[CARLA_PACKET_SIZE];   // Buffer to hold incoming carla messages.
-    uint8_t setupBuffer[SETUP_PACKET_SIZE]; // Buffer to hold incoming setup messages.
-    EthernetClient _controller;          // Controller currently connected to the server.
-    EthernetUDP _heartbeat;              // UDP socket for directly connecting to CARLA client.
-    EthernetUDP _carla;                  // UDP Multicast socket to receive CARLA frames from.
-    EthernetUDP _can;                    // UDP Multicast socket to send CAN frames on.
-    bool newCommand = false;
 
     struct CARLA_UDP // CARLA frame information struct
     {
@@ -41,9 +30,7 @@ public:
         uint8_t gear;
     } _frame;
 
-    EthernetCarla() : EthernetCarla("/config.txt") {}
-    EthernetCarla(const char *filename) : _filename(filename) {}
-    // Initialize using the parameters provided via the SD Card.
+    EthernetCarla() = default;
     // Returns 1 if successful, 0 otherwise.
     int init();
     // Begin monitoring all interfaces for activity and respond appropriately.
@@ -64,26 +51,11 @@ public:
     static void dumpFrame(CARLA_UDP frame);
 
 private:
-    // Initialise the Ethernet shield to use the provided MAC address and
-    // gain the rest of the configuration through DHCP.
-    // Returns 0 if the DHCP configuration failed, and 1 if it succeeded.
-    int ethernetBegin(int success);
-    static void checkHardware();
-    static void checkLink();
-    // Send configuration info to the server. If the connection to the server
-    // fails, retry every minute and print the time to show that the program is
-    // still running.
-    // Returns once it has successfully send the data to the server.
-    void registerWithServer();
-    bool sendConfig(unsigned long *lastAttempt);
-    // Check for new connections and/or new packets.
-    // If there are new setup instructions then update the class settings.
-    bool checkForCommand();
-    void startDataOperations();
-    void stopDataOperations();
+    void unsuccessfulRegistration();
+    void do_POST();
+    void do_DELETE();
 
-    void heartbeat();
-    void discardPacket(EthernetClient &newCommand, int commandSize);
+    IPAddress parseIPAddress(String IP);
 };
 
 #endif /* ethernet_carla_h_ */

@@ -14,7 +14,7 @@
 // char replyBuffer[64];                       //Buffer to hold outgoing packet
 
 
-EthernetCarla carla("/config.txt");
+EthernetCarla carla;
 // EthernetUDP udp;
 
 void setup() {

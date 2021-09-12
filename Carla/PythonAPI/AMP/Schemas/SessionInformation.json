@@ -29,11 +29,16 @@
         "GROUP_ID": {
             "$ref": "SessionGroupID.json"
         },
-        "CARLA_MCAST": {
+        "IP": {
             "$ref": "MulticastIP.json"
         },
-        "CAN_MCAST": {
+        "CAN_PORT": {
             "$ref": "MulticastIP.json"
+        },
+        "CARLA_PORT": {
+            "type": "number",
+            "maximum": 65535,
+            "minimum": 1025
         }
     }
 }
