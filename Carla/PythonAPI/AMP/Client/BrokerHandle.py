@@ -5,18 +5,39 @@ import http.client
 import selectors
 import logging
 import os
+from ipaddress import IPv4Address, AddressValueError
+from io import BytesIO
+from http.server import BaseHTTPRequestHandler
 from logging.handlers import TimedRotatingFileHandler
 from HelperMethods import ColoredConsoleHandler, Schema
 from getmac import get_mac_address as gma
 
-class BrokerHandle:
+class BrokerHandle(BaseHTTPRequestHandler):
     def __init__(self, _sel: selectors.DefaultSelector, _server_address = socket.gethostname()) -> None:
         self.__setup_logging()
         self.mac = gma()
         self.sel = _sel
         self.server_address = _server_address
+        self.protocol_version = "HTTP/1.1"
+        self.close_connection = False
         self.request_schema = Schema.compile_schema("RequestECUs.json")
+        self.session_schema = Schema.compile_schema("SessionInformation.json")
+        self.mcast_IP = IPv4Address()
+        self.can_port = 0
+        self.carla_port = 0
         # self.mac = "00:0C:29:DE:AD:BE"
+
+    # Overrides for the parent functions
+
+    def log_error(self, format, *args):
+        logging.error("%s - - %s\n" %
+                         ("SERVER", format%args))
+
+    def log_message(self, format, *args):
+        logging.info("%s - - %s\n" %
+                         ("SERVER", format%args))
+    
+    # ----------------------------------
 
     def __setup_logging(self) -> None:
         logging.basicConfig(
@@ -176,3 +197,69 @@ class BrokerHandle:
             logging.error(f'\tFailure Code: {response.status}')
             logging.error(f'\tFailure Reason: {response.reason}')
             return False
+
+    def receive_SSE(self, key: selectors.SelectorKey):
+        logging.debug("Received an SSE.")
+        self.__handle_SSE(self.ctrl.sock.recv(4096))
+        if self.close_connection:
+            logging.error("Server closed the connection.")
+            self.__shutdown_connection(key)
+
+    def __handle_SSE(self, message: bytes):
+        with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
+            self.handle_one_request()
+
+    def do_POST(self):
+        logging.debug("SSE is a POST.")
+        try:
+            data = json.loads(self.rfile)
+            self.session_schema.validate(data)
+            self.mcast_IP = IPv4Address(data["IP"])
+            self.can_port = data["CAN_PORT"]
+            self.carla_port = data["CARLA_PORT"]
+        except jsonschema.ValidationError as ve:
+            logging.error(ve)
+            self.close_connection = True
+            raise SyntaxError from ve
+        except json.decoder.JSONDecodeError as jde:
+            logging.error(jde)
+            self.close_connection = True
+            raise SyntaxError from jde
+        except AddressValueError as ave:
+            logging.error(ave)
+            self.close_connection = True
+            raise SyntaxError from ave
+
+    def do_DELETE(self):
+        logging.debug("SSE is a DELETE.")
+        logging.info("Server closed the current session.")
+        self.mcast_IP = IPv4Address()
+        self.can_port = 0
+        self.carla_port = 0
+
+    def send_delete(self, path: str, close = False):
+        logging.info(f'Sending DELETE.')
+        response = None
+        try:
+            self.ctrl.request("DELETE", path)
+            self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
+        except http.client.HTTPException as httpe:
+            logging.error("-> Delete request failed to send.")
+            self.__handle_connection_errors(httpe)
+        else:
+            if self.__wait_for_socket():
+                response = self.ctrl.getresponse()
+        finally:
+            if close:
+                key = self.sel.get_key(self.ctrl.sock)
+                self.shutdown_connection(key)
+                self.do_DELETE()
+            return response
+
+    def shutdown_connection(self, key: selectors.SelectorKey):
+        logging.debug("Unregistering the file object.")
+        self.sel.unregister(key.fileobj)
+        logging.debug("Shutting down the socket.")
+        key.fileobj.shutdown(socket.SHUT_RDWR)
+        logging.debug("Closing the socket object.")
+        key.fileobj.close()
