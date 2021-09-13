@@ -2,9 +2,7 @@ import socket
 import struct
 import sys
 import time
-import subprocess
 import os
-import re
 import selectors
 from typing import Union, Tuple, List, Dict, Optional
 from frame import Frame
@@ -14,6 +12,8 @@ from logging.handlers import TimedRotatingFileHandler
 from HelperMethods import ColoredConsoleHandler
 from BrokerHandle import BrokerHandle
 import shutil
+from ipaddress import IPv4Address
+import multiprocessing as mp
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -47,14 +47,29 @@ class SSS3:
 
     def __init__(self, _server_address = socket.gethostname()) -> None:
         self.__setup_logging()
-        self.carla_port = 0
-        self.can_port = 0
         self.frame = Frame()
         self.dropped_messages = 0
         self.timeouts = 0
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
         self.broker = BrokerHandle(self.sel, _server_address)
+        self.can, self.carla = socket.socketpair(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.listen = True
+        self.l_thread = mp.Process(target=self.__listen(0))
+
+    def __listen(self, timeout=None, waiting_msg = None) -> None:
+        if waiting_msg:
+            self.__typewritter(waiting_msg, tcolors.cyan)
+        while self.listen:
+            try:
+                connection_events = self.sel.select(timeout=timeout)
+                for key, mask in connection_events:
+                    callback = key.data.callback
+                    callback(key)  
+            except TimeoutError:
+                continue
+            except KeyboardInterrupt:
+                return
 
     def __setup_logging(self) -> None:
         logging.basicConfig(
@@ -89,7 +104,11 @@ class SSS3:
             self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
             input_list = input('').split(',')
             self.__request_devices([int(i.strip()) for i in input_list])
-            data = SimpleNamespace(callback = self.__parse_session_message)
+            data = SimpleNamespace(
+                callback = self.__receive_SSE,
+                outgoing_message = None,
+                message_lock = mp.Lock()
+                )
             self.sel.modify(self.broker.ctrl.sock, selectors.EVENT_READ, data)
             self.__listen(5, "Waiting for setup message from server...")
         else:
@@ -125,115 +144,98 @@ class SSS3:
         greeting_message = "* ECU Selection Menu *"
         print(f'{tcolors.green}{greeting_message:*^{term_size[0]-5}}{tcolors.reset}')
 
-    def __listen(self, timeout=None, waiting_msg = None) -> None:
-        if waiting_msg:
-            self.__typewritter(waiting_msg, tcolors.cyan)
+    def __receive_SSE(self, key: selectors.SelectorKey):
         try:
-            connection_events = self.sel.select(timeout=timeout)
-            for key, mask in connection_events:
-                self._key = key
-                callback = key.data.callback
-                callback(key)
-        except TimeoutError:
-            logging.error("Selector timed-out while waiting for a response or SSE.")
-            return
-        except KeyboardInterrupt:
-            return
+            self.broker.receive_SSE(key)
+        except SyntaxError as se:
+            pass
+        else:
+            if self.broker.command.lower() == "post":
+                self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
+            elif self.broker.command.lower() == "delete":
+                self.stop()
 
-    def __parse_session_message(self, key: selectors.SelectorKey):
-        key.fileobj.recv(4096)
+    def start(self, mcast_IP: IPv4Address, can_port: int, carla_port: int):
+        self.__typewritter("Received session setup information from the server.", tcolors.magenta)
+        self.__typewritter("Starting the session!", tcolors.yellow)
+        self.__set_mcast_options(self, self.can, mcast_IP, can_port)
+        can_data = SimpleNamespace(callback = self.receive)
+        self.sel.register(self.can, selectors.EVENT_READ, can_data)
+        self.__set_mcast_options(self, self.carla, mcast_IP, carla_port)
+        carla_data = SimpleNamespace(
+            callback = self.send,
+            outgoing_message = None,
+            message_lock = mp.Lock()
+            )
+        self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
+        self.l_thread.start()
+                
+    def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
+        sock.bind((mcast_IP, port))
+        mreq = struct.pack("4sl", socket.inet_aton(mcast_IP),
+                            socket.INADDR_ANY)
+        sock.setsockopt(socket.IPPROTO_IP,
+                        socket.IP_ADD_MEMBERSHIP, mreq)
+        sock.settimeout(0.4)
 
-    def send(self, control) -> None:
-        message = self.frame.pack(control)
-        self.socks["carla"].sendto(message, (self.mcast_ip, self.carla_port))
+    def stop(self):
+        self.__typewritter("Stopping session.", tcolors.red)
+        self.listen = False
+        self.broker.send_delete("/session")
+        self.broker.send_delete("/client/register", True)
+        logging.debug("Unregistering can socket.")
+        self.sel.unregister(self.can)
+        logging.debug("Shutting down the can socket.")
+        self.can.shutdown(socket.SHUT_RDWR)
+        logging.debug("Closing the can socket.")
+        self.can.close()
+        logging.debug("Unregistering carla socket.")
+        self.sel.unregister(self.carla)
+        logging.debug("Shutting down the carla socket.")
+        self.carla.shutdown(socket.SHUT_RDWR)
+        logging.debug("Closing the carla socket.")
+        self.carla.close()
 
-    def receive(self, control, verbose=False) -> None:
+    def send(self, key: selectors.SelectorKey) -> None:
+        with key.data.message_lock:
+            try:
+                message = self.frame.pack(key.data.outgoing_message)
+                key.fileobj.sendto(message, (self.mcast_ip, self.carla_port))
+                self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
+            except InterruptedError:
+                logging.error("Message was interrupted while sending.")
+            except BlockingIOError:
+                logging.error("Socket is currently blocked and cannot send messages.")
+
+    def receive(self, key: selectors.SelectorKey) -> None:
         try:
-            data = self.socks["can"].recv(20)
+            data = key.fileobj.recv(20)
             if len(data) == 20:  # 20 is size of carla struct in bytes
                 ecm_data = struct.unpack("Ifff???B", data)
-                if not self.frame(ecm_data, control, verbose):
-                    self.__frame_miss_match(ecm_data, verbose)
+                print(self.frame.print_frame(self.frame.unpack(ecm_data)))
+                # if not self.frame(ecm_data, control, verbose):
+                #     self.__frame_miss_match(ecm_data, verbose)
         except socket.timeout:
-            self.socks["can"].settimeout(0.04)
+            key.fileobj.settimeout(0.04)
             self.dropped_messages += 1
             self.timeouts += 1
-            print(f'Socket Timeout. Total: {self.timeouts}')
+            logging.warning(f'Socket Timeout. Total: {self.timeouts}')
 
-    def __frame_miss_match(self, ecm_data, verbose=False) -> None:
-        self.dropped_messages += 1
-        self.seq_miss_match += 1
-        self.socks["can"].settimeout(0.01)
-        for i in range(self.frame.last_frame - ecm_data[0]):
-            self.socks["can"].recv(20)
-            self.dropped_messages += 1
-            self.seq_miss_match += 1
-        self.socks["can"].settimeout(0.04)
-        if verbose:
-            print(ecm_data[0])
-            print(self.frame.last_frame)
-            print(
-                f'Sequence number miss match. Total: {self.seq_miss_match}')
-
-    def __set_mcast_options(self, mcast_grp, socks: SOCK_DICT) -> None:
-        for key, sock in socks.items():
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
-            sock.bind((mcast_grp, self[key + "_port"]))
-            mreq = struct.pack("4sl", socket.inet_aton(mcast_grp),
-                               socket.INADDR_ANY)
-            sock.setsockopt(socket.IPPROTO_IP,
-                            socket.IP_ADD_MEMBERSHIP, mreq)
-            sock.settimeout(0.4)
-
-    def __setup_sss3(self, _address: ADDR_LIST):
-        source_addr = (self.__find_source_address(), _address[0][1])
-        successfully_setup = []
-        for address in _address:
-            # Create Connection automatically tries all dns results for
-            # hostname addresses on both IPv4 and IPv6.
-            with socket.create_connection(address, 1, source_addr) as tcp_sock:
-                tcp_sock.settimeout(1)
-                if self.__send_setup(tcp_sock, address):
-                    successfully_setup.append(address)
-        return successfully_setup
-
-    def __find_source_address(self) -> str:
-        """
-        If the host device is connected to multiple NICs then choose the one
-        with the ip beginning in 192.168.X.X. If that IP does not exist then
-        choose the first IP.
-        """
-        all_ip = re.compile(
-            '([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})')
-        local_subnet_ip = re.compile('192\.168\.([0-9]{1,3})\.([0-9]{1,3})')
-        command = "ipconfig" if os.name == 'nt' else "ifconfig"
-        all_ipconfig = all_ip.search(subprocess.check_output([command]))
-        local_ipconfig = local_subnet_ip.search(
-            subprocess.check_output([command]))
-        if local_ipconfig:
-            return local_ipconfig.group()
-        else:
-            return all_ipconfig.group()
-
-    def __send_setup(self, tcp_sock: SOCK_T, address: ADDR_T, retry=True) -> bool:
-        try:
-            mcast_ip = socket.inet_aton(self.mcast_ip)
-            mcast_packet_size = 20
-            setup_message = struct.pack(
-                "4sii", mcast_ip, self.carla_port, self.can_port, mcast_packet_size)
-            tcp_sock.sendall(setup_message)
-            confirmation = tcp_sock.recv(1)
-            # True if sss3 setup correctly
-            return struct.unpack("?", confirmation)[0]
-        except (socket.herror, socket.gaierror, socket.timeout) as err:
-            if retry:
-                # DNS name assignment or socket closing may need to complete
-                time.sleep(1)
-                # Retry once
-                return self.__send_setup(tcp_sock, address, False)
-            else:
-                print(f"Error: {err}")
-                raise
+    # def __frame_miss_match(self, ecm_data, verbose=False) -> None:
+    #     self.dropped_messages += 1
+    #     self.seq_miss_match += 1
+    #     self.can.settimeout(0.01)
+    #     for i in range(self.frame.last_frame - ecm_data[0]):
+    #         self.can.recv(20)
+    #         self.dropped_messages += 1
+    #         self.seq_miss_match += 1
+    #     self.can.settimeout(0.04)
+    #     if verbose:
+    #         print(ecm_data[0])
+    #         print(self.frame.last_frame)
+    #         print(
+    #             f'Sequence number miss match. Total: {self.seq_miss_match}')
 
 
 if __name__ == '__main__':
