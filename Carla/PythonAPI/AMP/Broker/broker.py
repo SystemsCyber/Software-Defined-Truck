@@ -5,12 +5,13 @@ import os
 import time
 import sys
 import selectors
-import ipaddress
+from ipaddress import ip_network
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 from typing import Tuple, Dict, Union, List, Optional
 from types import SimpleNamespace
 from io import BytesIO
+from Device import Device
 from SSS3Handle import SSS3Handle
 from ClientHandle import ClientHandle
 import logging
@@ -19,121 +20,35 @@ from HelperMethods import ColoredConsoleHandler
 
 """TODO Notes:
     - We need to set the keep alive function on the teensy.
-    - We need to close connections if they don't register their device within a
-      few seconds after connecting.
-    - We don't need to scan the multicast address range because we can bind to a
-      specific interface via socket options.
-    - Use the built in socket keep alive options to send "heartbeats" to the
-      devices. Refer to this for more information:
-      https://stackoverflow.com/questions/12248132/how-to-change-tcp-keepalive-timer-using-python-script
-      and https://docs.microsoft.com/en-us/windows/win32/winsock/so-keepalive
-      
-    - Send error when protocol/method not supported. Use
-      HTTPStatus.NOT_IMPLEMENTED.
-    - Add error checking for IndexError when using Regex
     - When recving or sending timeout should be calculated dynamically.
         - From:
           https://www.geeksforgeeks.org/algorithm-for-dynamic-time-out-timer-calculation/
             - Use Karn's Modification with Jacob's Algorithm to dynamically
               calculate timeout and when to retransmit.
-        - Sockets don't expose ack so we can either make sure that we respond to messages so that both sides can calculate RTT or we can send pings. Unfortunately the 
-        - | ==================== Ignore ================== |
-        - Sockets don't expose ack so instead of sending multiple messages we
-          can get this information by pinging the device.
-        - Be careful:
-            - Don't use os.system. Use the safer alternative -> subprocess
-            - Use subprocess.popen as it spawns another process to do this
-              operation so that it doesn't slow down the main thread.
-            - If you use subprocess to run the ping command make sure to set the
-              shell argument to false.
-            - Don't use the pure python ping library because root is required on
-              linux to create ICMP sockets.
-            - No matter the method of doing this make sure that
-            - Example:
-                import os
-                import subprocess
-                
-                number_of_messages = "-n" if os.name == 'nt' else "-c"
-                host = "www.google.com"
-
-                ping = subprocess.Popen(
-                    ["ping", number_of_messages, "4", host],
-                    stdout = subprocess.PIPE,
-                    stderr = subprocess.PIPE
-                )
-
-                out, error = ping.communicate()
-                print out
-        - | ============================================= |
-    - When sending make sure to use send all and possibly flush as well.
-    - Send any errors that are raised via parsing, sending, or receiving.
-    - Use a token bucket algorithm to rate limit clients and devices.
-    - From:
-        https://stackoverflow.com/questions/667508/whats-a-good-rate-limiting-algorithm
-        rate = 5.0; // unit: messages
-        per  = 8.0; // unit: seconds
-        allowance = rate; // unit: messages
-        last_check = now(); // floating-point, e.g. usec accuracy. Unit: seconds
-
-        when (message_received):
-        current = now();
-        time_passed = current - last_check;
-        last_check = current;
-        allowance += time_passed * (rate / per);
-        if (allowance > rate):
-            allowance = rate; // throttle
-        if (allowance < 1.0):
-            discard_message();
-        else:
-            forward_message();
-            allowance -= 1.0;
-    - 
 """
 
 # Type Aliases
 SOCKTYPE = socket.socket
-if sys.version_info >= (3, 9):
-    MCAST_IP_ENTRY = (str, None | SOCKTYPE)
-    MCAST_IPS = list[MCAST_IP_ENTRY]
-    SSS3_ENTRY = selectors.SelectorKey
-    SSS3S = list[SSS3_ENTRY]
-    CARLA_CLIENT = selectors.SelectorKey
-    CARLA_CLIENTS = list[CARLA_CLIENT]
-    SAFE_LIST = MCAST_IPS | SSS3S | CARLA_CLIENTS
-    SAFE_ENTRY = MCAST_IP_ENTRY | SSS3_ENTRY | CARLA_CLIENT
-    SOCK_DICT = dict[str, SOCKTYPE]
-    SAFE_INDEX = (int, int | str | None)
-    CONN_HANDLE = (SOCKTYPE, (str, int))
-else:
-    MCAST_IP_ENTRY = Tuple[str, Union[None, SOCKTYPE]]
-    MCAST_IPS = List[MCAST_IP_ENTRY]
-    SSS3_ENTRY = selectors.SelectorKey
-    SSS3S = List[SSS3_ENTRY]
-    CARLA_CLIENT = selectors.SelectorKey
-    CARLA_CLIENTS = List[CARLA_CLIENT]
-    SAFE_LIST = Union[MCAST_IPS, SSS3S, CARLA_CLIENTS]
-    SAFE_ENTRY = Union[MCAST_IP_ENTRY, SSS3_ENTRY, CARLA_CLIENT]
-    SOCK_DICT = Dict[str, SOCKTYPE]
-    SAFE_INDEX = Tuple[int, Union[int, str, None]]
-    CONN_HANDLE = Tuple[SOCKTYPE, Tuple[str, int]]
-
 
 class Broker(BaseHTTPRequestHandler):
 
     # ==================== Initialization ====================
 
-    def __init__(self, _host_port=80, _carla_port=41664, _can_port=41665) -> None:
+    def __init__(self) -> None:
         self.__setup_logging()
+        self.log_sys_message("Broker Initializing.")
         self.protocol_version = "HTTP/1.1"
-        self.host_port = _host_port
-        self.carla_port = _carla_port
-        self.can_port = _can_port
-        self.__log_init()
         self.sel = selectors.DefaultSelector()
-        self.multicast_IPs = self.__init_multicast_ip_list()
+        self.multicast_IPs = []
+        for ip in ip_network('239.255.0.0/16'):
+            self.multicast_IPs.append({
+                "ip": ip,
+                "available": True,
+                "sockets": []
+            })
         self.blacklist_ips = []
         self.SSS3s = SSS3Handle(self.sel, self.blacklist_ips)
-        self.CLIENTs = ClientHandle(self.sel, self.blacklist_ips)
+        self.CLIENTs = ClientHandle(self.sel, self.blacklist_ips, self.multicast_IPs)
 
     def __setup_logging(self):
         logging.basicConfig(
@@ -153,15 +68,13 @@ class Broker(BaseHTTPRequestHandler):
         # self.logger = logging.getLogger(__name__)
         # self.logger.setLevel(logging.DEBUG)
 
-    def __init_multicast_ip_list(self):
-        multicast_ips = []
-        for ip in ipaddress.ip_network('239.255.0.0/16'):
-            multicast_ips.append({
-                "ip": ip,
-                "available": False,
-                "sockets": []
-            })
-        return multicast_ips
+    def log_sys_error(self, format, *args):
+        logging.error("%s - - %s\n" % ("SERVER", format%args))
+
+    def log_sys_message(self, format, *args):
+        logging.info("%s - - %s\n" % ("SERVER", format%args))
+
+    # ===== Overrides for parent class functions =====
 
     def log_error(self, format, *args):
         address_string = "SERVER"
@@ -177,7 +90,6 @@ class Broker(BaseHTTPRequestHandler):
         logging.info("%s - - %s\n" %
                          (address_string, format%args))
 
-    # Overriding the parent's function because they did it wrong
     def end_headers(self):
         """Send the blank line ending the MIME headers."""
         self.wfile.seek(0)
@@ -188,7 +100,6 @@ class Broker(BaseHTTPRequestHandler):
             self._headers_buffer.append(b"\r\n")
             self.flush_headers(message_body)
 
-    # Overriding the parent's function because they did it wrong
     def flush_headers(self, message_body=b""):
         if hasattr(self, '_headers_buffer'):
             headers = b"".join(self._headers_buffer)
@@ -196,25 +107,17 @@ class Broker(BaseHTTPRequestHandler):
             self.wfile.write(message_body)
             self._headers_buffer = []
 
-    def __log_init(self) -> None:
-        msg = f"Broker initializing with these settings:\n"
-        msg += f"\tHost Address: {socket.gethostname()}\n"
-        msg += f"\tHost Port: {self.host_port}\n"
-        msg += f"\tCarla Port: {self.carla_port}\n"
-        msg += f"\tCAN Port: {self.can_port}\n"
-        self.log_message(msg)
-
     # ==================== Main Server Functions ====================
 
     def listen(self):
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        lsock.bind((socket.gethostname(), self.host_port))
+        lsock.bind((socket.gethostname(), 80))
         lsock.listen()
         lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
         self.sel.register(lsock, selectors.EVENT_READ, data=data)
-        print(f'Listening on: {socket.gethostname()}:{self.host_port}')
+        self.log_sys_message(f'Listening on: {socket.gethostname()}:80')
         self.__wait_for_connection()
 
     def __wait_for_connection(self) -> None:
@@ -241,6 +144,9 @@ class Broker(BaseHTTPRequestHandler):
                 not_accepted = hasattr(key.data, "accept_by") and (
                     key.data.MAC == "unknown")
                 if not_accepted and (key.data.accept_by < time.time()):
+                    msg = f'{key.data.addr[0]} has not registered within 5 '
+                    msg += f'seconds of first connecting. Closing connection.'
+                    self.log_sys_message(msg)
                     self.__shutdown_connection(key)
         except RuntimeError:
             return
@@ -252,11 +158,12 @@ class Broker(BaseHTTPRequestHandler):
         conn, addr = key.fileobj.accept()
         conn.setblocking(False)
         if addr[0] in self.blacklist_ips:
+            self.log_sys_error(f'Blacklisted IP address: {addr[0]} tried to connect.')
             conn.shutdown(socket.SHUT_RDWR)
             conn.close()
         else:
+            self.log_sys_message(f'New connection from: {addr[0]}:{str(addr[1])}')
             self.__set_keepalive(conn, 300000, 300000)
-            print(f'New connection from: {addr[0]}:{str(addr[1])}')
             data = Device(self.__read, addr)
             self.sel.register(conn, selectors.EVENT_READ, data=data)
 
@@ -279,18 +186,20 @@ class Broker(BaseHTTPRequestHandler):
                 self.sel.modify(self._key.fileobj,
                                 selectors.EVENT_WRITE, self._key.data)
             except BlockingIOError:
-                pass
+                self.log_error("A blocking error occured in __read, when it shouldn't have.")
             except ConnectionResetError as cre:
                 key.data.close_connection = True
                 self.log_error(f'{cre}')
 
     def __rate_limit(self, key: selectors.SelectorKey) -> bool:
+        # Token Bucket algorithm
         now = time.time()
         key.data.allowance += (now - key.data.last_check) * key.data.rate
         key.data.last_check = now
         if (key.data.allowance > key.data.rate):
             key.data.allowance = key.data.rate
         if (key.data.allowance < 1.0):
+            self.log_sys_error(f'Rate limiting {key.data.addr[0]}')
             return True
         else:
             key.data.allowance -= 1.0
@@ -334,6 +243,7 @@ class Broker(BaseHTTPRequestHandler):
         try:
             device_list = getattr(self, list_name)
         except AttributeError:
+            self.log_error("Requested a non-existent device type.")
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         try:
@@ -342,6 +252,7 @@ class Broker(BaseHTTPRequestHandler):
             if not self.close_connection:
                 self.send_header("connection", "keep-alive")
         except AttributeError:
+            self.log_error("Requested a method that is not implemented.")
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)
 
     def __parse_path(self):
@@ -364,17 +275,22 @@ class Broker(BaseHTTPRequestHandler):
             key.data.callback = self.__read
             self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
         except InterruptedError:
+            msg = f'{key.data.addr[0]} - - Interrupted while sending message. '
+            msg += f'This is an unrecoverable error. Closing connection.'
+            logging.error(msg)
             key.data.close_connection = True
         except BlockingIOError:
-            pass
+            msg = f'{key.data.addr[0]} - - A blocking error occured in '
+            msg += f'__write, when it shouldnt have.'
+            logging.error(msg)
         finally:
             if key.data.close_connection:
+                logging.info(f'{key.data.addr[0]} - - Closed the connection.')
                 self.__shutdown_connection(key)
 
     def __shutdown_connection(self, key: selectors.SelectorKey):
-        # Stop monitoring the socket
+        logging.info(f'{key.data.addr[0]} - - Closing connection.')
         self.sel.unregister(key.fileobj)
-        # Close the socket
         key.fileobj.shutdown(socket.SHUT_RDWR)
         key.fileobj.close()
 
