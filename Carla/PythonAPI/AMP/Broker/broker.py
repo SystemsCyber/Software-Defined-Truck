@@ -13,7 +13,6 @@ from types import SimpleNamespace
 from io import BytesIO
 from SSS3Handle import SSS3Handle
 from ClientHandle import ClientHandle
-from Device import Device
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from HelperMethods import ColoredConsoleHandler

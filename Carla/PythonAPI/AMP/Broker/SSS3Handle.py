@@ -32,11 +32,14 @@ class SSS3Handle:
         return HTTPStatus.FOUND
 
     def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        data = json.load(rfile)
         try:
+            data = json.load(rfile)
             self.registration_schema.validate(data)
             return self.__register(key, data)
         except jsonschema.ValidationError:
+            self.close_connection = True
+            return HTTPStatus.BAD_REQUEST
+        except json.decoder.JSONDecodeError:
             self.close_connection = True
             return HTTPStatus.BAD_REQUEST
     

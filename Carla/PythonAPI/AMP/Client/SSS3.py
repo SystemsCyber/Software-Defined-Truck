@@ -5,13 +5,15 @@ import time
 import subprocess
 import os
 import re
+import selectors
 from typing import Union, Tuple, List, Dict, Optional
 from frame import Frame
-import selectors
 from types import SimpleNamespace
-from getmac import get_mac_address as gma
-import json
-import http.client
+import logging
+from logging.handlers import TimedRotatingFileHandler
+from HelperMethods import ColoredConsoleHandler
+from BrokerHandle import BrokerHandle
+import shutil
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -28,106 +30,118 @@ else:
     ADDR_LIST = List[ADDR_T]
     RETURN_ADDR_T = List[Union[ADDR_T, None]]
 
+class tcolors:
+    bold = '\u001b[1m'
+    black = '\u001b[30m'
+    red = '\u001b[31m'
+    green  = '\u001b[32m'
+    yellow = '\u001b[33m'
+    blue = '\u001b[34m'
+    magenta = '\u001b[35m'
+    cyan = '\u001b[36m'
+    white = '\u001b[37m'
+    reset = '\u001b[0m'
 
 class SSS3:
     """SSS3 communication utility in conjunction with the CARLA simulator"""
 
     def __init__(self, _server_address = socket.gethostname()) -> None:
-        self.carla_port = 41664
-        self.can_port = 41665
+        self.__setup_logging()
+        self.carla_port = 0
+        self.can_port = 0
         self.frame = Frame()
         self.dropped_messages = 0
         self.timeouts = 0
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
-        if self.__connect_to_server(_server_address):
-            self.__set_keepalive(self.ctrl.sock, 300000, 300000)
-            self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
-            # self.__register(gma())
-            self.__register("00:0C:29:DE:AD:BE")
+        self.broker = BrokerHandle(self.sel, _server_address)
 
-    def __connect_to_server(self, _server_address: str):
-        try:
-            self.ctrl = http.client.HTTPConnection(_server_address)
-        except http.client.GATEWAY_TIMEOUT:
-            print("something about gateway timeout")
-            return self.__retry_connect_to_server(_server_address)
-        except http.client.REQUEST_TIMEOUT:
-            print("Something about request timeout")
-            return self.__retry_connect_to_server(_server_address)
-        else:
-            print("Something about successfully connecting to server")
-            return True
+    def __setup_logging(self) -> None:
+        logging.basicConfig(
+            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
+            level=logging.DEBUG,
+            handlers=[
+                TimedRotatingFileHandler(
+                    filename="sss3_log",
+                    when="midnight",
+                    interval=1,
+                    backupCount=7,
+                    encoding='utf-8'
+                    ),
+                ColoredConsoleHandler()
+                ]
+            )
+        # self.logger = logging.getLogger(__name__)
+        # self.logger.setLevel(logging.DEBUG)
 
-    def __retry_connect_to_server(self, _server_address: str):
-        print("Something about retrying connection to server")
-        try:
-            self.ctrl = http.client.HTTPConnection(_server_address)
-        except http.client.GATEWAY_TIMEOUT:
-            print("something about gateway timeout")
-            print("something about server being unreachable")
-            return False
-        except http.client.REQUEST_TIMEOUT:
-            print("Something about request timeout")
-            print("Something about server being unreachable")
-            return False
+    def setup(self):
+        if self.broker.connect():
+            if self.broker.register():
+                self.__select_devices(self.broker.get_devices())
+            else:
+                logging.error("Request to register with server failed.")
         else:
-            print("Something about successfully connecting to server")
-            return True
-    
-    def __set_keepalive(self, conn: socket.socket, idle_sec: int, interval_sec: int) -> None:
-        if os.name == 'nt':
-            conn.ioctl(socket.SIO_KEEPALIVE_VALS, (1, idle_sec, interval_sec))
-        else:
-            conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, idle_sec)
-            conn.setsockopt(socket.IPPROTO_TCP,
-                            socket.TCP_KEEPINTVL, interval_sec)
-            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
+            logging.error("Could not connect to the server.")
 
-    def __wait_for_socket(self, timeout=None):
+    def __select_devices(self, devices: list):
+        if len(devices) > 0:
+            self.__print_devices(devices)
+            self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
+            input_list = input('').split(',')
+            self.__request_devices([int(i.strip()) for i in input_list])
+            data = SimpleNamespace(callback = self.__parse_session_message)
+            self.sel.modify(self.broker.ctrl.sock, selectors.EVENT_READ, data)
+            self.__listen(5, "Waiting for setup message from server...")
+        else:
+            self.__greeting_bar()
+            self.__typewritter("Unfortunately, there are no available ECUs right now. Please check back later.", tcolors.red)
+
+    def __print_devices(self, devices: list) -> None:
+        self.__greeting_bar()
+        self.__typewritter("Available ECUs: ", tcolors.magenta)
+        for i in range(len(devices)):
+            print(f'{i}):')
+            for ecu in i:
+                print(f'\tType: {ecu.type} | Year: {ecu.year} | ', end=None)
+                print(f'Make: {ecu.make} | Model: {ecu.model}', end="\n\n")
+
+    def __request_devices(self, requestedECUs: list):
+        if self.broker.request_devices(requestedECUs):
+            self.__typewritter("Requested devices were successfully allocated.", tcolors.yellow)
+        else:
+            self.__typewritter("One or more of the requested devices are no longer available. Please select new device(s).", tcolors.red)
+            self.__select_devices(self.broker.get_devices())
+
+    def __typewritter(self, sentence, color=None, end='\n'):
+        print(color, end='')
+        for char in sentence:
+            print(char, sep='', end='', flush=True)
+            time.sleep(0.01)
+        print(tcolors.reset, end=end)
+
+    def __greeting_bar(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        term_size = shutil.get_terminal_size()
+        greeting_message = "* ECU Selection Menu *"
+        print(f'{tcolors.green}{greeting_message:*^{term_size[0]-5}}{tcolors.reset}')
+
+    def __listen(self, timeout=None, waiting_msg = None) -> None:
+        if waiting_msg:
+            self.__typewritter(waiting_msg, tcolors.cyan)
         try:
-            if self.sel.select(timeout=timeout):
-                return True
+            connection_events = self.sel.select(timeout=timeout)
+            for key, mask in connection_events:
+                self._key = key
+                callback = key.data.callback
+                callback(key)
         except TimeoutError:
-            print("Log something about server being disconnected")
-            return False
+            logging.error("Selector timed-out while waiting for a response or SSE.")
+            return
         except KeyboardInterrupt:
-            return False
-    
-    def __send_registration(self, registration: str) -> http.client.HTTPResponse:
-        try:
-            self.ctrl.request("POST", "/client/register", registration)
-            self.sel.modify(self.ctrl.sock, selectors.EVENT_READ)
-        except http.client.HTTPException as httpe:
-            self.__handle_connection_errors(httpe)
-        else:
-            if self.__wait_for_socket():
-                return self.ctrl.getresponse()
+            return
 
-    def __register(self, mac: str) -> None:
-        registration = json.dumps({"MAC": mac})
-        print("Something about sending registration")
-        self.response = self.__send_registration(registration)
-        if self.response.status == 202:
-            print("something about being successfully registered")
-        else:
-            print("Something about unable to register or server rejected registration")
-            print("The response code for why the registration was rejected.")
-
-    def __handle_connection_errors(self, error):
-        pass
-
-    def get_available_devices(self):
-        try:
-            print("something about requesting available devices.")
-            self.ctrl.request("GET", "/sss3")
-        except http.client.HTTPException as httpe:
-            self.__handle_connection_errors(httpe)
-        else:
-            if self.__wait_for_socket():
-                self.response = self.ctrl.getresponse()
-                return self.response
+    def __parse_session_message(self, key: selectors.SelectorKey):
+        key.fileobj.recv(4096)
 
     def send(self, control) -> None:
         message = self.frame.pack(control)
