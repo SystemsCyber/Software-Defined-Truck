@@ -1,7 +1,7 @@
 import queue
 import time
 import selectors
-from typing import Tuple
+from typing import Tuple, Dict, List
 
 SEL = selectors.SelectorKey
 
@@ -30,7 +30,7 @@ class Device:
 
     @staticmethod
     def is_client(key: SEL) -> bool:
-        if Device.is_registered():
+        if Device.is_registered(key):
             return hasattr(key.data, "type") and key.data.type == "CLIENT"
         else:
             return False
@@ -45,20 +45,17 @@ class Device:
     @staticmethod
     def is_available(key: SEL) -> bool:
         if Device.is_not_listening_socket(key):
-            return Device.is_SSS3(key) and Device.is_free(key)
+            return Device.is_SSS3(key) and not key.data.in_use
 
     @staticmethod
-    def is_free(key: SEL) -> bool:
-        empty_carla_addr = key.data.session.CARLA_MCAST == None
-        empty_can_addr = key.data.session.CAN_MCAST == None
-        return empty_carla_addr and empty_can_addr
-
-    @staticmethod
-    def get_available_ECUs(sel: selectors.DefaultSelector) -> Dict:
-        available = {}
+    def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
+        available = []
         sel_map = sel.get_map()
         for fd in sel_map:
             key = sel_map[fd]
             if Device.is_available(key):
-                available[str(fd)] = key.data.ECUs
+                available.append({
+                    "ID": fd, 
+                    "ECUs": key.data.ECUs
+                })
         return available

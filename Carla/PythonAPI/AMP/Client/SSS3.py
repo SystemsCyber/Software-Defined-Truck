@@ -53,16 +53,16 @@ class SSS3:
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
         self.broker = BrokerHandle(self.sel, _server_address)
-        self.can, self.carla = socket.socketpair(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.carla = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.listen = True
-        self.l_thread = mp.Process(target=self.__listen(0))
 
-    def __listen(self, timeout=None, waiting_msg = None) -> None:
+    def __listen(self, _timeout=None, waiting_msg = None) -> None:
         if waiting_msg:
             self.__typewritter(waiting_msg, tcolors.cyan)
         while self.listen:
             try:
-                connection_events = self.sel.select(timeout=timeout)
+                connection_events = self.sel.select(timeout=_timeout)
                 for key, mask in connection_events:
                     callback = key.data.callback
                     callback(key)  
@@ -99,6 +99,7 @@ class SSS3:
             logging.error("Could not connect to the server.")
 
     def __select_devices(self, devices: list):
+        logging.debug(devices)
         if len(devices) > 0:
             self.__print_devices(devices)
             self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
@@ -139,7 +140,7 @@ class SSS3:
         print(tcolors.reset, end=end)
 
     def __greeting_bar(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # os.system('cls' if os.name == 'nt' else 'clear')
         term_size = shutil.get_terminal_size()
         greeting_message = "* ECU Selection Menu *"
         print(f'{tcolors.green}{greeting_message:*^{term_size[0]-5}}{tcolors.reset}')
@@ -168,6 +169,7 @@ class SSS3:
             message_lock = mp.Lock()
             )
         self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
+        self.l_thread = mp.Process(target=self.__listen(0))
         self.l_thread.start()
                 
     def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
@@ -240,3 +242,4 @@ class SSS3:
 
 if __name__ == '__main__':
     sss3object = SSS3()
+    sss3object.setup()

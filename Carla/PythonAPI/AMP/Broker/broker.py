@@ -251,7 +251,8 @@ class Broker(BaseHTTPRequestHandler):
             self.send_response(method_handle(self._key, self.rfile, self.wfile))
             if not self.close_connection:
                 self.send_header("connection", "keep-alive")
-        except AttributeError:
+        except AttributeError as ae:
+            logging.debug(ae)
             self.log_error("Requested a method that is not implemented.")
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)
 

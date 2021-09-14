@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from os import device_encoding
 import selectors
 from io import BytesIO
 from typing import Dict, Tuple, List
@@ -28,20 +29,21 @@ class SSS3Handle:
         logging.error(f'{key.data.addr[0]} - - {message}')
 
     def do_GET(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        self.__log_info("Requested available devices.")
+        self.__log_info(key, "Requested available devices.")
         if Device.is_client(key):
-            wfile.write(Device.get_available_ECUs(self.sel))
+            devices = json.dumps(Device.get_available_ECUs(self.sel))
+            wfile.write(bytes(devices, "ascii"))
             return HTTPStatus.FOUND
         else:
             return HTTPStatus.PRECONDITION_FAILED
 
     def do_GET_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        self.__log_info("Requested Reqistration schema.")
+        self.__log_info(key, "Requested Reqistration schema.")
         wfile.write(self.registration_schema)
         return HTTPStatus.FOUND
 
     def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        self.__log_info("Submitted registration information.")
+        self.__log_info(key, "Submitted registration information.")
         try:
             data = json.load(rfile)
             self.registration_schema.validate(data)
@@ -61,7 +63,7 @@ class SSS3Handle:
     
     def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.__log_info(key, "Unregistered.")
-        if key.data.is_free:
+        if key.data.in_use:
             key.data.close_connection = True
             return HTTPStatus.OK
         else:

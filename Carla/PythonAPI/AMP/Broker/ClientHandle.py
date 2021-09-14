@@ -29,12 +29,12 @@ class ClientHandle:
         logging.error(f'{key.data.addr[0]} - - {message}')
 
     def do_GET_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        self.__log_info("Requested Reqistration schema.")
-        wfile.write(bytes(json.dumps(self.registration_schema_file), "utf-8"))
+        self.__log_info(key, "Requested Reqistration schema.")
+        wfile.write(bytes(json.dumps(self.registration_schema_file), "ascii"))
         return HTTPStatus.FOUND
 
     def do_POST_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
-        self.__log_info("Submitted registration information.")
+        self.__log_info(key, "Submitted registration information.")
         try:
             data = json.load(rfile)
             self.registration_schema.validate(data)
@@ -54,7 +54,7 @@ class ClientHandle:
     
     def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.__log_info(key, "Unregistered.")
-        if key.data.is_free:
+        if key.data.in_use:
             key.data.close_connection = True
             return HTTPStatus.OK
         else:
@@ -79,7 +79,7 @@ class ClientHandle:
     
     def do_DELETE_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.__log_info(key, "Ended its session.")
-        if not key.data.is_free:
+        if not key.data.in_use:
             self.__handle_end_session(key)
             return HTTPStatus.OK
         else:
@@ -115,7 +115,7 @@ class ClientHandle:
             if old_key.data.MAC != new_key.data.MAC:
                 self.__log_error(new_key, "Tryed to change MAC. Banning device.")
                 self.blacklist_ips.append(new_key.data.addr[0])
-                key.data.close_connection = True
+                new_key.data.close_connection = True
                 return HTTPStatus.FORBIDDEN
             else:
                 return HTTPStatus.ACCEPTED
@@ -130,7 +130,7 @@ class ClientHandle:
             else:
                 self.__log_error(new_key, "Tryed to change MAC. Banning device.")
                 self.blacklist_ips.append(new_key.data.addr[0])
-                key.data.close_connection = True
+                new_key.data.close_connection = True
                 return HTTPStatus.FORBIDDEN
         else:
         # If its a different connection and different MAC we assume its a
@@ -163,13 +163,13 @@ class ClientHandle:
     def __gather_requested_devices(self, key: SEL, requested: Dict) -> List:
         self.__log_info(key, "Gathering requested devices.")
         available = Device.get_available_ECUs(self.sel)
-        members = [str(key.fd)]
+        members = [key.fd]
         for fd in requested["ECUs"].keys():
-            k = self.sel.get_key(int(fd))
+            k = self.sel.get_key(fd["ID"])
             if fd in available:
                 self.__log_info(key, f'{k.data.addr[0]} is available.')
-                k.data.is_free = False
-                members.append(int(fd))
+                k.data.in_use = False
+                members.append(fd["ID"])
             else:
                 self.__log_error(key, f'{k.data.addr[0]} is not available.')
                 return []
@@ -206,7 +206,7 @@ class ClientHandle:
         session_message = f'POST * HTTP/1.1\r\n'
         session_message += f'Connection: keep-alive\r\n'
         session_message += f'\r\n{session_information}'
-        return bytes(session_message)
+        return bytes(session_message, "ascii")
 
     def __log_registration(self, key: SEL) -> None:
         msg = f'Successfully registered!\n'

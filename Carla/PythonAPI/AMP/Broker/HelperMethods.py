@@ -18,6 +18,7 @@ class Schema:
     @staticmethod
     def find_schema_folder():
         base_dir = os.path.abspath(os.getcwd())
+        base_dir = base_dir.rpartition(os.path.sep)[0]
         for root, dirs, files in os.walk(base_dir):
             for name in dirs:
                 if name == "Schemas":

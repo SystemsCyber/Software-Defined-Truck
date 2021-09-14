@@ -20,12 +20,13 @@ class BrokerHandle(BaseHTTPRequestHandler):
         self.server_address = _server_address
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
-        self.request_schema = Schema.compile_schema("RequestECUs.json")
-        self.session_schema = Schema.compile_schema("SessionInformation.json")
-        self.mcast_IP = IPv4Address()
+        self.request_schema, self.request_schema_file = Schema.compile_schema("RequestECUs.json")
+        self.session_schema, self.session_schema_file = Schema.compile_schema("SessionInformation.json")
+        self.mcast_IP = IPv4Address
         self.can_port = 0
         self.carla_port = 0
-        # self.mac = "00:0C:29:DE:AD:BE"
+        
+        self.mac = "00:0C:29:DE:AD:BE"
 
     # Overrides for the parent functions
 
@@ -59,7 +60,8 @@ class BrokerHandle(BaseHTTPRequestHandler):
     
     def connect(self, retry = True) -> bool:
         try:
-            self.ctrl = http.client.HTTPConnection(self._server_address)
+            self.ctrl = http.client.HTTPConnection(self.server_address)
+            self.ctrl.connect()
         except http.client.HTTPException as httpe:
             logging.error("Unable to connect to server.")
             self.__handle_connection_errors(httpe)
@@ -113,7 +115,7 @@ class BrokerHandle(BaseHTTPRequestHandler):
         logging.info(f'Attempting to register with server using this MAC address: {self.mac}.')
         self.response = self.__submit_registration(json.dumps({"MAC": self.mac}))
         self.response_data = self.response.read(self.response.length)
-        if self.response.status >= 200 and self.response.status < 300:
+        if self.response.status >= 200 and self.response.status < 400:
             logging.info("Successfully registered with the server.")
             return True
         else:
@@ -148,10 +150,12 @@ class BrokerHandle(BaseHTTPRequestHandler):
             if self.__wait_for_socket():
                 self.response = self.ctrl.getresponse()
                 self.response_data = self.response.read(self.response.length)
+                logging.debug(self.response.length)
+                logging.debug(self.response.msg)
                 return self.__validate_device_list_response(self.response, self.response_data)
 
     def __validate_device_list_response(self, response: http.client.HTTPResponse, data: bytes) -> list:
-        if response.status >= 200 and response.status < 300:
+        if response.status >= 200 and response.status < 400:
             logging.info("Request for available devices was successful.")
             return self.__deserialize_device_list(data)
         else:
@@ -167,10 +171,12 @@ class BrokerHandle(BaseHTTPRequestHandler):
             logging.info("Validating device list against request schema.")
             self.request_schema.validate(available_devices)
             return available_devices
-        except jsonschema.ValidationError:
+        except jsonschema.ValidationError as ve:
+            logging.error(ve)
             logging.error("Device list failed validation again request schema.")
             return []
-        except json.decoder.JSONDecodeError:
+        except json.decoder.JSONDecodeError as jde:
+            logging.error(jde)
             logging.error("Device list could not be deserialized.")
             return []
 
