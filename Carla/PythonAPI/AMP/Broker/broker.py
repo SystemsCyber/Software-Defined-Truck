@@ -29,6 +29,7 @@ from HelperMethods import ColoredConsoleHandler
 
 # Type Aliases
 SOCKTYPE = socket.socket
+SEL = selectors.SelectorKey
 
 class Broker(BaseHTTPRequestHandler):
 
@@ -47,8 +48,8 @@ class Broker(BaseHTTPRequestHandler):
                 "sockets": []
             })
         self.blacklist_ips = []
-        self.SSS3s = SSS3Handle(self.sel, self.blacklist_ips)
-        self.CLIENTs = ClientHandle(self.sel, self.blacklist_ips, self.multicast_IPs)
+        self.SSS3s = SSS3Handle(self.sel, self.multicast_IPs)
+        self.CLIENTs = ClientHandle(self.sel, self.multicast_IPs)
 
     def __setup_logging(self):
         logging.basicConfig(
@@ -95,7 +96,12 @@ class Broker(BaseHTTPRequestHandler):
         self.wfile.seek(0)
         message_body = self.wfile.read()
         self.wfile.seek(0)
-        self.send_header("content-length", str(len(message_body)))
+        message_body_len = len(message_body)
+        self.send_header("Content-Length", str(message_body_len))
+        if message_body_len > 0:
+            self.send_header("Content-Type", "application/json")
+        if not self.close_connection:
+                self.send_header("Connection", "keep-alive")
         if self.request_version != 'HTTP/0.9':
             self._headers_buffer.append(b"\r\n")
             self.flush_headers(message_body)
@@ -112,7 +118,8 @@ class Broker(BaseHTTPRequestHandler):
     def listen(self):
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        lsock.bind((socket.gethostname(), 80))
+        # lsock.bind((socket.gethostname(), 80))
+        lsock.bind(("127.0.0.1", 80))
         lsock.listen()
         lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
@@ -151,7 +158,7 @@ class Broker(BaseHTTPRequestHandler):
         except RuntimeError:
             return
 
-    def __accept(self, key: selectors.SelectorKey) -> None:
+    def __accept(self, key: SEL) -> None:
         """Takes a new connection from the listening socket and assigns it its
         own socket. Then registers it with the selectors using the READ mask.
         """
@@ -164,7 +171,7 @@ class Broker(BaseHTTPRequestHandler):
         else:
             self.log_sys_message(f'New connection from: {addr[0]}:{str(addr[1])}')
             self.__set_keepalive(conn, 300000, 300000)
-            data = Device(self.__read, addr)
+            data = Device(self.__read, self.__write, addr)
             self.sel.register(conn, selectors.EVENT_READ, data=data)
 
     def __set_keepalive(self, conn: SOCKTYPE, idle_sec: int, interval_sec: int) -> None:
@@ -177,21 +184,20 @@ class Broker(BaseHTTPRequestHandler):
                             socket.TCP_KEEPINTVL, interval_sec)
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
 
-    def __read(self, key: selectors.SelectorKey):
+    def __read(self, key: SEL):
         if not self.__rate_limit(key):
             try:
                 self._key = key
                 self.client_address = self._key.data.addr
-                self.__handle_request(self._key.fileobj.recv(4096))
-                self.sel.modify(self._key.fileobj,
-                                selectors.EVENT_WRITE, self._key.data)
+                message = self._key.fileobj.recv(4096)
+                self.__check_connection(key, message)
             except BlockingIOError:
                 self.log_error("A blocking error occured in __read, when it shouldn't have.")
             except ConnectionResetError as cre:
                 key.data.close_connection = True
                 self.log_error(f'{cre}')
 
-    def __rate_limit(self, key: selectors.SelectorKey) -> bool:
+    def __rate_limit(self, key: SEL) -> bool:
         # Token Bucket algorithm
         now = time.time()
         key.data.allowance += (now - key.data.last_check) * key.data.rate
@@ -200,10 +206,26 @@ class Broker(BaseHTTPRequestHandler):
             key.data.allowance = key.data.rate
         if (key.data.allowance < 1.0):
             self.log_sys_error(f'Rate limiting {key.data.addr[0]}')
+            key.data.rate_limit_chances -= 1
+            if key.data.rate_limit_chances <= 0:
+                self.log_sys_error(f'Too many rate limit attempts. Banning {key.data.addr[0]}.')
+                self.blacklist_ips.append(key.data.addr[0])
+                self.__shutdown_connection(key)
             return True
         else:
             key.data.allowance -= 1.0
             return False
+
+    def __check_connection(self, key: SEL, message: bytes) -> None:
+        if len(message) == 0:
+            self.log_error("Closed the connection without notice.")
+            self.log_error("Performing cleanup operations.")
+            self.log_error("Cleanup methods not implemented.")
+            self.__shutdown_connection(key)
+        else:
+            self.__handle_request(message)
+            self.sel.modify(self._key.fileobj,
+                                selectors.EVENT_WRITE, self._key.data)
 
     def __handle_request(self, message: bytes) -> None:
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
@@ -242,15 +264,18 @@ class Broker(BaseHTTPRequestHandler):
         list_name, method_name = self.__parse_path()
         try:
             device_list = getattr(self, list_name)
-        except AttributeError:
+        except AttributeError as ae:
+            logging.debug(ae)
             self.log_error("Requested a non-existent device type.")
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         try:
             method_handle = getattr(device_list, method_name)
-            self.send_response(method_handle(self._key, self.rfile, self.wfile))
-            if not self.close_connection:
-                self.send_header("connection", "keep-alive")
+            response = method_handle(self._key, self.rfile, self.wfile)
+            if response == HTTPStatus.FORBIDDEN:
+                self.blacklist_ips.append(self._key.addr[0])
+                self._key.data.close_connection = True
+            self.send_response(response)
         except AttributeError as ae:
             logging.debug(ae)
             self.log_error("Requested a method that is not implemented.")
@@ -267,7 +292,7 @@ class Broker(BaseHTTPRequestHandler):
             method_name = 'do_' + self.command.upper() + verb_name 
         return list_name, method_name
 
-    def __write(self, key: selectors.SelectorKey):
+    def __write(self, key: SEL):
         try:
             while True:
                 message = key.data.outgoing_messages.get_nowait()
@@ -289,7 +314,7 @@ class Broker(BaseHTTPRequestHandler):
                 logging.info(f'{key.data.addr[0]} - - Closed the connection.')
                 self.__shutdown_connection(key)
 
-    def __shutdown_connection(self, key: selectors.SelectorKey):
+    def __shutdown_connection(self, key: SEL):
         logging.info(f'{key.data.addr[0]} - - Closing connection.')
         self.sel.unregister(key.fileobj)
         key.fileobj.shutdown(socket.SHUT_RDWR)

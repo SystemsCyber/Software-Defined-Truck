@@ -3,27 +3,10 @@
     "title": "Session Information",
     "description": "The session information will contain the multicast addresses for Carla and Can traffic.",
     "type": "object",
-    "examples": [
-        {
-            "CARLA_MCAST": {
-                "$ref": "MulticastIP.json/#/examples/0"
-            },
-            "CAN_MCAST": {
-                "$ref": "MulticastIP.json/#/examples/1"
-            }
-        },
-        {
-            "CARLA_MCAST": {
-                "$ref": "MulticastIP.json/#/examples/2"
-            },
-            "CAN_MCAST": {
-                "$ref": "MulticastIP.json/#/examples/3"
-            }
-        }
-    ],
     "required": [
-        "CARLA_MCAST",
-        "CAN_MCAST"
+        "IP",
+        "CARLA_PORT",
+        "CAN_PORT"
     ],
     "properties": {
         "GROUP_ID": {
@@ -33,7 +16,9 @@
             "$ref": "MulticastIP.json"
         },
         "CAN_PORT": {
-            "$ref": "MulticastIP.json"
+            "type": "number",
+            "maximum": 65535,
+            "minimum": 1025
         },
         "CARLA_PORT": {
             "type": "number",

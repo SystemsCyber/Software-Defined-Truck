@@ -13,7 +13,8 @@ from HelperMethods import ColoredConsoleHandler
 from BrokerHandle import BrokerHandle
 import shutil
 from ipaddress import IPv4Address
-import multiprocessing as mp
+# import multiprocessing as mp
+import threading
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -52,9 +53,12 @@ class SSS3:
         self.timeouts = 0
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
-        self.broker = BrokerHandle(self.sel, _server_address)
+        # self.broker = BrokerHandle(self.sel, _server_address)
+        self.broker = BrokerHandle(self.sel, "127.0.0.1")
         self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.carla = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.l_thread = threading.Thread(target=self.__listen, args=(0,))
+        self.l_thread.setDaemon(True)
         self.listen = True
 
     def __listen(self, _timeout=None, waiting_msg = None) -> None:
@@ -99,19 +103,19 @@ class SSS3:
             logging.error("Could not connect to the server.")
 
     def __select_devices(self, devices: list):
-        logging.debug(devices)
         if len(devices) > 0:
             self.__print_devices(devices)
             self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
             input_list = input('').split(',')
-            self.__request_devices([int(i.strip()) for i in input_list])
+            requested_devices = [int(i.strip()) for i in input_list]
+            self.__request_devices(requested_devices, devices)
             data = SimpleNamespace(
                 callback = self.__receive_SSE,
                 outgoing_message = None,
-                message_lock = mp.Lock()
+                message_lock = threading.Lock()
                 )
             self.sel.modify(self.broker.ctrl.sock, selectors.EVENT_READ, data)
-            self.__listen(5, "Waiting for setup message from server...")
+            self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
         else:
             self.__greeting_bar()
             self.__typewritter("Unfortunately, there are no available ECUs right now. Please check back later.", tcolors.red)
@@ -119,14 +123,14 @@ class SSS3:
     def __print_devices(self, devices: list) -> None:
         self.__greeting_bar()
         self.__typewritter("Available ECUs: ", tcolors.magenta)
-        for i in range(len(devices)):
-            print(f'{i}):')
-            for ecu in i:
-                print(f'\tType: {ecu.type} | Year: {ecu.year} | ', end=None)
-                print(f'Make: {ecu.make} | Model: {ecu.model}', end="\n\n")
+        for device in devices:
+            print(f'{device["ID"]}):')
+            for ecu in device["ECUs"]:
+                print(f'\tType: {ecu["type"]} | Year: {ecu["year"]} | ', end="")
+                print(f'Make: {ecu["make"]} | Model: {ecu["model"]}', end="\n\n")
 
-    def __request_devices(self, requestedECUs: list):
-        if self.broker.request_devices(requestedECUs):
+    def __request_devices(self, requestedECUs: list, devices: list):
+        if self.broker.request_devices(requestedECUs, devices):
             self.__typewritter("Requested devices were successfully allocated.", tcolors.yellow)
         else:
             self.__typewritter("One or more of the requested devices are no longer available. Please select new device(s).", tcolors.red)
@@ -149,7 +153,7 @@ class SSS3:
         try:
             self.broker.receive_SSE(key)
         except SyntaxError as se:
-            pass
+            logging.error(se)
         else:
             if self.broker.command.lower() == "post":
                 self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
@@ -159,24 +163,30 @@ class SSS3:
     def start(self, mcast_IP: IPv4Address, can_port: int, carla_port: int):
         self.__typewritter("Received session setup information from the server.", tcolors.magenta)
         self.__typewritter("Starting the session!", tcolors.yellow)
-        self.__set_mcast_options(self, self.can, mcast_IP, can_port)
+        self.__set_mcast_options(self.can, mcast_IP, can_port)
         can_data = SimpleNamespace(callback = self.receive)
         self.sel.register(self.can, selectors.EVENT_READ, can_data)
-        self.__set_mcast_options(self, self.carla, mcast_IP, carla_port)
+        self.__set_mcast_options(self.carla, mcast_IP, carla_port)
         carla_data = SimpleNamespace(
             callback = self.send,
             outgoing_message = None,
-            message_lock = mp.Lock()
+            message_lock = threading.Lock()
             )
         self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
-        self.l_thread = mp.Process(target=self.__listen(0))
-        self.l_thread.start()
+        if self.l_thread.is_alive():
+            self.listen = False
+            self.l_thread.join(1)
+            self.listen = True
+            self.l_thread.start()
+        else:
+            self.listen = True
+            self.l_thread.start()
                 
     def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
-        sock.bind((mcast_IP, port))
-        mreq = struct.pack("4sl", socket.inet_aton(mcast_IP),
-                            socket.INADDR_ANY)
+        sock.bind(('', port))
+        group = socket.inet_aton(str(mcast_IP))
+        mreq = struct.pack("4sl", group, socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP,
                         socket.IP_ADD_MEMBERSHIP, mreq)
         sock.settimeout(0.4)

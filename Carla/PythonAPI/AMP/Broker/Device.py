@@ -6,8 +6,10 @@ from typing import Tuple, Dict, List
 SEL = selectors.SelectorKey
 
 class Device:
-    def __init__(self, callback, addr: Tuple[str, int]) -> None:
-        self.callback = callback
+    def __init__(self, read, write, addr: Tuple[str, int]) -> None:
+        self.read = read
+        self.write = write
+        self.callback = read
         self.addr = addr
         self.accept_by = time.time() + 5
         self.MAC = "unknown"
@@ -17,6 +19,7 @@ class Device:
         self.rate = 10.0 # 10 messages per second
         self.allowance = self.rate
         self.last_check = time.time()
+        self.rate_limit_chances = 10
 
     @staticmethod
     def is_registered(key: SEL) -> bool:

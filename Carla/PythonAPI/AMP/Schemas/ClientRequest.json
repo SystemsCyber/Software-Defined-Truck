@@ -19,7 +19,7 @@
                 "$ref": "VMMAC.json/#/examples/0"
             },
             "ECUs": {
-                "$ref": "RequestedECUs.json/#/examples/0"
+                "$ref": "RequestECUs.json/#/examples/0"
             }
         },
         {
@@ -27,7 +27,7 @@
                 "$ref": "VMMAC.json/#/examples/1"
             },
             "ECUs": {
-                "$ref": "RequestedECUs.json/#/examples/1"
+                "$ref": "RequestECUs.json/#/examples/1"
             }
         }
     ],
@@ -40,7 +40,7 @@
             "$ref": "VMMAC.json"
         },
         "ECUs": {
-            "$ref": "RequestedECUs.json"
+            "$ref": "RequestECUs.json"
         }
     }
 }

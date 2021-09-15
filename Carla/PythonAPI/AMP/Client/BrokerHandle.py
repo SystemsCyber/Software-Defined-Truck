@@ -20,8 +20,8 @@ class BrokerHandle(BaseHTTPRequestHandler):
         self.server_address = _server_address
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
-        self.request_schema, self.request_schema_file = Schema.compile_schema("RequestECUs.json")
-        self.session_schema, self.session_schema_file = Schema.compile_schema("SessionInformation.json")
+        self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
+        self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
         self.mcast_IP = IPv4Address
         self.can_port = 0
         self.carla_port = 0
@@ -101,7 +101,8 @@ class BrokerHandle(BaseHTTPRequestHandler):
     def __submit_registration(self, registration: str) -> http.client.HTTPResponse:
         logging.info("-> Sending registration request.")
         try:
-            self.ctrl.request("POST", "/client/register", registration)
+            headers = {"Content-Type": "application/json"}
+            self.ctrl.request("POST", "/client/register", registration, headers)
             logging.info("-> Registration request successfully sent!")
             self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
         except http.client.HTTPException as httpe:
@@ -150,8 +151,6 @@ class BrokerHandle(BaseHTTPRequestHandler):
             if self.__wait_for_socket():
                 self.response = self.ctrl.getresponse()
                 self.response_data = self.response.read(self.response.length)
-                logging.debug(self.response.length)
-                logging.debug(self.response.msg)
                 return self.__validate_device_list_response(self.response, self.response_data)
 
     def __validate_device_list_response(self, response: http.client.HTTPResponse, data: bytes) -> list:
@@ -169,7 +168,8 @@ class BrokerHandle(BaseHTTPRequestHandler):
             logging.info("Deserializing device list.")
             available_devices = json.loads(data)
             logging.info("Validating device list against request schema.")
-            self.request_schema.validate(available_devices)
+            if len(available_devices) > 0:
+                self.request_schema.validate(available_devices)
             return available_devices
         except jsonschema.ValidationError as ve:
             logging.error(ve)
@@ -180,22 +180,26 @@ class BrokerHandle(BaseHTTPRequestHandler):
             logging.error("Device list could not be deserialized.")
             return []
 
-    def request_devices(self, devices: list) -> bool:
-        requestJSON = json.dumps({"MAC": self.mac, "ECUs": devices})
+    def request_devices(self, requested_devices: list, devices: list) -> bool:
+        req_to_ecu_list = [i for i in devices if i["ID"] in requested_devices]
+        requestJSON = json.dumps({"MAC": self.mac, "ECUs": req_to_ecu_list})
         try:
             logging.info("Requesting devices from the server.")
-            self.ctrl.request("POST", "/session", requestJSON)
+            headers = {"Content-Type": "application/json"}
+            self.ctrl.request("POST", "/client/session", requestJSON, headers)
         except http.client.HTTPException as httpe:
             self.__handle_connection_errors(httpe)
             return False
         else:
             if self.__wait_for_socket():
                 self.response = self.ctrl.getresponse()
-                self.response_data = self.response.read(self.response.length)
-                return self.__validate_request_device_response(self.response)
+                response_data = self.response.read(self.response.length)
+                return self.__validate_request_device_response(self.response, response_data)
 
-    def __validate_request_device_response(self, response: http.client.HTTPResponse) -> bool:
+    def __validate_request_device_response(self, response: http.client.HTTPResponse, response_data: bytes) -> bool:
         if response.status >= 200 and response.status < 300:
+            with BytesIO(response_data) as self.rfile:
+                self.do_POST()
             logging.info("Request for selected devices was successful.")
             return True
         else:
@@ -209,16 +213,15 @@ class BrokerHandle(BaseHTTPRequestHandler):
         self.__handle_SSE(self.ctrl.sock.recv(4096))
         if self.close_connection:
             logging.error("Server closed the connection.")
-            self.__shutdown_connection(key)
+            self.shutdown_connection(key)
 
-    def __handle_SSE(self, message: bytes):
+    def __handle_SSE(self, message: bytes, skip_handle = False):
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
             self.handle_one_request()
 
     def do_POST(self):
-        logging.debug("SSE is a POST.")
         try:
-            data = json.loads(self.rfile)
+            data = json.load(self.rfile)
             self.session_schema.validate(data)
             self.mcast_IP = IPv4Address(data["IP"])
             self.can_port = data["CAN_PORT"]
@@ -237,9 +240,8 @@ class BrokerHandle(BaseHTTPRequestHandler):
             raise SyntaxError from ave
 
     def do_DELETE(self):
-        logging.debug("SSE is a DELETE.")
         logging.info("Server closed the current session.")
-        self.mcast_IP = IPv4Address()
+        self.mcast_IP = IPv4Address
         self.can_port = 0
         self.carla_port = 0
 
