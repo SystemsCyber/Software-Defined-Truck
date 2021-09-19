@@ -16,7 +16,7 @@ from SSS3Handle import SSS3Handle
 from ClientHandle import ClientHandle
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from HelperMethods import ColoredConsoleHandler
+from HelperMethods import ColoredConsoleHandler, LogFolder
 
 """TODO Notes:
     - We need to set the keep alive function on the teensy.
@@ -52,12 +52,13 @@ class Broker(BaseHTTPRequestHandler):
         self.CLIENTs = ClientHandle(self.sel, self.multicast_IPs)
 
     def __setup_logging(self):
+        filename = LogFolder.findpath("broker_log")
         logging.basicConfig(
             format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
             level=logging.DEBUG,
             handlers=[
                 TimedRotatingFileHandler(
-                    filename="broker_log.log",
+                    filename=filename,
                     when="midnight",
                     interval=1,
                     backupCount=7,
@@ -119,8 +120,7 @@ class Broker(BaseHTTPRequestHandler):
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # lsock.bind((socket.gethostname(), 80))
-        lsock.bind(("192.168.1.58", 80))
-        # lsock.bind(("127.0.0.1", 80))
+        lsock.bind(("127.0.0.1", 80))
         lsock.listen()
         lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
@@ -195,8 +195,9 @@ class Broker(BaseHTTPRequestHandler):
             except BlockingIOError:
                 self.log_error("A blocking error occured in __read, when it shouldn't have.")
             except ConnectionResetError as cre:
-                key.data.close_connection = True
                 self.log_error(f'{cre}')
+                key.data.close_connection = True
+                self.__shutdown_connection(key)
 
     def __rate_limit(self, key: SEL) -> bool:
         # Token Bucket algorithm

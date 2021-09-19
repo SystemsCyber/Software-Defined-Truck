@@ -1079,6 +1079,8 @@ class CameraManager(object):
 
 
 def game_loop(args):
+    ecu = SSS3(args.server_host)
+    ecu.setup()
     pygame.init()
     pygame.font.init()
     world = None
@@ -1097,12 +1099,10 @@ def game_loop(args):
         world = World(client.get_world(), hud, args)
         # world = World(client.load_world('Town02'), hud, args)
         controller = KeyboardControl(world, args.autopilot)
-        ecu = SSS3(args.sss3_host)
-        ecu.setup()
 
         clock = pygame.time.Clock()
         while True:
-            clock.tick_busy_loop(60) # originally 60
+            clock.tick_busy_loop(60)
             c = world.player.get_control()
             # p = world.player.get_physics_control()
             # t = world.player.get_transform()
@@ -1163,7 +1163,7 @@ def main():
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
-        default='800x600', # originally 1280 x 720
+        default='1280x720', # originally 1280 x 720
         help='window resolution (default: 1280x720)')
     argparser.add_argument(
         '--filter',

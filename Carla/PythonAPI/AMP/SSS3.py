@@ -2,14 +2,14 @@ import socket
 import struct
 import sys
 import time
-import os
+import atexit
 import selectors
 from typing import Union, Tuple, List, Dict, Optional
 from frame import Frame
 from types import SimpleNamespace
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from HelperMethods import ColoredConsoleHandler
+from HelperMethods import ColoredConsoleHandler, LogFolder
 from BrokerHandle import BrokerHandle
 import shutil
 from ipaddress import IPv4Address
@@ -48,14 +48,14 @@ class SSS3:
     """SSS3 communication utility in conjunction with the CARLA simulator"""
 
     def __init__(self, _server_address = socket.gethostname()) -> None:
+        atexit.register(self.stop)
         self.__setup_logging()
         self.frame = Frame()
         self.dropped_messages = 0
         self.timeouts = 0
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
-        # self.broker = BrokerHandle(self.sel, _server_address)
-        self.broker = BrokerHandle(self.sel, "192.168.1.58")
+        self.broker = BrokerHandle(self.sel, _server_address)
         self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.carla = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.l_thread = threading.Thread(target=self.__listen, args=(0,))
@@ -79,12 +79,13 @@ class SSS3:
                 return
 
     def __setup_logging(self) -> None:
+        filename = LogFolder.findpath("sss3_log")
         logging.basicConfig(
             format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
             level=logging.DEBUG,
             handlers=[
                 TimedRotatingFileHandler(
-                    filename="sss3_log",
+                    filename=filename,
                     when="midnight",
                     interval=1,
                     backupCount=7,
@@ -107,11 +108,7 @@ class SSS3:
 
     def __select_devices(self, devices: list):
         if len(devices) > 0:
-            self.__print_devices(devices)
-            self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
-            input_list = input('').split(',')
-            requested_devices = [int(i.strip()) for i in input_list]
-            self.__request_devices(requested_devices, devices)
+            self.__request_devices(devices)
             data = SimpleNamespace(
                 callback = self.__receive_SSE,
                 outgoing_message = None
@@ -131,12 +128,25 @@ class SSS3:
                 print(f'\tType: {ecu["type"]} | Year: {ecu["year"]} | ', end="")
                 print(f'Make: {ecu["make"]} | Model: {ecu["model"]}', end="\n\n")
 
-    def __request_devices(self, requestedECUs: list, devices: list):
+    def __request_devices(self, devices: list):
+        self.__print_devices(devices)
+        device_ids = [device["ID"] for device in devices]
+        requestedECUs = self.__request_user_select_devices(device_ids)
         if self.broker.request_devices(requestedECUs, devices):
             self.__typewritter("Requested devices were successfully allocated.", tcolors.yellow)
         else:
             self.__typewritter("One or more of the requested devices are no longer available. Please select new device(s).", tcolors.red)
             self.__select_devices(self.broker.get_devices())
+
+    def __request_user_select_devices(self, device_ids: list) -> List:
+        self.__typewritter("Enter the numbers corresponding to the ECUs you would like to use (comma separated): ", tcolors.magenta, end=None)
+        input_list = input('').split(',')
+        requestedECUs = [int(i.strip()) for i in input_list]
+        if set(requestedECUs).issubset(device_ids):
+            return requestedECUs
+        else:
+            self.__typewritter("One or more numbers entered do not correspond with the available devices.", tcolors.red)
+            return self.__request_user_select_devices(device_ids)
 
     def __typewritter(self, sentence, color=None, end='\n'):
         print(color, end='')
@@ -182,10 +192,10 @@ class SSS3:
         else:
             self.listen = True
             self.l_thread.start()
-            try:
-                time.sleep(1000)
-            except KeyboardInterrupt:
-                pass
+            # try:
+            #     time.sleep(1000)
+            # except KeyboardInterrupt:
+            #     pass
                 
     def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
@@ -224,7 +234,7 @@ class SSS3:
     def __send(self, key: selectors.SelectorKey) -> None:
         try:
             message = key.data.outgoing_message
-            key.fileobj.sendto(message, (self.mcast_ip, self.carla_port))
+            key.fileobj.sendto(message, (str(self.broker.mcast_IP), self.broker.carla_port))
             self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
         except InterruptedError:
             logging.error("Message was interrupted while sending.")
@@ -233,12 +243,29 @@ class SSS3:
 
     def __receive(self, key: selectors.SelectorKey) -> None:
         try:
-            data = key.fileobj.recv(20)
-            if len(data) == 20:  # 20 is size of carla struct in bytes
-                ecm_data = struct.unpack("Ifff???B", data)
-                print(self.frame.print_frame(self.frame.unpack(ecm_data)))
-                # if not self.frame(ecm_data, control, verbose):
-                #     self.__frame_miss_match(ecm_data, verbose)
+            data = key.fileobj.recv(31)
+            if len(data) == 31:
+                data = struct.unpack("IIIHB????BBBBBBBBBbB?", data)
+                frameNum = data[0]
+                seqNum = data[1]
+                id = data[2]
+                timestamp = data[3]
+                IDHit = data[4]
+                extended = data[5]
+                remote = data[6]
+                overrun = data[7]
+                reserved = data[8]
+                datalen = data[9]
+                canData = [data[i] for i in range(10,19)]
+                mb = data[19]
+                bus = data[20]
+                seqFrame = data[21]
+                printout = f'Frame #: {frameNum} Seq. #: {seqNum}\n'
+                printout += f'\tID: {id} Timestamp: {timestamp} IDHit: {IDHit}\n'
+                printout += f'\tExtended: {extended} Remote: {remote} Overrun: {overrun} Reserved: {reserved}\n'
+                printout += f'\tLen: {datalen} Data: {canData}\n'
+                printout += f'\tMailbox: {mb} Bus: {bus} SeqFrame: {seqFrame}\n\n'
+                print(printout)
         except socket.timeout:
             key.fileobj.settimeout(0.04)
             self.dropped_messages += 1

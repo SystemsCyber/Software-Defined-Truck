@@ -25,6 +25,17 @@ class Schema:
                     return os.path.join(root, name)
         return os.path.join(base_dir, "Schemas")
 
+class LogFolder:
+    @staticmethod
+    def findpath(log_name):
+        base_dir = os.path.abspath(os.getcwd())
+        for root, dirs, files in os.walk(base_dir):
+            for name in dirs:
+                if name == "Logs":
+                    log_path = os.path.join(root, name)
+                    return os.path.join(log_path, log_name)
+        log_path = os.path.join(base_dir, "Logs")
+        return os.path.join(log_path, log_name)
 
 # COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
 class ColoredConsoleHandler(logging.StreamHandler):

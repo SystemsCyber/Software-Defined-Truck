@@ -1,5 +1,4 @@
 import struct
-from ctypes import c_uint8, c_uint32, c_float
 
 
 class Frame:
@@ -10,14 +9,14 @@ class Frame:
     def pack(self, control) -> bytes:
         self.last_frame = self.frame_num
         return struct.pack("Ifff???B",
-                           c_uint32(self.frame_num),   # Frame number
-                           c_float(control.throttle),  # Throttle
-                           c_float(control.steer),     # Steering
-                           c_float(control.brake),     # Braking
-                           control.hand_brake,         # Hand Brake
-                           control.reverse,            # Reverse
-                           control.manual_gear_shift,  # Manual
-                           c_uint8(control.gear))      # Gear
+                           self.frame_num,              # Frame number
+                           control.throttle,            # Throttle
+                           control.steer,               # Steering
+                           control.brake,               # Braking
+                           control.hand_brake,          # Hand Brake
+                           control.reverse,             # Reverse
+                           control.manual_gear_shift,   # Manual
+                           control.gear)                # Gear
 
     def unpack(self, ecm_data, control, verbose=False) -> bool:
         if ecm_data[0] >= self.last_frame:

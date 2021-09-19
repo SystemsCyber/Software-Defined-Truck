@@ -8,13 +8,11 @@ import os
 from ipaddress import IPv4Address, AddressValueError
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler
-from logging.handlers import TimedRotatingFileHandler
-from HelperMethods import ColoredConsoleHandler, Schema
+from HelperMethods import Schema
 from getmac import get_mac_address as gma
 
 class BrokerHandle(BaseHTTPRequestHandler):
     def __init__(self, _sel: selectors.DefaultSelector, _server_address = socket.gethostname()) -> None:
-        self.__setup_logging()
         self.mac = gma()
         self.sel = _sel
         self.server_address = _server_address
@@ -39,24 +37,6 @@ class BrokerHandle(BaseHTTPRequestHandler):
                          ("SERVER", format%args))
     
     # ----------------------------------
-
-    def __setup_logging(self) -> None:
-        logging.basicConfig(
-            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
-            level=logging.DEBUG,
-            handlers=[
-                TimedRotatingFileHandler(
-                    filename="sss3_log",
-                    when="midnight",
-                    interval=1,
-                    backupCount=7,
-                    encoding='utf-8'
-                    ),
-                ColoredConsoleHandler()
-                ]
-            )
-        # self.logger = logging.getLogger(__name__)
-        # self.logger.setLevel(logging.DEBUG)
     
     def connect(self, retry = True) -> bool:
         try:
@@ -112,13 +92,16 @@ class BrokerHandle(BaseHTTPRequestHandler):
             if self.__wait_for_socket():
                 return self.ctrl.getresponse()
 
-    def register(self) -> bool:
+    def register(self, retry = True) -> bool:
         logging.info(f'Attempting to register with server using this MAC address: {self.mac}.')
         self.response = self.__submit_registration(json.dumps({"MAC": self.mac}))
         self.response_data = self.response.read(self.response.length)
         if self.response.status >= 200 and self.response.status < 400:
             logging.info("Successfully registered with the server.")
             return True
+        elif retry:
+            logging.error("Bad response from server. Retrying.")
+            return self.register(False)
         else:
             logging.error("Failed to register with server: ")
             logging.error(f'\tFailure Code: {self.response.status}')
