@@ -8,70 +8,97 @@
 
 int HTTPClient::init()
 {
+    config.init();
     Serial.println("Setting up Ethernet:");
     Serial.println("\t-> Initializing the Ethernet shield to use the provided MAC address");
     Serial.println("\t   and retreving network configuration parameters through DHCP.");
-    return initEthernet(Ethernet.begin(&(_config.mac[0])));
+    ethernetInitialized = initEthernet(Ethernet.begin(&(config.mac[0])));
+    return ethernetInitialized;
 }
 
-bool HTTPClient::enlist()
+bool HTTPClient::connect()
 {
-    if (!(_config.FQDN[0] >= '0' && _config.FQDN[0] <= '9'))
+    if (ethernetInitialized)
     {
-        DNSClient dns;
-        dns.begin(Ethernet.dnsServerIP());
-        dns.getHostByName(_config.FQDN, _config.serverIP);
-    }
-    unsigned long lastAttempt = 0;
-    const unsigned long retryInterval = 60 * 1000;
-    bool successfullyRegistered = submitConfiguration(&lastAttempt);
-    while (!successfullyRegistered)
-    {
-        if (millis() - lastAttempt > retryInterval)
+        serverAddress = resolveServerAddress(config.config["serverAddress"]);
+        request = {"POST", "/sss3/register", config.config};
+        unsigned long lastAttempt = millis();
+        const unsigned long retryInterval = 60 * 1000;
+        bool submitted = false;
+        do
         {
-            successfullyRegistered = submitConfiguration(&lastAttempt);
+            submitted = tryToConnect(&lastAttempt, retryInterval);
         }
+        while (!submitted);
+        return write(request, &response);
     }
-    return awaitConfirmation();
+    else
+    {
+        Serial.println("Cannot connect to server until HTTPClient has been initialized.");
+        return false;
+    }
 }
 
-bool HTTPClient::readSSE()
+bool HTTPClient::read(struct Request *req)
 {
     Ethernet.maintain(); //Keep current address assigned by DHCP server.
     if (server.available())
     {
-        request, requestMethod, requestError = "";
-        request = server.readString((size_t) 4096);
-        if (request.length() > 0 && parseRequest())
+        req->raw = server.readString((size_t) 4096);
+        if ((req->raw).length() > 0 && parseRequest(req))
         {
             Serial.print("New command from: ");
             Serial.println(server.remoteIP());
-            Serial.println(request);
+            Serial.println(req->raw);
             return true;
         }
-        Serial.println(requestError);
+        Serial.println(req->error);
     }
     else if (!server.connected())
     {
         Serial.println("Lost connection to the Control Server. Trying to re-connect...");
-        enlist();
+        connect();
     }
     return false;
 }
 
-bool HTTPClient::writeCSE(String method, String data)
+bool HTTPClient::write(struct Request req, struct Response *res, bool retry)
 {
-    if (!server.connected()) return false;
-    response, responseReason, responseMessage, responseError = "";
-    responseCode = 0;
-    Serial.print("Sending Server Client Side Event message...");
-    server.println(method + " /sss3/register HTTP/1.1");
-    server.println("Connection: keep-alive");
-    server.println();
-    server.print(data);
-    server.flush();
-    Serial.println("Done.");
-    return true;
+    Ethernet.maintain();
+    if (server.connected())
+    {
+        server.println(req.method + " " + req.uri + " HTTP/1.1");
+        server.println("Connection: keep-alive");
+        if (!req.data.isNull())
+        {
+            server.println("Content-Type: application/json");
+            server.println();
+            String data;
+            serializeJson(req.data, data);
+            server.print(data);
+        }
+        else
+        {
+            server.println();
+        }
+        server.flush();
+        return getResponse(req, res, retry);
+    }
+    else
+    {
+        Serial.println("Lost connection to the Control Server. Trying to re-connect...");
+        if (connect())
+        {
+            Serial.println("Successfully reconnected and re-registered with the server.");
+            Serial.println("Attempting to send message again.");
+            return write(req, res, false);
+        }
+        else
+        {
+            Serial.println("Could not re-connect to the Control Server.");
+            return false;
+        }
+    }
 }
 
 int HTTPClient::initEthernet(int success)
@@ -84,9 +111,9 @@ int HTTPClient::initEthernet(int success)
         Serial.println("Network Configuration:");
         Serial.print("\tHostname: ");
         Serial.print("WIZnet");
-        Serial.print(_config.mac[3], HEX);
-        Serial.print(_config.mac[4], HEX);
-        Serial.println(_config.mac[5], HEX);
+        Serial.print(config.mac[3], HEX);
+        Serial.print(config.mac[4], HEX);
+        Serial.println(config.mac[5], HEX);
         Serial.print("\tIP Address: ");
         Serial.println(Ethernet.localIP());
         Serial.print("\tNetmask: ");
@@ -133,153 +160,215 @@ void HTTPClient::checkLink()
     }
 }
 
-bool HTTPClient::submitConfiguration(unsigned long *lastAttempt)
+IPAddress HTTPClient::resolveServerAddress(const char *nameOrIP)
 {
-    response, responseReason, responseMessage, responseError = "";
-    responseCode = 0;
-    Serial.print("Connecting to the Control Server at ");
-    Serial.print(_config.serverIP);
-    Serial.print("... ");
-    if (server.connect(_config.serverIP, 80))
+    Serial.println("Resolving serverAddress to an IP address.");
+    IPAddress address(0,0,0,0);
+    DNSClient dns;
+    dns.begin(Ethernet.dnsServerIP());
+    switch (dns.getHostByName(nameOrIP, address))
     {
-        Serial.println("connected.");
-        Serial.print("Generating registration request...");
-        String config;
-        serializeJson(_config, config);
-        Serial.println("Done.");
-        Serial.print("Sending configuration message... ");
-        server.println("POST /sss3/register HTTP/1.1");
-        server.println("Connection: keep-alive");
-        server.println();
-        server.print(config);
-        server.flush();
-        Serial.println("complete.");
-        return true;
+    case 1:
+        Serial.println("Successfully resolved serverAddress as " + address);
+        break;
+    case -1:
+        Serial.println("Could not resolve serverAddress: Timed out.");
+        break;
+    case -2:
+        Serial.println("Could not resolve serverAddress: Invalid server.");
+        break;
+    case -3:
+        Serial.println("Could not resolve serverAddress: Truncated.");
+        break;
+    case -4:
+        Serial.println("Could not resolve serverAddress: Invalid response.");
+        break;
+    default:
+        Serial.println("Could not resolve serverAddress. Continuing with 0.0.0.0");
+        break;
+    }
+    return address;
+}
+
+bool HTTPClient::tryToConnect(unsigned long *lastAttempt, const unsigned long retryInterval)
+{
+    if (millis() - *lastAttempt > retryInterval)
+    {
+        Serial.print("Connecting to the Control Server at ");
+        Serial.print(serverAddress);
+        Serial.print("... ");
+        if (server.connect(serverAddress, 80))
+        {
+            Serial.println("connected.");
+            return true;
+        }
+        else
+        {
+            *lastAttempt = millis();
+            Serial.println("connection failed.");
+            Serial.println("Retrying in 60 seconds.");
+            Serial.println();
+            return false;
+        }
     }
     else
     {
-        *lastAttempt = millis();
-        Serial.println("connection failed.");
-        Serial.println("Retrying in 60 seconds.");
-        Serial.println();
         return false;
     }
 }
 
-bool HTTPClient::awaitConfirmation()
+bool HTTPClient::getResponse(struct Request req, struct Response *res, bool retry)
 {
-    Ethernet.maintain(); //Keep current address assigned by DHCP server.
-    if (server.connected())
+    if (!waitForResponse()) return false;
+    Serial.println("Server replied to request. Reading response.");
+    res->raw = server.readString((size_t) 4096);
+    bool didResponseParse = parseResponse(res);
+    if (!didResponseParse && retry)
     {
-        while (!server.available())
-        {
-            Serial.println("Waiting on server to reply to registration request.");
-            delay(500);       
-        }
-        response = server.readString((size_t) 4096);
-        if (parseResponse())
-        {
-            return ((responseCode >= 200) && (responseCode < 300));
-        }
-        return false;
+        Serial.print("Received a poorly formatted response. Retrying.");
+        return write(req, res, false);
+    }
+    else if (didResponseParse && !(res->code >= 200 && res->code < 400) && retry)
+    {
+        Serial.print("Received a bad response code. Retrying in case message got corrupted.");
+        return write(req, res, false);
     }
     else
     {
-        Serial.println("Lost connection to the Server. Trying to re-connect...");
-        return enlist();
+        return didResponseParse;
     }
 }
 
-bool HTTPClient::parseResponse()
+bool HTTPClient::waitForResponse()
 {
-    if (response.length() <= 0) return false;
-    std::vector<String> responseArray = tokenizeHTTPMessage(response);
+    unsigned long originalTime = millis();
+    int count = 0;
+    while (!server.available())
+    {
+        if (millis() - originalTime >= (uint32_t) 500)
+        {
+            count += 1;
+            originalTime = millis();
+            Serial.println("Waiting on server to reply to request.");
+        }
+        else if (count > 10)
+        {
+            Serial.println("No response heard for 5 seconds.");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool HTTPClient::parseResponse(struct Response *res)
+{
+    if (res->raw.length() <= 0) return false;
+    std::array<String, 2> messageSplit = splitMessage(res->raw);
+    std::vector<String> responseArray = tokenizeHTTPMessage(messageSplit[0]);
     if (responseArray.size() < 2)
     {
-        responseError = "Response is incorrectly formatted";
+        res->error = "Response is incorrectly formatted";
         return false;
     }
     else if (responseArray[0] != "HTTP/1.1")
     {
-        responseError = "Response is missing HTTP/1.1";
+        res->error = "Response is missing HTTP/1.1";
         return false;
     }
-    responseCode = responseArray[1].toInt();
-    if (responseCode == 0) {
-        responseError = "Response error code could not be convert to a long";
+    res->code = responseArray[1].toInt();
+    if (res->code == 0) {
+        res->error = "Response error code could not be convert to a long";
         return false;
     }
-    if (responseArray.size() >= 3) responseReason = responseArray[2];
-    if (responseArray.size() >= 4)
-    {
-        for (int i = 4; i < responseArray.size(); i++)
-        {
-            responseMessage += " " + responseArray[i];
-        }
-    }
+    if (responseArray.size() >= 3) res->reason = responseArray[2];
+    if (messageSplit[1].length() > 0) res->data = messageSplit[1];
     return true;
 }
 
-bool HTTPClient::parseRequest()
+bool HTTPClient::parseRequest(struct Request *req)
 {
-    if (request.length() <= 0) return false;
-    std::vector<String> requestArray = tokenizeHTTPMessage(request);
+    if (req->raw.length() <= 0) return false;
+    std::array<String, 2> messageSplit = splitMessage(req->raw);
+    std::vector<String> requestArray = tokenizeHTTPMessage(messageSplit[0]);
     if (requestArray.size() < 3)
     {
-        requestError = "Request is incorrectly formatted";
+        req->error = "Request is incorrectly formatted";
         return false;
     }
     else if (requestArray[2] != "HTTP/1.1")
     {
-        requestError = "Request is missing HTTP/1.1";
+        req->error = "Request is missing HTTP/1.1";
         return false;
     }
-    requestMethod = requestArray[0];
-    if (!(requestMethod.equalsIgnoreCase("Delete") || requestMethod.equalsIgnoreCase("Post")))
+    req->method = requestArray[0];
+    if (messageSplit[1].length() > 0)
     {
-        requestError = "Request method is not DELETE or POST";
-        return false;
-    }
-    if (requestArray.size() >= 3)
-    {
-        DeserializationError error = deserializeJson(requestData, requestArray[3]);
+        DynamicJsonDocument data(1024);
+        DeserializationError error = deserializeJson(data, messageSplit[1]);
         if (error)
         {
-            requestError = "Deserializing the request data failed with code ";
-            requestError += error.c_str();
+            req->error = "Deserializing the request data failed with code ";
+            req->error += error.c_str();
             return false;
         }
+        req->data = data;
     }
-    return validateJSON();
+    return validateJSON(req);
 }
 
-bool HTTPClient::validateJSON()
+bool HTTPClient::validateJSON(struct Request *req)
 {
-    bool containsIP = requestData.containsKey("IP");
-    bool containsCAN_PORT = requestData.containsKey("CAN_PORT");
-    bool containsCARLA_PORT = requestData.containsKey("CARLA_PORT");
+    bool containsIP = req->data.containsKey("IP");
+    bool containsCAN_PORT = req->data.containsKey("CAN_PORT");
+    bool containsCARLA_PORT = req->data.containsKey("CARLA_PORT");
     if (!containsIP || !containsCAN_PORT || !containsCARLA_PORT)
     {
-        requestError = "Request JSON is missing one of the required keys.";
+        req->error = "Request JSON is missing one of the required keys.";
         return false;
     }
-    String IP = requestData["IP"];
+    String IP = req->data["IP"];
     if (!IP.startsWith("239.255."))
     {
-        requestError = "IP in request JSON does not start with 239.255.";
+        req->error = "IP in request JSON does not start with 239.255.";
         return false;
     }
-    else if (requestData["CAN_PORT"] < 1025 || requestData["CAN_PORT"] > 65535)
+    else if (req->data["CAN_PORT"] < 1025 || req->data["CAN_PORT"] > 65535)
     {
-        requestError = "CAN port in request is out of range.";
+        req->error = "CAN port in request is out of range.";
         return false;
     }
-    else if (requestData["CARLA_PORT"] < 1025 || requestData["CARLA_PORT"] > 65535)
+    else if (req->data["CARLA_PORT"] < 1025 || req->data["CARLA_PORT"] > 65535)
     {
-        requestError = "CARLA port in request is out of range.";
+        req->error = "CARLA port in request is out of range.";
         return false;
     }
     return true;
+}
+
+std::array<String, 2> HTTPClient::splitMessage(String message)
+{
+    std::array<String, 2> messageSplit;
+    int startOfData = message.indexOf("\r\n\r\n");
+    if (startOfData == -1)
+    {
+        startOfData = message.indexOf("\n\n");
+        if (startOfData == -1)
+        {
+            messageSplit[0] = message;
+            messageSplit[1] = "";
+            return messageSplit;
+        }
+    }
+    messageSplit[0] = message.substring(0, startOfData);
+    if (startOfData < (signed) message.length() - 1)
+    {
+        messageSplit[1] = message.substring(startOfData + 1);
+    }
+    else
+    {
+        messageSplit[1] = "";
+    }
+    return messageSplit;
 }
 
 std::vector<String> HTTPClient::tokenizeHTTPMessage(String message)

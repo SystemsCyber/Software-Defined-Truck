@@ -208,11 +208,11 @@ class ClientHandle:
         for device in members:
             if device != self._key.fd:
                 key = mapping[device]
-                # key.data.callback = key.data.write
-                # key.data.outgoing_messages.put(message)
-                # self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
-                # self.__log_info(f'Successfully notified {key.data.addr[0]}.')
-                logging.debug(f'Would have successfully notified {key.data.addr[0]}, but its currently disabled for debugging purposes.')
+                key.data.callback = key.data.write
+                key.data.outgoing_messages.put(message)
+                self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
+                self.__log_info(f'Successfully notified {key.data.addr[0]}.')
+                # logging.debug(f'Would have successfully notified {key.data.addr[0]}, but its currently disabled for debugging purposes.')
 
     def __log_registration(self) -> None:
         msg = f'Successfully registered!\n'

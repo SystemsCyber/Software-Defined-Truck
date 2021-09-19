@@ -18,6 +18,7 @@ import threading
 
 # Type Aliases
 SOCK_T = socket.socket
+SEL = selectors.SelectorKey
 if sys.version_info >= (3, 9):
     SOCK_DICT = dict[str, SOCK_T]
     MCAST_SOCKS = tuple[str, SOCK_DICT]
@@ -54,11 +55,12 @@ class SSS3:
         self.seq_miss_match = 0
         self.sel = selectors.DefaultSelector()
         # self.broker = BrokerHandle(self.sel, _server_address)
-        self.broker = BrokerHandle(self.sel, "127.0.0.1")
+        self.broker = BrokerHandle(self.sel, "192.168.1.58")
         self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.carla = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.l_thread = threading.Thread(target=self.__listen, args=(0,))
         self.l_thread.setDaemon(True)
+        self.selector_lock = threading.Lock()
         self.listen = True
 
     def __listen(self, _timeout=None, waiting_msg = None) -> None:
@@ -66,10 +68,11 @@ class SSS3:
             self.__typewritter(waiting_msg, tcolors.cyan)
         while self.listen:
             try:
-                connection_events = self.sel.select(timeout=_timeout)
-                for key, mask in connection_events:
-                    callback = key.data.callback
-                    callback(key)  
+                with self.selector_lock:
+                    connection_events = self.sel.select(timeout=_timeout)
+                    for key, mask in connection_events:
+                        callback = key.data.callback
+                        callback(key)  
             except TimeoutError:
                 continue
             except KeyboardInterrupt:
@@ -111,8 +114,7 @@ class SSS3:
             self.__request_devices(requested_devices, devices)
             data = SimpleNamespace(
                 callback = self.__receive_SSE,
-                outgoing_message = None,
-                message_lock = threading.Lock()
+                outgoing_message = None
                 )
             self.sel.modify(self.broker.ctrl.sock, selectors.EVENT_READ, data)
             self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
@@ -164,15 +166,14 @@ class SSS3:
         self.__typewritter("Received session setup information from the server.", tcolors.magenta)
         self.__typewritter("Starting the session!", tcolors.yellow)
         self.__set_mcast_options(self.can, mcast_IP, can_port)
-        can_data = SimpleNamespace(callback = self.receive)
+        can_data = SimpleNamespace(callback = self.__receive)
         self.sel.register(self.can, selectors.EVENT_READ, can_data)
         self.__set_mcast_options(self.carla, mcast_IP, carla_port)
         carla_data = SimpleNamespace(
-            callback = self.send,
-            outgoing_message = None,
-            message_lock = threading.Lock()
+            callback = self.__send,
+            outgoing_message = None
             )
-        self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
+        self._key = self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
         if self.l_thread.is_alive():
             self.listen = False
             self.l_thread.join(1)
@@ -181,6 +182,10 @@ class SSS3:
         else:
             self.listen = True
             self.l_thread.start()
+            try:
+                time.sleep(1000)
+            except KeyboardInterrupt:
+                pass
                 
     def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
@@ -209,18 +214,24 @@ class SSS3:
         logging.debug("Closing the carla socket.")
         self.carla.close()
 
-    def send(self, key: selectors.SelectorKey) -> None:
-        with key.data.message_lock:
-            try:
-                message = self.frame.pack(key.data.outgoing_message)
-                key.fileobj.sendto(message, (self.mcast_ip, self.carla_port))
-                self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
-            except InterruptedError:
-                logging.error("Message was interrupted while sending.")
-            except BlockingIOError:
-                logging.error("Socket is currently blocked and cannot send messages.")
+    def send_control_frame(self, control):
+        with self.selector_lock:
+            self.frame.frame_num += 1
+            message = self.frame.pack(control)
+            self._key.data.outgoing_message = message
+            self.sel.modify(self._key.fileobj, selectors.EVENT_WRITE, self._key.data)
 
-    def receive(self, key: selectors.SelectorKey) -> None:
+    def __send(self, key: selectors.SelectorKey) -> None:
+        try:
+            message = key.data.outgoing_message
+            key.fileobj.sendto(message, (self.mcast_ip, self.carla_port))
+            self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
+        except InterruptedError:
+            logging.error("Message was interrupted while sending.")
+        except BlockingIOError:
+            logging.error("Socket is currently blocked and cannot send messages.")
+
+    def __receive(self, key: selectors.SelectorKey) -> None:
         try:
             data = key.fileobj.recv(20)
             if len(data) == 20:  # 20 is size of carla struct in bytes

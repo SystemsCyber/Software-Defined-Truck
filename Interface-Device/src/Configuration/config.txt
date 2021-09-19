@@ -1,6 +1,5 @@
 {
-    "mac":"AB:CD:EF:GH:IJ:KL",
-    "serverIP":"123.456.789.101",
-    "serverPort":12345,
+    "serverIP":"192.168.56.1",
+    "serverPort":80,
     "attachedDevice":"ECM_CM2150_200k"
 }

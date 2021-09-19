@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <IPAddress.h>
 #include <Ethernet.h>
 #include <Configuration/LoadConfiguration.h>
 #include <vector>
@@ -10,31 +11,40 @@
 class HTTPClient
 {
 private:
-    LoadConfiguration _config;  // Configuration object containing initailization values.
+    LoadConfiguration config;  // Configuration object containing initailization values.
+    IPAddress serverAddress;
+    bool ethernetInitialized;
 
 public:
-    String request;             // String to hold outgoing messages.
-    String requestMethod;
-    DynamicJsonDocument requestData;
-    String requestError;
-    String response;            // String to hold incoming messages.
-    long responseCode;
-    String responseReason;
-    String responseMessage;
-    String responseError;
+    struct Request {
+        String method;
+        String uri;
+        StaticJsonDocument<1024> data;
+        String error;
+        String raw;
+    } request;
+
+    struct Response {
+        String version;
+        long code;
+        String reason;
+        String data;
+        String error;
+        String raw;
+    } response;
     EthernetClient server;      // Connection object for the server.
 
-    HTTPClient() : requestData(96) {};
+    HTTPClient() : ethernetInitialized(false) {};
     // Send configuration info to the server. If the connection to the server
     // fails, retry every minute and print the time to show that the program is
     // still running.
     // Returns once it has successfully send the data to the server.
     int init();
-    bool enlist();
+    bool connect();
     // Maintain connection and read Server Side Events if any exist.
-    bool readSSE();
+    bool read(struct Request *req);
     // Maintain connection and write Client Side Events if any exist.
-    bool writeCSE(String method, String data = "");
+    bool write(struct Request req, struct Response *res, bool retry = true);
 
 private:
     // Initialise the Ethernet shield to use the provided MAC address and
@@ -43,11 +53,15 @@ private:
     int initEthernet(int success);
     static void checkHardware();
     static void checkLink();
-    bool submitConfiguration(unsigned long *lastAttempt);
-    bool awaitConfirmation();
-    bool parseResponse();
-    bool parseRequest();
-    bool validateJSON();
+
+    IPAddress resolveServerAddress(const char *nameOrIP);
+    bool tryToConnect(unsigned long *lastAttempt, const unsigned long retryInterval);
+    bool getResponse(struct Request req, struct Response *res, bool retry = true);
+    bool waitForResponse();
+    bool parseResponse(struct Response *res);
+    bool parseRequest(struct Request *req);
+    bool validateJSON(struct Request *req);
+    std::array<String, 2> splitMessage(String message);
     std::vector<String> tokenizeHTTPMessage(String message);
 };
 

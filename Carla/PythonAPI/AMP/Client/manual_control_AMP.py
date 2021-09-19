@@ -89,7 +89,7 @@ import math
 import random
 import re
 import weakref
-from ecm_control import ECMControl
+from SSS3 import SSS3
 
 try:
     import pygame
@@ -1097,7 +1097,8 @@ def game_loop(args):
         world = World(client.get_world(), hud, args)
         # world = World(client.load_world('Town02'), hud, args)
         controller = KeyboardControl(world, args.autopilot)
-        ecm_controller = ECMControl(args.sss3_host, args.sss3_port)
+        ecu = SSS3(args.sss3_host)
+        ecu.setup()
 
         clock = pygame.time.Clock()
         while True:
@@ -1106,13 +1107,12 @@ def game_loop(args):
             # p = world.player.get_physics_control()
             # t = world.player.get_transform()
             # v = world.player.get_velocity()
-            ecm_controller.send_frame_information(c)
+            ecu.send_control_frame(c)
             if controller.parse_events(client, world, clock):
                 return
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
-            ecm_controller.increase_frame()
 
     finally:
 
@@ -1121,9 +1121,9 @@ def game_loop(args):
 
         if world is not None:
             world.destroy()
-        print(f'Number of Dropped Messages: {ecm_controller.dropped_messages}')
-        print(f'Sequence number miss match. Total: {ecm_controller.seq_miss_match}')
-        print(f'Socket Timeout. Total: {ecm_controller.timeouts}')
+        # print(f'Number of Dropped Messages: {ecm_controller.dropped_messages}')
+        # print(f'Sequence number miss match. Total: {ecm_controller.seq_miss_match}')
+        # print(f'Socket Timeout. Total: {ecm_controller.timeouts}')
         pygame.quit()
 
 
@@ -1146,16 +1146,10 @@ def main():
         default='127.0.0.1',
         help='IP of the host server (default: 127.0.0.1)')
     argparser.add_argument(
-        '--sss3_host',
+        '--server_host',
         metavar='S',
         default='127.0.0.1',
-        help='IP of the SSS3 UDP server (default: 127.0.0.1)')
-    argparser.add_argument(
-        '--sss3_port',
-        metavar='Q',
-        default=8080,
-        type=int,
-        help='Port of the SSS3 UDP server (default: 8080)')
+        help='IP of the server to set up communication between the client and SSS3 (default: 127.0.0.1)')
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
