@@ -137,10 +137,9 @@ class SSS3Handle:
     def __notify_session_members(self, members: List, message: bytes):
         self.__log_info(f'Notifying devices.')
         mapping = self.sel.get_map()
-        for device in members:
-            if device != self._key.fd:
-                key = mapping[device]
-                key.data.callback = key.data.write
-                key.data.outgoing_messages.put(message)
-                self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
-                self.__log_info(f'Successfully notified {key.data.addr[0]}.')
+        for device in members[1:]:
+            key = mapping[device]
+            key.data.callback = key.data.write
+            key.data.outgoing_messages.put(message)
+            self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
+            self.__log_info(f'Successfully notified {key.data.addr[0]}.')

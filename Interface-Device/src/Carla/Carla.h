@@ -5,6 +5,10 @@
 #include <EthernetUdp.h>
 #include <HTTPClient/HTTPClient.h>
 #include <IPAddress.h>
+#include <FlexCAN_T4.h>
+
+#define CAN_message_t_size (size_t) 23
+#define CAN_TX_BUFFER_SIZE (size_t) 35
 
 class Carla
 {
@@ -25,7 +29,9 @@ public:
         bool handBrake, reverse, manualGearShift;
         uint8_t gear;
     } _frame;
+    uint32_t id;
     uint32_t sequenceNumber;
+    uint8_t txCanFrameBuffer[CAN_TX_BUFFER_SIZE];
 
     Carla() = default;
     // Returns 1 if successful, 0 otherwise.
@@ -39,6 +45,9 @@ public:
     // Write size_t bytes from buffer into the packet.
     // Returns 1 if the packet was sent successfully, 0 if there was an error.
     int write(const uint8_t *txBuffer, size_t size);
+    // Write size_t bytes from buffer into the packet.
+    // Returns 1 if the packet was sent successfully, 0 if there was an error.
+    int write(const CAN_message_t *txBuffer);
     // Dumps the packet information to serial.
     static void dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP); 
     // Dumps the frame information to serial.

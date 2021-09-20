@@ -157,9 +157,9 @@ class ClientHandle:
                 self.__log_info("Successfully allocated requested devices.")
                 ip = self.__find_mcast_IP(members)
                 self.__log_info(f'Found available multicast IP address: {ip}.')
-                message, information = self.__create_start_message(ip)
-                wfile.write(information)
-                self.__notify_session_members(members, message)
+                wfile.write(self.__create_session_information(ip, self._key.fd))
+                message = self.__create_start_message()
+                self.__notify_session_members(members, message, ip)
                 return HTTPStatus.CREATED
             self.__log_error("Requested devices are no longer available.")
             return HTTPStatus.CONFLICT
@@ -181,20 +181,25 @@ class ClientHandle:
         self._key.data.in_use = True
         return members
 
-    def __create_start_message(self, IP: IPv4Address) -> bytes:
+    def __create_start_message(self) -> bytes:
+        session_message = (
+            f'POST * HTTP/1.1\r\n'
+            f'Connection: keep-alive\r\n'
+            f'Content-Type: application/json\r\n'
+            "\r\n"
+        )
+        session_message = bytes(session_message, "iso-8859-1")
+        return session_message
+
+    def __create_session_information(self, IP: IPv4Address, FD: int) -> bytes:
         session_information = json.dumps({
+            "ID" : FD,
             "IP" : str(IP),
             "CAN_PORT": self.can_port,
             "CARLA_PORT": self.carla_port
         })
         session_information = bytes(session_information, "UTF-8")
-        session_message = f'POST * HTTP/1.1\r\n'
-        session_message += f'Connection: keep-alive\r\n'
-        session_message += f'Content-Type: application/json\r\n'
-        session_message += "\r\n"
-        session_message = bytes(session_message, "iso-8859-1")
-        session_message = session_message + session_information
-        return session_message, session_information
+        return session_information
 
     def __find_mcast_IP(self, members: List) -> IPv4Address:
         for ip in self.multicast_ips:
@@ -202,17 +207,17 @@ class ClientHandle:
                 ip["sockets"] = members
                 return ip["ip"]
                 
-    def __notify_session_members(self, members: List, message: bytes):
+    def __notify_session_members(self, members: List, message: bytes, IP = None):
         self.__log_info(f'Notifying devices.')
         mapping = self.sel.get_map()
-        for device in members:
-            if device != self._key.fd:
-                key = mapping[device]
-                key.data.callback = key.data.write
-                key.data.outgoing_messages.put(message)
-                self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
-                self.__log_info(f'Successfully notified {key.data.addr[0]}.')
-                # logging.debug(f'Would have successfully notified {key.data.addr[0]}, but its currently disabled for debugging purposes.')
+        for device in members[1:]:
+            if IP:
+                message += self.__create_session_information(IP, device)
+            key = mapping[device]
+            key.data.callback = key.data.write
+            key.data.outgoing_messages.put(message)
+            self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
+            self.__log_info(f'Successfully notified {key.data.addr[0]}.')
 
     def __log_registration(self) -> None:
         msg = f'Successfully registered!\n'

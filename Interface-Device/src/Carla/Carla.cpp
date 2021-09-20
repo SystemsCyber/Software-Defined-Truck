@@ -3,6 +3,7 @@
 #include <Carla/Carla.h>
 #include <HTTPClient/HTTPClient.h>
 #include <Dns.h>
+#include <FlexCAN_T4.h>
 
 int Carla::init()
 {
@@ -32,14 +33,16 @@ int Carla::init()
 int Carla::monitor(bool verbose)
 {
     struct HTTPClient::Request sse;
-    bool CheckForSSE = server.read(&sse);
-    if (CheckForSSE && sse.method.equalsIgnoreCase("Post"))
+    if (server.read(&sse))
     {
-        do_POST(sse);
-    }
-    else if (CheckForSSE && sse.method.equalsIgnoreCase("Delete"))
-    {
-        do_DELETE();
+        if (sse.method.equalsIgnoreCase("POST"))
+        {
+            do_POST(sse);
+        }
+        else if (sse.method.equalsIgnoreCase("DELETE"))
+        {
+            do_DELETE();
+        }
     }
     else
     {
@@ -81,23 +84,34 @@ int Carla::write(const uint8_t *txBuffer, size_t size)
     }
     else
     {
-        size_t newSize = size + (size_t) 8;
+        size_t newSize = size + (size_t) 12;
         uint8_t txBufferWithFrameNumber[newSize];
-        if (_frame.frameNumber == 0)
-        {
-            uint32_t zero = 0;
-            memcpy(&txBufferWithFrameNumber[0], &zero, (size_t) 4);
-            memcpy(&txBufferWithFrameNumber[4], &sequenceNumber, (size_t) 4);
-        }
-        else
-        {
-            memcpy(&txBufferWithFrameNumber[0], &_frame.frameNumber, (size_t) 4);
-            memcpy(&txBufferWithFrameNumber[4], &sequenceNumber, (size_t) 4);
-            sequenceNumber += 1;
-        }
-        memcpy(&txBufferWithFrameNumber[8], txBuffer, size);
+        memcpy(&txBufferWithFrameNumber[0], &id, (size_t) 4);
+        memcpy(&txBufferWithFrameNumber[4], &_frame.frameNumber, (size_t) 4);
+        memcpy(&txBufferWithFrameNumber[8], &sequenceNumber, (size_t) 4);
+        sequenceNumber += 1;
+        memcpy(&txBufferWithFrameNumber[12], txBuffer, size);
         can.beginPacket(mcastIP, canPort);
         can.write(txBufferWithFrameNumber, newSize);
+        return can.endPacket();
+    }
+}
+
+int Carla::write(const CAN_message_t *txBuffer)
+{
+    if (canPort == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        memcpy(&txCanFrameBuffer[0], &id, (size_t) 4);
+        memcpy(&txCanFrameBuffer[4], &_frame.frameNumber, (size_t) 4);
+        memcpy(&txCanFrameBuffer[8], &sequenceNumber, (size_t) 4);
+        sequenceNumber += 1;
+        memcpy(&txCanFrameBuffer[12], txBuffer, CAN_message_t_size);
+        can.beginPacket(mcastIP, canPort);
+        can.write(txCanFrameBuffer, CAN_TX_BUFFER_SIZE);
         return can.endPacket();
     }
 }
@@ -151,6 +165,7 @@ void Carla::do_POST(struct HTTPClient::Request sse)
     {
         Serial.println("Failed to parse multicast IP address.");
     }
+    id = sse.data["ID"];
     canPort = sse.data["CAN_PORT"];
     carlaPort = sse.data["CARLA_PORT"];
     sequenceNumber = 0;

@@ -6,7 +6,6 @@ Carla carla;
 FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 CAN_message_t msg;
-size_t canSize = sizeof(msg);
 
 void setup() {
     // Open serial communications and wait for port to open:
@@ -28,14 +27,10 @@ void loop() {
     carla.monitor();
     if (can0.read(msg))
     {
-        uint8_t canFrameBuffer[canSize];
-        memcpy(&canFrameBuffer, &msg, canSize);
-        carla.write(canFrameBuffer, canSize);
+        carla.write(&msg);
     }
     if (can1.read(msg))
     {
-        uint8_t canFrameBuffer[canSize];
-        memcpy(&canFrameBuffer, &msg, canSize);
-        carla.write(canFrameBuffer, canSize);
+        carla.write(&msg);
     }
 }

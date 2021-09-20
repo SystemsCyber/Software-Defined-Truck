@@ -6,34 +6,33 @@
 #include <array>
 
 LoadConfiguration::LoadConfiguration(): exConfigWithIP(512), exConfigWithFQDN(512), exECU1(256),
-                                        exECU2(256), mac{0}, config(1024)
-                                        
+                                        exECU2(256), mac{0}, config(1024)                   
 {
-        exECU1["sn"] = "1a2b3c4d";
-        exECU1["make"] = "Cummins";
-        exECU1["model"] = "theModel";
-        exECU1["year"] = 1999;
-        JsonArray ecuType1 = exECU1.createNestedArray("type");
-        ecuType1.add("ECU");
-        ecuType1.add("Electronic Control Unit");
+    exECU1["sn"] = "1a2b3c4d";
+    exECU1["make"] = "Cummins";
+    exECU1["model"] = "theModel";
+    exECU1["year"] = 1999;
+    JsonArray ecuType1 = exECU1.createNestedArray("type");
+    ecuType1.add("ECU");
+    ecuType1.add("Electronic Control Unit");
 
-        exECU2["sn"] = "a1b2c3d4";
-        exECU2["make"] = "Detroit Desiel";
-        exECU2["model"] = "theModel";
-        exECU2["year"] = 2000;
-        JsonArray ecuType2 = exECU2.createNestedArray("type");
-        ecuType2.add("ECM");
-        ecuType2.add("Engine Control Module");
+    exECU2["sn"] = "a1b2c3d4";
+    exECU2["make"] = "Detroit Desiel";
+    exECU2["model"] = "theModel";
+    exECU2["year"] = 2000;
+    JsonArray ecuType2 = exECU2.createNestedArray("type");
+    ecuType2.add("ECM");
+    ecuType2.add("Engine Control Module");
 
-        exConfigWithIP["serverAddress"] = "123.456.789.101";
-        JsonArray ecus1 = exConfigWithIP.createNestedArray("ECUs");
-        ecus1.add(exECU1);
-        ecus1.add(exECU2);
+    exConfigWithIP["serverAddress"] = "123.456.789.101";
+    JsonArray ecus1 = exConfigWithIP.createNestedArray("ECUs");
+    ecus1.add(exECU1);
+    ecus1.add(exECU2);
 
-        exConfigWithFQDN["serverAddress"] = "aHostName";
-        JsonArray ecus2 = exConfigWithFQDN.createNestedArray("ECUs");
-        ecus2.add(exECU1);
-        ecus2.add(exECU2);
+    exConfigWithFQDN["serverAddress"] = "aHostName";
+    JsonArray ecus2 = exConfigWithFQDN.createNestedArray("ECUs");
+    ecus2.add(exECU1);
+    ecus2.add(exECU2);
 };
 
 void LoadConfiguration::init()

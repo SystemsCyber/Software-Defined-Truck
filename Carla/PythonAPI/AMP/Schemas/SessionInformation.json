@@ -12,6 +12,15 @@
         "GROUP_ID": {
             "$ref": "SessionGroupID.json"
         },
+        "ID": {
+            "type":"integer",
+            "examples": [
+                1234,
+                4321
+            ],
+            "minimum": 4,
+            "maximum": 65535
+        },
         "IP": {
             "$ref": "MulticastIP.json"
         },

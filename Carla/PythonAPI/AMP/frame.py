@@ -1,12 +1,31 @@
 import struct
+from collections import namedtuple
+from typing import Tuple
 
 
 class Frame:
     def __init__(self) -> None:
         self.frame_num = 0
         self.last_frame = 0
+        self.can_frame = namedtuple("can_frame", [
+            "device_id",
+            "control_frame_ref",
+            "sequence_number",
+            "can_id",
+            "timestamp",
+            "id_hit",
+            "extended",
+            "remote",
+            "overrun",
+            "reserved",
+            "data_length",
+            "data",
+            "mailbox",
+            "bus",
+            "sequential_frame"
+            ])
 
-    def pack(self, control) -> bytes:
+    def packControlFrame(self, control) -> bytes:
         self.last_frame = self.frame_num
         return struct.pack("Ifff???B",
                            self.frame_num,              # Frame number
@@ -18,28 +37,33 @@ class Frame:
                            control.manual_gear_shift,   # Manual
                            control.gear)                # Gear
 
-    def unpack(self, ecm_data, control, verbose=False) -> bool:
-        if ecm_data[0] >= self.last_frame:
-            control.throttle = ecm_data[1]
-            control.steer = ecm_data[2]
-            control.brake = ecm_data[3]
-            control.hand_brake = ecm_data[4]
-            control.reverse = ecm_data[5]
-            control.manual_gear_shift = ecm_data[6]
-            control.gear = ecm_data[7]
-            if verbose:
-                self.print_frame(ecm_data)
-            return True
-        else:
-            return False
-
-    def print_frame(self, frame) -> None:
-        print(f'Frame: {frame[0]:<8,}')
-        print(
-            f'Throttle: {frame[1]:0<.4f}  Steer:   {frame[2]:0<.4f}  Brake:  {frame[3]:0<.4f}')
-        print(f'Reverse:  {frame[4]:<5}  E-Brake: {frame[5]:<5}  '
-              f'Manual: {frame[6]:<5}  Gear: {frame[7]}\n')
-
-        #Frame: 12345678
-        # Throttle: 1.1234  Steer:   1.1234  Brake:  1.1234
-        # Reverse:  Falsee  E-Brake: Falsee  Manual: Falsee  Gear: 1
+    def unpackCanFrame(self, buffer, verbose=False) -> Tuple:
+        rawCanFrame = struct.unpack("IIIIHB????BBBBBBBBBbB?", buffer)
+        can_frame = self.can_frame(
+            device_id = rawCanFrame[0],
+            control_frame_ref = rawCanFrame[1],
+            sequence_number = rawCanFrame[2],
+            can_id = rawCanFrame[3],
+            timestamp = rawCanFrame[4],
+            id_hit = rawCanFrame[5],
+            extended = rawCanFrame[6],
+            remote = rawCanFrame[7],
+            overrun = rawCanFrame[8],
+            reserved = rawCanFrame[9],
+            data_length = rawCanFrame[10],
+            data = [rawCanFrame[i] for i in range(11,20)],
+            mailbox = rawCanFrame[20],
+            bus = rawCanFrame[21],
+            sequential_frame = rawCanFrame[22]
+        )
+        if verbose:
+            printout = (
+                f'Device: {can_frame.device_id:>5d}\n'
+                f'Frame #: {can_frame.control_frame_ref:>8d} Seq. #: {can_frame.sequence_number:>10d}\n'
+                f'\tID: {can_frame.can_id} Timestamp: {can_frame.timestamp} IDHit: {can_frame.id_hit}\n'
+                f'\tExtended: {can_frame.extended} Remote: {can_frame.remote} Overrun: {can_frame.overrun} Reserved: {can_frame.reserved}\n'
+                f'\tLength: {can_frame.data_length} Data: {can_frame.data}\n'
+                f'\tMailbox: {can_frame.mailbox} Bus: {can_frame.bus} SeqFrame: {can_frame.sequential_frame}\n'
+            )
+            print(printout)
+        return can_frame

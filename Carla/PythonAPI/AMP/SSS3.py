@@ -51,9 +51,8 @@ class SSS3:
         atexit.register(self.stop)
         self.__setup_logging()
         self.frame = Frame()
-        self.dropped_messages = 0
-        self.timeouts = 0
-        self.seq_miss_match = 0
+        self.dropped_control_frames = 0
+        self.dropped_can_frames = 0
         self.sel = selectors.DefaultSelector()
         self.broker = BrokerHandle(self.sel, _server_address)
         self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -227,7 +226,7 @@ class SSS3:
     def send_control_frame(self, control):
         with self.selector_lock:
             self.frame.frame_num += 1
-            message = self.frame.pack(control)
+            message = self.frame.packControlFrame(control)
             self._key.data.outgoing_message = message
             self.sel.modify(self._key.fileobj, selectors.EVENT_WRITE, self._key.data)
 
@@ -245,32 +244,9 @@ class SSS3:
         try:
             data = key.fileobj.recv(31)
             if len(data) == 31:
-                data = struct.unpack("IIIHB????BBBBBBBBBbB?", data)
-                frameNum = data[0]
-                seqNum = data[1]
-                id = data[2]
-                timestamp = data[3]
-                IDHit = data[4]
-                extended = data[5]
-                remote = data[6]
-                overrun = data[7]
-                reserved = data[8]
-                datalen = data[9]
-                canData = [data[i] for i in range(10,19)]
-                mb = data[19]
-                bus = data[20]
-                seqFrame = data[21]
-                printout = f'Frame #: {frameNum} Seq. #: {seqNum}\n'
-                printout += f'\tID: {id} Timestamp: {timestamp} IDHit: {IDHit}\n'
-                printout += f'\tExtended: {extended} Remote: {remote} Overrun: {overrun} Reserved: {reserved}\n'
-                printout += f'\tLen: {datalen} Data: {canData}\n'
-                printout += f'\tMailbox: {mb} Bus: {bus} SeqFrame: {seqFrame}\n\n'
-                print(printout)
+                can_frame = self.frame.unpackCanFrame(data, verbose=True)
         except socket.timeout:
-            key.fileobj.settimeout(0.04)
-            self.dropped_messages += 1
-            self.timeouts += 1
-            logging.warning(f'Socket Timeout. Total: {self.timeouts}')
+            logging.warning(f'Socket timed out.')
 
     # def __frame_miss_match(self, ecm_data, verbose=False) -> None:
     #     self.dropped_messages += 1
