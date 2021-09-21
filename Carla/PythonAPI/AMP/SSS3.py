@@ -48,18 +48,20 @@ class SSS3:
     """SSS3 communication utility in conjunction with the CARLA simulator"""
 
     def __init__(self, _server_address = socket.gethostname()) -> None:
-        atexit.register(self.stop)
+        atexit.register(self.shutdown)
         self.__setup_logging()
         self.frame = Frame()
         self.dropped_control_frames = 0
         self.dropped_can_frames = 0
         self.sel = selectors.DefaultSelector()
-        self.broker = BrokerHandle(self.sel, _server_address)
+        self.selector_lock = threading.Lock()
+        self.broker = BrokerHandle(self.sel, self.selector_lock, _server_address)
         self.can = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.can.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.carla = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.carla.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.l_thread = threading.Thread(target=self.__listen, args=(0,))
         self.l_thread.setDaemon(True)
-        self.selector_lock = threading.Lock()
         self.listen = True
 
     def __listen(self, _timeout=None, waiting_msg = None) -> None:
@@ -167,22 +169,16 @@ class SSS3:
             logging.error(se)
         else:
             if self.broker.command.lower() == "post":
-                self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
+                self.start(self.broker.mcast_IP, self.broker.can_port)
             elif self.broker.command.lower() == "delete":
                 self.stop()
 
-    def start(self, mcast_IP: IPv4Address, can_port: int, carla_port: int):
+    def start(self, mcast_IP: IPv4Address, can_port: int):
         self.__typewritter("Received session setup information from the server.", tcolors.magenta)
         self.__typewritter("Starting the session!", tcolors.yellow)
-        self.__set_mcast_options(self.can, mcast_IP, can_port)
-        can_data = SimpleNamespace(callback = self.__receive)
-        self.sel.register(self.can, selectors.EVENT_READ, can_data)
-        self.__set_mcast_options(self.carla, mcast_IP, carla_port)
-        carla_data = SimpleNamespace(
-            callback = self.__send,
-            outgoing_message = None
-            )
-        self._key = self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
+        group = socket.inet_aton(str(mcast_IP))
+        self.mreq = struct.pack("4sl", group, socket.INADDR_ANY)
+        self.__set_mcast_options(mcast_IP, can_port)
         if self.l_thread.is_alive():
             self.listen = False
             self.l_thread.join(1)
@@ -191,25 +187,47 @@ class SSS3:
         else:
             self.listen = True
             self.l_thread.start()
+            # control = SimpleNamespace(
+            #     throttle = 1.0,
+            #     steer = 1.0,
+            #     brake = 1.0,
+            #     hand_brake = 1,
+            #     reverse = 1,
+            #     manual_gear_shift = 1,
+            #     gear = 1
+            # )
             # try:
-            #     time.sleep(1000)
+            #     while True:
+            #         self.send_control_frame(control)
+            #         time.sleep(1)
             # except KeyboardInterrupt:
             #     pass
                 
-    def __set_mcast_options(self, sock: socket.socket, mcast_IP: IPv4Address, port: int) -> None:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 2)
-        sock.bind(('', port))
-        group = socket.inet_aton(str(mcast_IP))
-        mreq = struct.pack("4sl", group, socket.INADDR_ANY)
-        sock.setsockopt(socket.IPPROTO_IP,
-                        socket.IP_ADD_MEMBERSHIP, mreq)
-        sock.settimeout(0.4)
+    def __set_mcast_options(self, mcast_IP: IPv4Address, can_port:int) -> None:
+        self.can.bind((str(mcast_IP), can_port))
+        self.can.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, self.mreq)
+        self.can.setblocking(False)
+        can_data = SimpleNamespace(callback = self.__receive)
+        self.sel.register(self.can, selectors.EVENT_READ, can_data)
+        self.carla.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
+        self.carla.setblocking(False)
+        carla_data = SimpleNamespace(
+            callback = self.__send,
+            outgoing_message = None
+            )
+        self._key = self.sel.register(self.carla, selectors.EVENT_READ, carla_data)
+
+    def shutdown(self):
+        self.stop()
+        self.broker.do_DELETE()
+        self.broker.send_delete("/client/register", True)
 
     def stop(self):
         self.__typewritter("Stopping session.", tcolors.red)
         self.listen = False
-        self.broker.send_delete("/session")
-        self.broker.send_delete("/client/register", True)
+        self.broker.send_delete("/client/session")
+        logging.debug("Leaving Multicast Membership.")
+        self.can.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, self.mreq)
         logging.debug("Unregistering can socket.")
         self.sel.unregister(self.can)
         logging.debug("Shutting down the can socket.")
