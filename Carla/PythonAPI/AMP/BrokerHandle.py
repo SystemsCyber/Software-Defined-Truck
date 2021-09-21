@@ -1,5 +1,6 @@
 import socket
 import json
+from types import SimpleNamespace
 import jsonschema
 import http.client
 import selectors
@@ -10,11 +11,13 @@ from io import BytesIO
 from http.server import BaseHTTPRequestHandler
 from HelperMethods import Schema
 from getmac import get_mac_address as gma
+from threading import Lock
 
 class BrokerHandle(BaseHTTPRequestHandler):
-    def __init__(self, _sel: selectors.DefaultSelector, _server_address = socket.gethostname()) -> None:
+    def __init__(self, _sel: selectors.DefaultSelector, _lock: Lock, _server_address = socket.gethostname()) -> None:
         self.mac = gma()
         self.sel = _sel
+        self.selector_lock = _lock
         self.server_address = _server_address
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
@@ -70,8 +73,9 @@ class BrokerHandle(BaseHTTPRequestHandler):
 
     def __wait_for_socket(self, timeout=None) -> bool:
         try:
-            if self.sel.select(timeout=timeout):
-                return True
+            with self.selector_lock:
+                if self.sel.select(timeout=timeout):
+                    return True
         except TimeoutError:
             logging.error("Selector timed-out while waiting for a response or SSE.")
             return False
@@ -198,7 +202,7 @@ class BrokerHandle(BaseHTTPRequestHandler):
             logging.error("Server closed the connection.")
             self.shutdown_connection(key)
 
-    def __handle_SSE(self, message: bytes, skip_handle = False):
+    def __handle_SSE(self, message: bytes):
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
             self.handle_one_request()
 
