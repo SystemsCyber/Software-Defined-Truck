@@ -119,8 +119,8 @@ class Broker(BaseHTTPRequestHandler):
     def listen(self):
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # lsock.bind((socket.gethostname(), 80))
-        lsock.bind(("127.0.0.1", 80))
+        lsock.bind((socket.gethostname(), 80))
+        # lsock.bind(("127.0.0.1", 80))
         lsock.listen()
         lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
@@ -196,6 +196,10 @@ class Broker(BaseHTTPRequestHandler):
                 self.log_error("A blocking error occured in __read, when it shouldn't have.")
             except ConnectionResetError as cre:
                 self.log_error(f'{cre}')
+                key.data.close_connection = True
+                self.__shutdown_connection(key)
+            except ConnectionAbortedError as cae:
+                self.log_error(f'{cae}')
                 key.data.close_connection = True
                 self.__shutdown_connection(key)
 
