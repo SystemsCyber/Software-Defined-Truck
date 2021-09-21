@@ -16,21 +16,22 @@ int HTTPClient::init()
     return ethernetInitialized;
 }
 
-bool HTTPClient::connect()
+bool HTTPClient::connect(bool retry)
 {
     if (ethernetInitialized)
     {
-        serverAddress = resolveServerAddress(config.config["serverAddress"]);
         request = {"POST", "/sss3/register", config.config};
         unsigned long lastAttempt = millis();
         const unsigned long retryInterval = 60 * 1000;
-        bool submitted = false;
-        do
+        bool submitted = tryToConnect(config.config["serverAddress"], &lastAttempt);
+        while (!submitted)
         {
-            submitted = tryToConnect(&lastAttempt, retryInterval);
+            if (millis() - lastAttempt > retryInterval)
+            {
+                submitted = tryToConnect(config.config["serverAddress"], &lastAttempt);
+            }
         }
-        while (!submitted);
-        return write(request, &response);
+        return write(request, &response, retry);
     }
     else
     {
@@ -54,7 +55,7 @@ bool HTTPClient::read(struct Request *req)
         }
         Serial.println(req->error);
     }
-    else if (!server.connected())
+    else if (!server.connected() && !serverUnreachable)
     {
         Serial.println("Lost connection to the Control Server. Trying to re-connect...");
         connect();
@@ -84,10 +85,10 @@ bool HTTPClient::write(struct Request req, struct Response *res, bool retry)
         server.flush();
         return getResponse(req, res, retry);
     }
-    else
+    else if (retry)
     {
         Serial.println("Lost connection to the Control Server. Trying to re-connect...");
-        if (connect())
+        if (connect(false))
         {
             Serial.println("Successfully reconnected and re-registered with the server.");
             Serial.println("Attempting to send message again.");
@@ -98,6 +99,11 @@ bool HTTPClient::write(struct Request req, struct Response *res, bool retry)
             Serial.println("Could not re-connect to the Control Server.");
             return false;
         }
+    }
+    else
+    {
+        serverUnreachable = true;
+        return false;
     }
 }
 
@@ -127,7 +133,6 @@ int HTTPClient::initEthernet(int success)
     {
         checkHardware();
         Serial.println("\t***Failed to configure Ethernet using DHCP***");
-        
     }
     return success;
 }
@@ -160,59 +165,22 @@ void HTTPClient::checkLink()
     }
 }
 
-IPAddress HTTPClient::resolveServerAddress(const char *nameOrIP)
+bool HTTPClient::tryToConnect(const char *serverAddress, unsigned long *lastAttempt)
 {
-    Serial.println("Resolving serverAddress to an IP address.");
-    IPAddress address(0,0,0,0);
-    DNSClient dns;
-    dns.begin(Ethernet.dnsServerIP());
-    switch (dns.getHostByName(nameOrIP, address))
+    Serial.print("Connecting to the Control Server at ");
+    Serial.print(serverAddress);
+    Serial.print("... ");
+    if (server.connect(serverAddress, 80))
     {
-    case 1:
-        Serial.println("Successfully resolved serverAddress as " + address);
-        break;
-    case -1:
-        Serial.println("Could not resolve serverAddress: Timed out.");
-        break;
-    case -2:
-        Serial.println("Could not resolve serverAddress: Invalid server.");
-        break;
-    case -3:
-        Serial.println("Could not resolve serverAddress: Truncated.");
-        break;
-    case -4:
-        Serial.println("Could not resolve serverAddress: Invalid response.");
-        break;
-    default:
-        Serial.println("Could not resolve serverAddress. Continuing with 0.0.0.0");
-        break;
-    }
-    return address;
-}
-
-bool HTTPClient::tryToConnect(unsigned long *lastAttempt, const unsigned long retryInterval)
-{
-    if (millis() - *lastAttempt > retryInterval)
-    {
-        Serial.print("Connecting to the Control Server at ");
-        Serial.print(serverAddress);
-        Serial.print("... ");
-        if (server.connect(serverAddress, 80))
-        {
-            Serial.println("connected.");
-            return true;
-        }
-        else
-        {
-            *lastAttempt = millis();
-            Serial.println("connection failed.");
-            Serial.println("Retrying in 60 seconds.");
-            Serial.println();
-            return false;
-        }
+        Serial.println("connected.");
+        return true;
     }
     else
     {
+        *lastAttempt = millis();
+        Serial.println("connection failed.");
+        Serial.println("Retrying in 60 seconds.");
+        Serial.println();
         return false;
     }
 }

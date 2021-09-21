@@ -2,7 +2,7 @@
 #include <Carla/Carla.h>
 #include <FlexCAN_T4.h>
 
-Carla carla;
+Carla client;
 FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 CAN_message_t msg;
@@ -20,17 +20,11 @@ void setup() {
     can0.setBaudRate(500000);
     can1.begin();
     can1.setBaudRate(500000);
-    carla.init();
+    client.init();
 }
 
 void loop() {
-    carla.monitor();
-    if (can0.read(msg))
-    {
-        carla.write(&msg);
-    }
-    if (can1.read(msg))
-    {
-        carla.write(&msg);
-    }
+    client.monitor(true);
+    if (can0.read(msg)) client.write(&msg);
+    if (can1.read(msg)) client.write(&msg);
 }

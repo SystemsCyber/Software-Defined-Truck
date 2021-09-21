@@ -43,10 +43,10 @@ int Carla::monitor(bool verbose)
         {
             do_DELETE();
         }
-    }
-    else
-    {
-        Serial.println("Bad command received... discarding.");
+        else
+        {
+            Serial.println("Bad command received... discarding.");
+        }
     }
     if (carlaPort == 0)
     {
@@ -60,18 +60,19 @@ int Carla::monitor(bool verbose)
 
 int Carla::read(bool verbose)
 {
-    int packetSize = carla.parsePacket();
+    size_t packetSize = carla.parsePacket();
     if (packetSize)
     {
         uint8_t rxBuffer[packetSize];
-        carla.read(rxBuffer, packetSize);
-        memcpy(&_frame, rxBuffer, sizeof(_frame));
-        if (verbose)
+        if (carla.read(rxBuffer, packetSize))
         {
-            dumpPacket(rxBuffer, packetSize, carla.remoteIP());
-            dumpFrame(_frame);
+            memcpy(&_frame, rxBuffer, sizeof(_frame));
         }
-        return true;
+        else
+        {
+            Serial.println("parsePacket indicated available message. Failed to read them.");
+        }
+        if (verbose) dumpFrame(_frame);
     }
     return packetSize;
 }
@@ -86,14 +87,22 @@ int Carla::write(const uint8_t *txBuffer, size_t size)
     {
         size_t newSize = size + (size_t) 12;
         uint8_t txBufferWithFrameNumber[newSize];
-        memcpy(&txBufferWithFrameNumber[0], &id, (size_t) 4);
-        memcpy(&txBufferWithFrameNumber[4], &_frame.frameNumber, (size_t) 4);
-        memcpy(&txBufferWithFrameNumber[8], &sequenceNumber, (size_t) 4);
+        memcpy(txBufferWithFrameNumber, &id, (size_t) 4);
+        memcpy(txBufferWithFrameNumber+4, &_frame.frameNumber, (size_t) 4);
+        memcpy(txBufferWithFrameNumber + 8, &sequenceNumber, (size_t) 4);
         sequenceNumber += 1;
-        memcpy(&txBufferWithFrameNumber[12], txBuffer, size);
+        memcpy(txBufferWithFrameNumber + 12, txBuffer, size);
         can.beginPacket(mcastIP, canPort);
-        can.write(txBufferWithFrameNumber, newSize);
-        return can.endPacket();
+        if (can.write(txBufferWithFrameNumber, newSize) == 0)
+        {
+            Serial.println("Failed to write the message.");
+        }
+        int successfullySent = can.endPacket();
+        if (successfullySent == 0)
+        {
+            Serial.println("Unknown Error occured while sending the message.");
+        }
+        return successfullySent;
     }
 }
 
@@ -105,14 +114,22 @@ int Carla::write(const CAN_message_t *txBuffer)
     }
     else
     {
-        memcpy(&txCanFrameBuffer[0], &id, (size_t) 4);
-        memcpy(&txCanFrameBuffer[4], &_frame.frameNumber, (size_t) 4);
-        memcpy(&txCanFrameBuffer[8], &sequenceNumber, (size_t) 4);
+        memcpy(txCanFrameBuffer + 0, &id, (size_t) 4);
+        memcpy(txCanFrameBuffer + 4, &_frame.frameNumber, (size_t) 4);
+        memcpy(txCanFrameBuffer + 8, &sequenceNumber, (size_t) 4);
         sequenceNumber += 1;
-        memcpy(&txCanFrameBuffer[12], txBuffer, CAN_message_t_size);
+        memcpy(txCanFrameBuffer + 12, txBuffer, CAN_message_t_size);
         can.beginPacket(mcastIP, canPort);
-        can.write(txCanFrameBuffer, CAN_TX_BUFFER_SIZE);
-        return can.endPacket();
+        if (can.write(txCanFrameBuffer, CAN_TX_BUFFER_SIZE) == 0)
+        {
+            Serial.println("Failed to write the message.");
+        }
+        int successfullySent = can.endPacket();
+        if (successfullySent == 0)
+        {
+            Serial.println("Unknown Error occured while sending the message.");
+        }
+        return successfullySent;
     }
 }
 
@@ -161,7 +178,11 @@ void Carla::do_POST(struct HTTPClient::Request sse)
 {
     DNSClient dns;
     String IP = sse.data["IP"];
-    if (!dns.inet_aton(IP.c_str(), mcastIP))
+    if (dns.inet_aton(IP.c_str(), mcastIP))
+    {
+        Serial.println("Successfully parsed multicast IP address.");
+    }
+    else
     {
         Serial.println("Failed to parse multicast IP address.");
     }
@@ -169,6 +190,14 @@ void Carla::do_POST(struct HTTPClient::Request sse)
     canPort = sse.data["CAN_PORT"];
     carlaPort = sse.data["CARLA_PORT"];
     sequenceNumber = 0;
+    if (carla.beginMulticast(mcastIP, carlaPort))
+    {
+        Serial.println("Successfully created a udp multicast socket.");
+    }
+    else
+    {
+        Serial.println("Failed to create a udp multicast socket.");
+    }
     Serial.println("Starting new session...");
     Serial.println("Configuration: ");
     Serial.print("IP: ");
@@ -177,8 +206,6 @@ void Carla::do_POST(struct HTTPClient::Request sse)
     Serial.println(carlaPort);
     Serial.print("CAN Port: ");
     Serial.println(canPort);
-    carla.beginMulticast(mcastIP, carlaPort);
-    can.beginMulticast(mcastIP, canPort);
 }
 
 void Carla::do_DELETE()
