@@ -38,7 +38,7 @@ class Frame:
                            control.gear)                # Gear
 
     def unpackCanFrame(self, buffer, verbose=False) -> Tuple:
-        rawCanFrame = struct.unpack("IIIIHB????BBBBBBBBBbB?", buffer)
+        rawCanFrame = struct.unpack("IIIIHB????Bs8bB?x1", buffer)
         can_frame = self.can_frame(
             device_id = rawCanFrame[0],
             control_frame_ref = rawCanFrame[1],
@@ -51,10 +51,10 @@ class Frame:
             overrun = rawCanFrame[8],
             reserved = rawCanFrame[9],
             data_length = rawCanFrame[10],
-            data = [rawCanFrame[i] for i in range(11,20)],
-            mailbox = rawCanFrame[20],
-            bus = rawCanFrame[21],
-            sequential_frame = rawCanFrame[22]
+            data = rawCanFrame[11],
+            mailbox = rawCanFrame[12],
+            bus = rawCanFrame[13],
+            sequential_frame = rawCanFrame[14]
         )
         if verbose:
             printout = (
