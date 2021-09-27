@@ -17,6 +17,7 @@ from ClientHandle import ClientHandle
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from HelperMethods import ColoredConsoleHandler, LogFolder
+import http.client
 
 """TODO Notes:
     - We need to set the keep alive function on the teensy.
@@ -37,7 +38,7 @@ class Broker(BaseHTTPRequestHandler):
 
     def __init__(self) -> None:
         self.__setup_logging()
-        self.log_sys_message("Broker Initializing.")
+        self.log_message("Broker Initializing.")
         self.protocol_version = "HTTP/1.1"
         self.sel = selectors.DefaultSelector()
         self.multicast_IPs = []
@@ -69,12 +70,6 @@ class Broker(BaseHTTPRequestHandler):
             )
         # self.logger = logging.getLogger(__name__)
         # self.logger.setLevel(logging.DEBUG)
-
-    def log_sys_error(self, format, *args):
-        logging.error("%s - - %s\n" % ("SERVER", format%args))
-
-    def log_sys_message(self, format, *args):
-        logging.info("%s - - %s\n" % ("SERVER", format%args))
 
     # ===== Overrides for parent class functions =====
 
@@ -119,45 +114,56 @@ class Broker(BaseHTTPRequestHandler):
     def listen(self):
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        lsock.bind((socket.gethostname(), 80))
+        device_address = socket.gethostbyname_ex(socket.gethostname())[2][3]
+        lsock.bind((device_address, 80))
         # lsock.bind(("127.0.0.1", 80))
         lsock.listen()
         lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
         self.sel.register(lsock, selectors.EVENT_READ, data=data)
-        self.log_sys_message(f'Listening on: {socket.gethostname()}:80')
-        self.__wait_for_connection()
+        self.log_message(f'Listening on: {device_address}:80')
+        self.__handle_connection()
 
-    def __wait_for_connection(self) -> None:
+    def __handle_connection(self) -> None:
         while True:
             try:
                 connection_events = self.sel.select(timeout=1)
-                for key, mask in connection_events:
-                    self._key = key
-                    callback = key.data.callback
-                    callback(key)
-                self.__drop_loose_connections()
             except TimeoutError:
                 continue
             except KeyboardInterrupt:
                 return
+            else:
+                for key, mask in connection_events:
+                    self.__handle_mask_events(key, mask)
+                self.__prune_connections()
 
-    def __drop_loose_connections(self) -> None:
+    def __handle_mask_events(self, key: SEL, mask):
+        if mask == selectors.EVENT_READ:
+            if key.data.callback == self.__accept:
+                callback = key.data.callback
+                callback(key)
+            elif not key.data.rate_limit:
+                time.sleep(0.001)  # Small hack to let the rest of the message
+                                    # make it in to the socket before reading it.
+                self.__call_callback(key)
+        else:
+            self.__call_callback(key)
+
+    def __call_callback(self, key: SEL):
+        with key.data.addr as self.client_address:
+            callback = key.data.callback
+            callback(key)
+
+    def __prune_connections(self) -> None:
         """Loose connections are accepted connections from devices that don't
         register within 5 seconds of connecting."""
-        sel_map = self.sel.get_map()
-        try:
-            for fd in sel_map:
-                key = sel_map[fd]
-                not_accepted = hasattr(key.data, "accept_by") and (
-                    key.data.MAC == "unknown")
-                if not_accepted and (key.data.accept_by < time.time()):
-                    msg = f'{key.data.addr[0]} has not registered within 5 '
-                    msg += f'seconds of first connecting. Closing connection.'
-                    self.log_sys_message(msg)
+        current_time = time.time()
+        for fd, key in self.sel.get_map():
+            try:
+                if key.data.is_loose(current_time, self.log_error):
                     self.__shutdown_connection(key)
-        except RuntimeError:
-            return
+            except AttributeError:
+                continue
 
     def __accept(self, key: SEL) -> None:
         """Takes a new connection from the listening socket and assigns it its
@@ -166,11 +172,11 @@ class Broker(BaseHTTPRequestHandler):
         conn, addr = key.fileobj.accept()
         conn.setblocking(False)
         if addr[0] in self.blacklist_ips:
-            self.log_sys_error(f'Blacklisted IP address: {addr[0]} tried to connect.')
+            self.log_error(f'Blacklisted IP address: {addr[0]} tried to connect.')
             conn.shutdown(socket.SHUT_RDWR)
             conn.close()
         else:
-            self.log_sys_message(f'New connection from: {addr[0]}:{str(addr[1])}')
+            self.log_message(f'New connection from: {addr[0]}:{str(addr[1])}')
             self.__set_keepalive(conn, 300000, 300000)
             data = Device(self.__read, self.__write, addr)
             self.sel.register(conn, selectors.EVENT_READ, data=data)
@@ -186,61 +192,40 @@ class Broker(BaseHTTPRequestHandler):
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
 
     def __read(self, key: SEL):
-        if not self.__rate_limit(key):
+        if key.data.expecting_response:
+            self.__handle_response(key)
+        else:
             try:
-                self._key = key
-                self.client_address = self._key.data.addr
                 message = self._key.fileobj.recv(4096)
-                self.__check_connection(key, message)
-            except BlockingIOError:
-                self.log_error("A blocking error occured in __read, when it shouldn't have.")
-            except ConnectionResetError as cre:
-                self.log_error(f'{cre}')
+                self.__handle_request(key, message)
+            except OSError as ose:
                 key.data.close_connection = True
                 self.__shutdown_connection(key)
-            except ConnectionAbortedError as cae:
-                self.log_error(f'{cae}')
-                key.data.close_connection = True
-                self.__shutdown_connection(key)
+                self.log_error(ose)
 
-    def __rate_limit(self, key: SEL) -> bool:
-        # Token Bucket algorithm
-        now = time.time()
-        key.data.allowance += (now - key.data.last_check) * key.data.rate
-        key.data.last_check = now
-        if (key.data.allowance > key.data.rate):
-            key.data.allowance = key.data.rate
-        if (key.data.allowance < 1.0):
-            self.log_sys_error(f'Rate limiting {key.data.addr[0]}')
-            key.data.rate_limit_chances -= 1
-            if key.data.rate_limit_chances <= 0:
-                self.log_sys_error(f'Too many rate limit attempts. Banning {key.data.addr[0]}.')
-                self.blacklist_ips.append(key.data.addr[0])
-                self.__shutdown_connection(key)
-            return True
-        else:
-            key.data.allowance -= 1.0
-            return False
-
-    def __check_connection(self, key: SEL, message: bytes) -> None:
-        if len(message) == 0:
-            self.log_error("Closed the connection without notice.")
-            self.log_error("Performing cleanup operations.")
-            self.log_error("Cleanup methods not implemented.")
-            self.__shutdown_connection(key)
-        else:
-            self.__handle_request(message)
-            self.sel.modify(self._key.fileobj,
-                                selectors.EVENT_WRITE, self._key.data)
-
-    def __handle_request(self, message: bytes) -> None:
+    def __handle_request(self, key: SEL, message: bytes) -> None:
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
             self.handle_one_request()
-            self.end_headers()
-            self.wfile.seek(0)
-            self._key.data.outgoing_messages.put(self.wfile.read())
-            self._key.data.callback = self.__write
-            self._key.data.close_connection = self.close_connection
+            if len(self.wfile) > 0:
+                self.end_headers()
+                self.wfile.seek(0)
+                key.data.outgoing_messages.put(self.wfile.read())
+                key.data.callback = self.__write
+                key.data.close_connection = self.close_connection
+                self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
+            else:
+                logging.info(f'{key.data.addr[0]} - - Closed the connection.')
+                self.__shutdown_connection(key)
+
+    def __handle_response(self, key: SEL):
+        key.data.response = http.client.HTTPResponse(key.fileobj)
+        try:
+            key.data.response.begin()
+            key.data.expecting_response = False
+        except http.client.HTTPException as he:
+            self.log_error(he)
+            key.data.close_connection = True
+            self.__shutdown_connection(key)
 
     def do_GET(self):
         self.__method_poxy()
@@ -306,18 +291,12 @@ class Broker(BaseHTTPRequestHandler):
         except queue.Empty:
             key.data.callback = self.__read
             self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
-        except InterruptedError:
-            msg = f'{key.data.addr[0]} - - Interrupted while sending message. '
-            msg += f'This is an unrecoverable error. Closing connection.'
-            logging.error(msg)
+        except OSError as ose:
+            self.log_error(ose)
             key.data.close_connection = True
-        except BlockingIOError:
-            msg = f'{key.data.addr[0]} - - A blocking error occured in '
-            msg += f'__write, when it shouldnt have.'
-            logging.error(msg)
         finally:
             if key.data.close_connection:
-                logging.info(f'{key.data.addr[0]} - - Closed the connection.')
+                self.log_message(f'Closed the connection.')
                 self.__shutdown_connection(key)
 
     def __shutdown_connection(self, key: SEL):
@@ -329,7 +308,6 @@ class Broker(BaseHTTPRequestHandler):
 def main():
     broker = Broker()
     broker.listen()
-
 
 if __name__ == "__main__":
     main()
