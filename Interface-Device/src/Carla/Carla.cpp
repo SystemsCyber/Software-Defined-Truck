@@ -14,17 +14,21 @@ int Carla::init()
         Serial.println("Successfully registered with the server.");
         return true;
     }
-    else if (connected && !(server.response.code >= 200 && server.response.code < 400))
+    else if (connected && (server.response.error == ""))
     {
         Serial.println("Server did not accept this devices registration.");
-        Serial.println("Response Code: " + String(server.response.code));
-        Serial.println("Response Reason: " + server.response.reason);
-        Serial.println("Response Message: " + server.response.data);
+        Serial.print("Response Code: ");
+        Serial.println(String(server.response.code));
+        Serial.print("Response Reason: ");
+        Serial.println(server.response.reason);
+        Serial.print("Response Message: ");
+        Serial.println(server.response.data);
         return false;
     }
     else
     {
-        Serial.println("Failed to parse server response because " + server.response.error);
+        Serial.print("Failed to parse server response because ");
+        Serial.println(server.response.error);
         return false;
     }
     return false;
@@ -190,13 +194,15 @@ void Carla::do_POST(struct HTTPClient::Request sse)
     canPort = sse.data["CAN_PORT"];
     carlaPort = sse.data["CARLA_PORT"];
     sequenceNumber = 0;
-    if (carla.beginMulticast(mcastIP, carlaPort))
+    int carlaMulticast = carla.beginMulticast(mcastIP, carlaPort);
+    int canMulticast = can.beginMulticast(mcastIP, canPort);
+    if (carlaMulticast && canMulticast)
     {
-        Serial.println("Successfully created a udp multicast socket.");
+        Serial.println("Successfully created udp multicast sockets.");
     }
     else
     {
-        Serial.println("Failed to create a udp multicast socket.");
+        Serial.println("Failed to create the udp multicast sockets.");
     }
     Serial.println("Starting new session...");
     Serial.println("Configuration: ");
