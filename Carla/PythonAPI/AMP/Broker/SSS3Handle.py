@@ -132,6 +132,7 @@ class SSS3Handle:
         message = bytes(message, "iso-8859-1")
         for members in self.multicast_ips:
             if self._key.fd == members["sockets"][0]:
+                members["available"] = True
                 self.__notify_session_members(members, message)
 
     def __notify_session_members(self, members: List, message: bytes):
@@ -141,5 +142,6 @@ class SSS3Handle:
             key = mapping[device]
             key.data.callback = key.data.write
             key.data.outgoing_messages.put(message)
+            key.data.expecting_response = True
             self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
             self.__log_info(f'Successfully notified {key.data.addr[0]}.')
