@@ -12,18 +12,47 @@ class Device:
         self.callback = read
         self.addr = addr
         self.accept_by = time.time() + 5
-        self.MAC = "unknown"
+        self.MAC = None
         self.type = "unknown"
         self.in_use = False
         self.outgoing_messages = queue.SimpleQueue()
-        self.rate = 10.0 # 10 messages per second
+        self.rate = 100.0 # 100 messages per second
         self.allowance = self.rate
         self.last_check = time.time()
-        self.rate_limit_chances = 10
+        self.logged_rate_limit = False
+        self.expecting_response = False
+        self.response = None
+    
+    def rate_limit(self, log_error) -> bool:
+        # Token Bucket algorithm
+        now = time.time()
+        self.allowance += (now - self.last_check) * self.rate
+        self.last_check = now
+        if (self.allowance > self.rate):
+            self.allowance = self.rate
+        if (self.allowance < 1.0):
+            if not self.logged_rate_limit:
+                log_error(f'Rate limiting {self.addr[0]}')
+            return True
+        else:
+            self.logged_rate_limit = False
+            self.allowance -= 1.0
+            return False
+
+    def is_loose(self, current_time: float, log_error) -> bool:
+        if self.MAC:
+            return False
+        elif self.accept_by > current_time:
+            return False
+        else:
+            msg = f'{self.addr[0]} has not registered within 5 '
+            msg += f'seconds of first connecting. Closing connection.'
+            log_error(msg)
+            return True
 
     @staticmethod
     def is_registered(key: SEL) -> bool:
-        if hasattr(key.data, "MAC") and key.data.MAC != "unknown":
+        if hasattr(key.data, "MAC") and key.data.MAC:
             return True
         return False
 
@@ -40,7 +69,7 @@ class Device:
     
     @staticmethod
     def is_SSS3(key: SEL) -> bool:
-        if hasattr(key.data, "MAC") and key.data.MAC != "unknown":
+        if hasattr(key.data, "MAC") and key.data.MAC:
             return hasattr(key.data, "type") and key.data.type == "SSS3"
         else:
             return False
@@ -53,9 +82,7 @@ class Device:
     @staticmethod
     def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
         available = []
-        sel_map = sel.get_map()
-        for fd in sel_map:
-            key = sel_map[fd]
+        for fd, key in sel.get_map():
             if Device.is_available(key):
                 available.append({
                     "ID": fd, 
