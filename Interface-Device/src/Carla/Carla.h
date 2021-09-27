@@ -7,8 +7,8 @@
 #include <IPAddress.h>
 #include <FlexCAN_T4.h>
 
-#define CAN_message_t_size (size_t) 23
-#define CAN_TX_BUFFER_SIZE (size_t) 35
+#define CAN_message_t_size (size_t) 24
+#define CAN_TX_BUFFER_SIZE (size_t) 36
 
 class Carla
 {
