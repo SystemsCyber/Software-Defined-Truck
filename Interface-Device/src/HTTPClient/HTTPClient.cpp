@@ -193,12 +193,12 @@ bool HTTPClient::getResponse(struct Request req, struct Response *res, bool retr
     bool didResponseParse = parseResponse(res);
     if (!didResponseParse && retry)
     {
-        Serial.print("Received a poorly formatted response. Retrying.");
+        Serial.println("Received a poorly formatted response. Retrying.");
         return write(req, res, false);
     }
     else if (didResponseParse && !(res->code >= 200 && res->code < 400) && retry)
     {
-        Serial.print("Received a bad response code. Retrying in case message got corrupted.");
+        Serial.println("Received a bad response code. Retrying in case message got corrupted.");
         return write(req, res, false);
     }
     else
