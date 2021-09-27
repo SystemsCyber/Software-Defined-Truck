@@ -15,6 +15,7 @@ import shutil
 from ipaddress import IPv4Address
 # import multiprocessing as mp
 import threading
+from collections import namedtuple
 
 # Type Aliases
 SOCK_T = socket.socket
@@ -51,8 +52,15 @@ class SSS3:
         atexit.register(self.shutdown)
         self.__setup_logging()
         self.frame = Frame()
-        self.dropped_control_frames = 0
-        self.dropped_can_frames = 0
+        self.last_frame_sent_time = time.time()
+        self.devices = {}
+        self.device = namedtuple("device", [
+            "latency",
+            "number_of_messages_received",
+            "last_can_seq_number"
+            "dropped_can_frames",
+            "dropped_carla_frames" 
+            ])
         self.sel = selectors.DefaultSelector()
         self.selector_lock = threading.Lock()
         self.broker = BrokerHandle(self.sel, self.selector_lock, _server_address)
@@ -115,7 +123,7 @@ class SSS3:
                 outgoing_message = None
                 )
             self.sel.modify(self.broker.ctrl.sock, selectors.EVENT_READ, data)
-            self.start(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
+            self.start(self.broker.mcast_IP, self.broker.can_port)
         else:
             self.__greeting_bar()
             self.__typewritter("Unfortunately, there are no available ECUs right now. Please check back later.", tcolors.red)
@@ -131,11 +139,14 @@ class SSS3:
 
     def __request_devices(self, devices: list):
         self.__print_devices(devices)
-        device_ids = [device["ID"] for device in devices]
-        requestedECUs = self.__request_user_select_devices(device_ids)
+        available_device_ids = [device["ID"] for device in devices]
+        requestedECUs = self.__request_user_select_devices(available_device_ids)
         if self.broker.request_devices(requestedECUs, devices):
+            for i in requestedECUs:
+                self.devices[str(i)] = self.device(0.0,0,0,0,0)
             self.__typewritter("Requested devices were successfully allocated.", tcolors.yellow)
         else:
+            self.devices = {}
             self.__typewritter("One or more of the requested devices are no longer available. Please select new device(s).", tcolors.red)
             self.__select_devices(self.broker.get_devices())
 
@@ -176,9 +187,12 @@ class SSS3:
     def start(self, mcast_IP: IPv4Address, can_port: int):
         self.__typewritter("Received session setup information from the server.", tcolors.magenta)
         self.__typewritter("Starting the session!", tcolors.yellow)
+        device_address = socket.gethostbyname_ex(socket.gethostname())[2][3]
+        logging.info(device_address + " was chosen as the interface to subscribe to for multicast messages.")
         group = socket.inet_aton(str(mcast_IP))
-        self.mreq = struct.pack("4sl", group, socket.INADDR_ANY)
-        self.__set_mcast_options(mcast_IP, can_port)
+        iface = socket.inet_aton(device_address)
+        self.mreq = group + iface
+        self.__set_mcast_options(can_port, iface)
         if self.l_thread.is_alive():
             self.listen = False
             self.l_thread.join(1)
@@ -187,29 +201,30 @@ class SSS3:
         else:
             self.listen = True
             self.l_thread.start()
-            # control = SimpleNamespace(
-            #     throttle = 1.0,
-            #     steer = 1.0,
-            #     brake = 1.0,
-            #     hand_brake = 1,
-            #     reverse = 1,
-            #     manual_gear_shift = 1,
-            #     gear = 1
-            # )
-            # try:
-            #     while True:
-            #         self.send_control_frame(control)
-            #         time.sleep(1)
-            # except KeyboardInterrupt:
-            #     pass
+            control = SimpleNamespace(
+                throttle = 1.0,
+                steer = 1.0,
+                brake = 1.0,
+                hand_brake = 1,
+                reverse = 1,
+                manual_gear_shift = 1,
+                gear = 1
+            )
+            try:
+                while True:
+                    self.send_control_frame(control)
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
                 
-    def __set_mcast_options(self, mcast_IP: IPv4Address, can_port:int) -> None:
-        self.can.bind((str(mcast_IP), can_port))
+    def __set_mcast_options(self, can_port:int, iface: str) -> None:
         self.can.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, self.mreq)
+        self.can.bind(('', can_port))
         self.can.setblocking(False)
         can_data = SimpleNamespace(callback = self.__receive)
         self.sel.register(self.can, selectors.EVENT_READ, can_data)
-        self.carla.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
+        self.carla.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 128)
+        self.carla.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, iface)
         self.carla.setblocking(False)
         carla_data = SimpleNamespace(
             callback = self.__send,
@@ -243,7 +258,11 @@ class SSS3:
 
     def send_control_frame(self, control):
         with self.selector_lock:
-            self.frame.frame_num += 1
+            if self.frame.frame_num == 4294967296:
+                self.frame.frame_num = 0
+            else:
+                self.frame.frame_num += 1
+            self.last_control_frame = control
             message = self.frame.packControlFrame(control)
             self._key.data.outgoing_message = message
             self.sel.modify(self._key.fileobj, selectors.EVENT_WRITE, self._key.data)
@@ -252,6 +271,7 @@ class SSS3:
         try:
             message = key.data.outgoing_message
             key.fileobj.sendto(message, (str(self.broker.mcast_IP), self.broker.carla_port))
+            self.last_frame_sent_time = time.time()
             self.sel.modify(key.fileobj, selectors.EVENT_READ, key.data)
         except InterruptedError:
             logging.error("Message was interrupted while sending.")
@@ -260,26 +280,58 @@ class SSS3:
 
     def __receive(self, key: selectors.SelectorKey) -> None:
         try:
-            data = key.fileobj.recv(31)
-            if len(data) == 31:
-                can_frame = self.frame.unpackCanFrame(data, verbose=True)
+            data = key.fileobj.recv(36)
         except socket.timeout:
             logging.warning(f'Socket timed out.')
+        except OSError as oe:
+            logging.error(oe)
+        else:
+            if len(data) == 36:
+                can_frame = self.frame.unpackCanFrame(data, verbose=True)
+                self.__calc_device_stats(can_frame, True)
 
-    # def __frame_miss_match(self, ecm_data, verbose=False) -> None:
-    #     self.dropped_messages += 1
-    #     self.seq_miss_match += 1
-    #     self.can.settimeout(0.01)
-    #     for i in range(self.frame.last_frame - ecm_data[0]):
-    #         self.can.recv(20)
-    #         self.dropped_messages += 1
-    #         self.seq_miss_match += 1
-    #     self.can.settimeout(0.04)
-    #     if verbose:
-    #         print(ecm_data[0])
-    #         print(self.frame.last_frame)
-    #         print(
-    #             f'Sequence number miss match. Total: {self.seq_miss_match}')
+    def __calc_device_stats(self, can_frame, verbose=False) -> None:
+        if not can_frame.device_id in self.devices.keys():
+            logging.error("Received a CAN frame from an out-of-band device.")
+            return
+        current_device = self.devices[str(can_frame.device_id)]
+        self.__calc_latency(current_device)
+        self.__calc_dropped_frame(current_device, can_frame)
+        if can_frame.sequence_number == 4294967296:
+            current_device.last_can_seq_num = -1
+        else:
+            current_device.last_can_seq_num = can_frame.sequence_number
+        if verbose: self.__print_stats()
+
+    def __calc_latency(self, current_device):
+        msg_rtt = time.time() - self.last_frame_sent_time
+        curr_rtt = current_device.latency
+        current_device.number_of_messages_received += 1
+        curr_num = current_device.number_of_messages_received
+        # From: https://stackoverflow.com/questions/22999487/update-the-average-of-a-continuous-sequence-of-numbers-in-constant-time
+        current_device.latency += (msg_rtt - curr_rtt) / curr_num
+
+    def __calc_dropped_frame(self, current_device, can_frame):
+        frame_diff = self.frame.last_frame - can_frame.control_frame_ref
+        seq_diff = can_frame.sequence_number - current_device.last_can_seq_num
+        if frame_diff > 1:
+            current_device.dropped_carla_frames += 1
+        if seq_diff > 1:
+            current_device.dropped_can_frames += 1
+
+    def __print_stats(self):
+        if hasattr(self, "last_print_time"):
+            if time.time() - self.last_print_time > 1:
+                for k,v in self.devices:
+                    msg = (
+                        f'[{k}]:\n'
+                        f'\tLatency: {v.latency:>5.2f}ms\n'
+                        f'\tDropped Carla Frames: {v.dropped_carla_frames}\n'
+                        f'\tDropped CAN Frames: {v.dropped_can_frames}\n'
+                    )
+                    print(msg)
+        else:
+            self.last_print_time = time.time()
 
 
 if __name__ == '__main__':
