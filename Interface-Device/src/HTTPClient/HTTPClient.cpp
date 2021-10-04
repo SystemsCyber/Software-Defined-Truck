@@ -42,9 +42,9 @@ bool HTTPClient::connect(bool retry)
 
 bool HTTPClient::read(struct Request *req)
 {
-    Ethernet.maintain(); //Keep current address assigned by DHCP server.
     if (server.available())
     {
+        Ethernet.maintain(); //Keep current address assigned by DHCP server. Not sure how often to call this.
         req->raw = server.readString((size_t) 4096);
         if ((req->raw).length() > 0 && parseRequest(req))
         {
@@ -68,20 +68,21 @@ bool HTTPClient::write(struct Request req, struct Response *res, bool retry)
     Ethernet.maintain();
     if (server.connected())
     {
-        server.println(req.method + " " + req.uri + " HTTP/1.1");
-        server.println("Connection: keep-alive");
+        String message = req.method + " " + req.uri + " HTTP/1.1\r\n";
+        message += "Connection: keep-alive\r\n";
         if (!req.data.isNull())
         {
-            server.println("Content-Type: application/json");
-            server.println();
+            message += "Content-Type: application/json\r\n";
+            message += "\r\n";
             String data;
             serializeJson(req.data, data);
-            server.print(data);
+            message += data;
         }
         else
         {
-            server.println();
+            message += "\r\n";
         }
+        server.write(message.c_str());
         server.flush();
         return getResponse(req, res, retry);
     }
@@ -269,7 +270,7 @@ bool HTTPClient::parseRequest(struct Request *req)
         return false;
     }
     req->method = requestArray[0];
-    if (messageSplit[1].length() > 0)
+    if (messageSplit[1].length() > 3)
     {
         DynamicJsonDocument data(1024);
         DeserializationError error = deserializeJson(data, messageSplit[1]);
@@ -289,7 +290,12 @@ bool HTTPClient::validateJSON(struct Request *req)
     bool containsIP = req->data.containsKey("IP");
     bool containsCAN_PORT = req->data.containsKey("CAN_PORT");
     bool containsCARLA_PORT = req->data.containsKey("CARLA_PORT");
-    if (!containsIP || !containsCAN_PORT || !containsCARLA_PORT)
+    bool isPOST = req->method.equalsIgnoreCase("POST");
+    if (!containsIP && !containsCAN_PORT && !containsCARLA_PORT && !isPOST)
+    {
+        return true;
+    }
+    else if (!containsIP || !containsCAN_PORT || !containsCARLA_PORT)
     {
         req->error = "Request JSON is missing one of the required keys.";
         return false;

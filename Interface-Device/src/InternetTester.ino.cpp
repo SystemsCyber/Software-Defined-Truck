@@ -25,6 +25,6 @@ void setup() {
 
 void loop() {
     client.monitor(true);
-    if (can0.read(msg)) client.write(&msg);
-    if (can1.read(msg)) client.write(&msg);
+    if (client.canPort && can0.read(msg)) client.write(&msg);
+    if (client.canPort && can1.read(msg)) client.write(&msg);
 }

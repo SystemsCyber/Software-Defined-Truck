@@ -17,11 +17,11 @@ private:
     EthernetUDP carla;      // Multicast socket to receive CARLA frames from.
     EthernetUDP can;        // Multicast socket to send CAN frames on.
 
+public:
     IPAddress mcastIP;
     int carlaPort;
     int canPort;
 
-public:
     struct CARLA_UDP // CARLA frame information struct
     {
         uint32_t frameNumber;
