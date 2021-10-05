@@ -54,14 +54,14 @@ class ClientHandle:
         self.__log_info("Submitted a change in registration.")
         return self.do_POST_register(key, rfile, wfile)
     
-    def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_register(self, key: SEL, rfile = None, wfile = None) -> HTTPStatus:
         self._key = key
         self.__log_info("Unregistered.")
         if key.data.in_use:
+            self.__handle_end_session()
             key.data.close_connection = True
             return HTTPStatus.OK
         else:
-            self.__handle_end_session()
             key.data.close_connection = True
             return HTTPStatus.OK
 
@@ -84,8 +84,8 @@ class ClientHandle:
     def do_DELETE_session(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self._key = key
         self.__log_info("Ended its session.")
-        if not key.data.in_use:
-            self.__handle_end_session(wfile)
+        if key.data.in_use:
+            self.__handle_end_session()
             return HTTPStatus.OK
         else:
             self.__log_error("Tried to end a non-existent session.")
@@ -94,12 +94,14 @@ class ClientHandle:
 
     def __handle_end_session(self):
         message = "DELETE * HTTP/1.1\r\n"
-        message += "Connection: keep-alive\r\n\r\n"
+        message += "Connection: keep-alive\r\n"
+        message += "Content-Length: 0\r\n\r\n"
         message = bytes(message, "iso-8859-1")
         for members in self.multicast_ips:
-            if self._key.fd == members["sockets"][0]:
+            list_length = len(members["sockets"]) > 0
+            if list_length and self._key.fd == members["sockets"][0]:
                 members["available"] = True
-                self.__notify_session_members(members, message)
+                self.__notify_session_members(members["sockets"], message)
 
     def __register(self, data: Dict) -> HTTPStatus:
         self._key.data.MAC = data["MAC"]
@@ -174,12 +176,10 @@ class ClientHandle:
             key = mapping[ecu["ID"]]
             if ecu in available:
                 self.__log_info(f'{key.data.addr[0]} is available.')
-                key.data.in_use = True
                 members.append(ecu["ID"])
             else:
                 self.__log_error(f'{key.data.addr[0]} is not available.')
                 return []
-        self._key.data.in_use = True
         return members
 
     def __create_start_message(self) -> bytes:
@@ -210,6 +210,7 @@ class ClientHandle:
                 return ip["ip"]
                 
     def __notify_session_members(self, members: List, message: bytes, IP = None):
+        self._key.data.in_use = not self._key.data.in_use
         self.__log_info(f'Notifying devices.')
         mapping = self.sel.get_map()
         for device in members[1:]:
@@ -219,6 +220,7 @@ class ClientHandle:
             key.data.callback = key.data.write
             key.data.outgoing_messages.put(message)
             key.data.expecting_response = True
+            key.data.in_use = not key.data.in_use
             self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
             self.__log_info(f'Successfully notified {key.data.addr[0]}.')
 
