@@ -11,7 +11,8 @@ class Device:
         self.write = write
         self.callback = read
         self.addr = addr
-        self.accept_by = time.time() + 5
+        self.accept_by = time.time() + 30
+        self.logged_connection_close = False
         self.MAC = None
         self.type = "unknown"
         self.in_use = False
@@ -44,10 +45,13 @@ class Device:
             return False
         elif self.accept_by > current_time:
             return False
-        else:
-            msg = f'{self.addr[0]} has not registered within 5 '
+        elif not self.logged_connection_close:
+            self.logged_connection_close = True
+            msg = f'{self.addr[0]} has not registered within 30 '
             msg += f'seconds of first connecting. Closing connection.'
             log_error(msg)
+            return True
+        else:
             return True
 
     @staticmethod
@@ -82,7 +86,9 @@ class Device:
     @staticmethod
     def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
         available = []
-        for fd, key in sel.get_map():
+        sel_map = sel.get_map()
+        for fd in sel_map:
+            key = sel_map[fd]
             if Device.is_available(key):
                 available.append({
                     "ID": fd, 
