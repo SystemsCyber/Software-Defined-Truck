@@ -61,14 +61,14 @@ class SSS3Handle:
         self.__log_info("Submitted a change in registration.")
         return self.do_POST_register(key, rfile, wfile)
     
-    def do_DELETE_register(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def do_DELETE_register(self, key: SEL, rfile = None, wfile = None) -> HTTPStatus:
         self._key = key
         self.__log_info("Unregistered.")
         if key.data.in_use:
+            self.__handle_end_session()
             key.data.close_connection = True
             return HTTPStatus.OK
         else:
-            self.__handle_end_session()
             key.data.close_connection = True
             return HTTPStatus.OK
 
@@ -133,9 +133,10 @@ class SSS3Handle:
         for members in self.multicast_ips:
             if self._key.fd == members["sockets"][0]:
                 members["available"] = True
-                self.__notify_session_members(members, message)
+                self.__notify_session_members(members["sockets"], message)
 
     def __notify_session_members(self, members: List, message: bytes):
+        self._key.data.in_use = not self._key.data.in_use
         self.__log_info(f'Notifying devices.')
         mapping = self.sel.get_map()
         for device in members[1:]:
@@ -143,5 +144,6 @@ class SSS3Handle:
             key.data.callback = key.data.write
             key.data.outgoing_messages.put(message)
             key.data.expecting_response = True
+            key.data.in_use = not key.data.in_use
             self.sel.modify(key.fileobj, selectors.EVENT_WRITE, key.data)
             self.__log_info(f'Successfully notified {key.data.addr[0]}.')
