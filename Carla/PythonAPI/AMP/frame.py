@@ -2,12 +2,7 @@ import struct
 from collections import namedtuple
 from typing import Tuple
 
-
-class Frame:
-    def __init__(self) -> None:
-        self.frame_num = 0
-        self.last_frame = 0
-        self.can_frame = namedtuple("can_frame", [
+can_frame = namedtuple("can_frame", [
             "device_id",
             "control_frame_ref",
             "sequence_number",
@@ -25,6 +20,11 @@ class Frame:
             "sequential_frame"
             ])
 
+class Frame:
+    def __init__(self) -> None:
+        self.frame_num = 0
+        self.last_frame = 0
+
     def packControlFrame(self, control) -> bytes:
         self.last_frame = self.frame_num
         return struct.pack("Ifff???B",
@@ -38,8 +38,8 @@ class Frame:
                            control.gear)                # Gear
 
     def unpackCanFrame(self, buffer, verbose=False) -> Tuple:
-        rawCanFrame = struct.unpack("IIIIHB????Bs8bB?x1", buffer)
-        can_frame = self.can_frame(
+        rawCanFrame = struct.unpack("IIIIHB????Bs8bB?x", buffer)
+        cf = can_frame(
             device_id = rawCanFrame[0],
             control_frame_ref = rawCanFrame[1],
             sequence_number = rawCanFrame[2],
@@ -58,12 +58,12 @@ class Frame:
         )
         if verbose:
             printout = (
-                f'Device: {can_frame.device_id:>5d}\n'
-                f'Frame #: {can_frame.control_frame_ref:>8d} Seq. #: {can_frame.sequence_number:>10d}\n'
-                f'\tID: {can_frame.can_id} Timestamp: {can_frame.timestamp} IDHit: {can_frame.id_hit}\n'
-                f'\tExtended: {can_frame.extended} Remote: {can_frame.remote} Overrun: {can_frame.overrun} Reserved: {can_frame.reserved}\n'
-                f'\tLength: {can_frame.data_length} Data: {can_frame.data}\n'
-                f'\tMailbox: {can_frame.mailbox} Bus: {can_frame.bus} SeqFrame: {can_frame.sequential_frame}\n'
+                f'Device: {cf.device_id:>5d}\n'
+                f'Frame #: {cf.control_frame_ref:>8d} Seq. #: {cf.sequence_number:>10d}\n'
+                f'\tID: {cf.can_id} Timestamp: {cf.timestamp} IDHit: {cf.id_hit}\n'
+                f'\tExtended: {cf.extended} Remote: {cf.remote} Overrun: {cf.overrun} Reserved: {cf.reserved}\n'
+                f'\tLength: {cf.data_length} Data: {cf.data}\n'
+                f'\tMailbox: {cf.mailbox} Bus: {cf.bus} SeqFrame: {cf.sequential_frame}\n'
             )
             print(printout)
-        return can_frame
+        return cf
