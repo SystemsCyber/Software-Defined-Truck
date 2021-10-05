@@ -1,11 +1,9 @@
 import socket
 import json
-from types import SimpleNamespace
 import jsonschema
 import http.client
 import selectors
 import logging
-import os
 from ipaddress import IPv4Address, AddressValueError
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler
@@ -50,7 +48,6 @@ class BrokerHandle(BaseHTTPRequestHandler):
             self.__handle_connection_errors(httpe)
         else:
             logging.info("Successfully connected to server")
-            self.__set_keepalive(self.ctrl.sock, 300000, 300000)
             return True
         if retry:
             logging.info("Retrying connection to server.")
@@ -58,18 +55,6 @@ class BrokerHandle(BaseHTTPRequestHandler):
         else:
             logging.error("Server unreachable. Exiting.")
             return False
-    
-    def __set_keepalive(self, conn: socket.socket, idle_sec: int, interval_sec: int) -> None:
-        logging.info(f'Setting Keep-Alive idle seconds to {idle_sec}.')
-        logging.info(f'Setting Keep-Alive interval seconds to {interval_sec}.')
-        if os.name == 'nt':
-            conn.ioctl(socket.SIO_KEEPALIVE_VALS, (1, idle_sec, interval_sec))
-        else:
-            conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, idle_sec)
-            conn.setsockopt(socket.IPPROTO_TCP,
-                            socket.TCP_KEEPINTVL, interval_sec)
-            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 10)
 
     def __wait_for_socket(self, timeout=None) -> bool:
         try:
@@ -227,7 +212,7 @@ class BrokerHandle(BaseHTTPRequestHandler):
             raise SyntaxError from ave
 
     def do_DELETE(self):
-        logging.info("Server closed the current session.")
+        logging.info("Closing the current session.")
         self.mcast_IP = IPv4Address
         self.can_port = 0
         self.carla_port = 0
@@ -236,14 +221,18 @@ class BrokerHandle(BaseHTTPRequestHandler):
         logging.info(f'Sending DELETE.')
         response = None
         try:
-            self.ctrl.request("DELETE", path)
-            self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
+            headers = {"Connection": "keep-alive"}
+            self.ctrl.request("DELETE", path, headers=headers)
+            with self.selector_lock:
+                self.sel.modify(self.ctrl.sock, selectors.EVENT_READ)
         except http.client.HTTPException as httpe:
             logging.error("-> Delete request failed to send.")
             self.__handle_connection_errors(httpe)
+            logging.error(httpe)
         else:
             if self.__wait_for_socket():
                 response = self.ctrl.getresponse()
+                response.read(response.length)
         finally:
             if close:
                 key = self.sel.get_key(self.ctrl.sock)
@@ -258,3 +247,9 @@ class BrokerHandle(BaseHTTPRequestHandler):
         key.fileobj.shutdown(socket.SHUT_RDWR)
         logging.debug("Closing the socket object.")
         key.fileobj.close()
+
+
+
+# Time out for frame -> max(1/retries * fps, average rtt)
+# Time before declaring sss3 dead is 1 second.
+# Make sure we receive confirmation of last frame before sending the next frame to the server.

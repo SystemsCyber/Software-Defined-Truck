@@ -1,8 +1,10 @@
 import os
 import json
-import jsonschema
+from jsonschema import RefResolver, Draft7Validator
 import logging
 import copy
+from time import sleep
+from shutil import get_terminal_size
 from typing import Dict, Tuple, List
 
 class Schema:
@@ -12,8 +14,8 @@ class Schema:
         schema_path = os.path.join(schema_dir, schema_name)
         with open(schema_path, 'rb') as schema_file:
             schema = json.load(schema_file)
-        resolver = jsonschema.RefResolver('file:///' + schema_dir.replace("\\", "/") + '/', schema)
-        return jsonschema.Draft7Validator(schema, resolver=resolver), schema
+        resolver = RefResolver('file:///' + schema_dir.replace("\\", "/") + '/', schema)
+        return Draft7Validator(schema, resolver=resolver), schema
 
     @staticmethod
     def find_schema_folder():
@@ -59,3 +61,30 @@ class ColoredConsoleHandler(logging.StreamHandler):
         myrecord.levelname = color + str(myrecord.levelname) + '\x1b[0m'  # normal
         logging.StreamHandler.emit(self, myrecord)
 # ------------------------------------------------------------
+
+class TypeWritter:
+    bold = '\u001b[1m'
+    black = '\u001b[30m'
+    red = '\u001b[31m'
+    green  = '\u001b[32m'
+    yellow = '\u001b[33m'
+    blue = '\u001b[34m'
+    magenta = '\u001b[35m'
+    cyan = '\u001b[36m'
+    white = '\u001b[37m'
+    reset = '\u001b[0m'
+
+    @staticmethod
+    def write(sentence, color=None, end='\n'):
+        print(color, end='')
+        for char in sentence:
+            print(char, sep='', end='', flush=True)
+            sleep(0.01)
+        print(TypeWritter.reset, end=end)
+
+    @staticmethod
+    def bar():
+        # os.system('cls' if os.name == 'nt' else 'clear')
+        term_size = get_terminal_size()
+        greeting_message = "* ECU Selection Menu *"
+        print(f'{TypeWritter.green}{greeting_message:*^{term_size[0]-5}}{TypeWritter.reset}')

@@ -1079,7 +1079,7 @@ class CameraManager(object):
 
 
 def game_loop(args):
-    ecu = SSS3(args.server_host)
+    ecu = SSS3(10, args.server_host)
     ecu.setup()
     pygame.init()
     pygame.font.init()
