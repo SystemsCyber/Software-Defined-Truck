@@ -8,9 +8,9 @@ from ipaddress import ip_network
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 from io import BytesIO
-from Device import Device
-from SSS3Handle import SSS3Handle
-from ClientHandle import ClientHandle
+from Node import Node
+from CANNodes import CANNodes
+from SensorNodes import SensorNodes
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from HelperMethods import ColoredConsoleHandler, LogFolder
@@ -44,8 +44,8 @@ class Broker(BaseHTTPRequestHandler):
                 "sockets": []
             })
         self.blacklist_ips = []
-        self.SSS3s = SSS3Handle(self.sel, self.multicast_IPs)
-        self.CLIENTs = ClientHandle(self.sel, self.multicast_IPs)
+        self.SSS3s = CANNodes(self.sel, self.multicast_IPs)
+        self.CLIENTs = SensorNodes(self.sel, self.multicast_IPs)
 
     def __setup_logging(self):
         filename = LogFolder.findpath("broker_log")
@@ -175,7 +175,7 @@ class Broker(BaseHTTPRequestHandler):
         else:
             self.log_message(f'New connection from: {addr[0]}:{str(addr[1])}')
             self.__set_keepalive(conn)
-            data = Device(self.__read, self.__write, addr)
+            data = Node(self.__read, self.__write, addr)
             self.sel.register(conn, EVENT_READ, data=data)
 
     def __set_keepalive(self, conn: SocketType) -> None:

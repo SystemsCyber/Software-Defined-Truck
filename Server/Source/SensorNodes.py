@@ -7,11 +7,11 @@ from io import BytesIO
 from typing import Tuple, List, Dict
 import logging
 from HelperMethods import Schema
-from Device import Device
+from Node import Node
 
 SEL = selectors.SelectorKey
 
-class ClientHandle:
+class SensorNodes:
     def __init__(self, sel: selectors.DefaultSelector, multicast_ips: List) -> None:
         self.sel = sel
         self.multicast_ips = multicast_ips
@@ -116,7 +116,7 @@ class ClientHandle:
         sel_map = self.sel.get_map()
         self.duplicates = [self._key]
         for fd in sel_map:
-            if Device.is_not_listening_socket(sel_map[fd]):
+            if Node.is_not_listening_socket(sel_map[fd]):
                 return self.__check_already_registered(sel_map[fd])
 
     def __check_already_registered(self, old_key: SEL) -> HTTPStatus:
@@ -169,7 +169,7 @@ class ClientHandle:
 
     def __gather_requested_devices(self, requested: Dict) -> List:
         self.__log_info("Gathering requested devices.")
-        available = Device.get_available_ECUs(self.sel)
+        available = Node.get_available_ECUs(self.sel)
         members = [self._key.fd]
         mapping = self.sel.get_map()
         for ecu in requested["ECUs"]:

@@ -2,7 +2,7 @@ from time import time
 from typing import NamedTuple
 
 
-class SSS3Device:
+class NetworkStats:
 
     def __init__(self, _id: int) -> None:
         self.id = _id

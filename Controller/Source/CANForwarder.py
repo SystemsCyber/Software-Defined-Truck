@@ -20,7 +20,7 @@ can_frame = namedtuple("can_frame", [
             "sequential_frame"
             ])
 
-class Frame:
+class CANForwarder:
     def __init__(self) -> None:
         self.frame_num = 0
         self.last_frame = 0

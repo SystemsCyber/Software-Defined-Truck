@@ -6,12 +6,12 @@ import json
 import jsonschema
 import logging
 from HelperMethods import Schema
-from Device import Device
+from Node import Node
 
 SEL = selectors.SelectorKey
 
 
-class SSS3Handle:
+class CANNodes:
     def __init__(self, sel: selectors.DefaultSelector, multicast_ips: List) -> None:
         self.sel = sel
         self.multicast_ips = multicast_ips
@@ -27,8 +27,8 @@ class SSS3Handle:
     def do_GET(self, key: SEL, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self._key = key
         self.__log_info("Requested available devices.")
-        if Device.is_client(key):
-            devices = json.dumps(Device.get_available_ECUs(self.sel))
+        if Node.is_client(key):
+            devices = json.dumps(Node.get_available_ECUs(self.sel))
             wfile.write(bytes(devices, "UTF-8"))
             return HTTPStatus.FOUND
         else:
@@ -72,7 +72,7 @@ class SSS3Handle:
             key.data.close_connection = True
             return HTTPStatus.OK
 
-    def __register(self, data: Device) -> HTTPStatus:
+    def __register(self, data: Node) -> HTTPStatus:
         self._key.data.MAC = data["MAC"]
         self._key.data.type = "SSS3"
         self._key.data.ECUs = data["ECUs"]
@@ -85,7 +85,7 @@ class SSS3Handle:
         self.__log_info("Checking registration.")
         sel_map = self.sel.get_map()
         for fd in sel_map:
-            if Device.is_not_listening_socket(sel_map[fd]):
+            if Node.is_not_listening_socket(sel_map[fd]):
                 return self.__check_already_registered(sel_map[fd])
 
     def __check_already_registered(self, old_key: SEL) -> HTTPStatus:

@@ -1,10 +1,10 @@
 import atexit
 import logging
-from SSS3Device import SSS3Device
-from SSS3Sockets import SSS3Sockets
-from frame import Frame
+from NetworkStats import NetworkStats
+from CANNode import CANNode
+from CANForwarder import CANForwarder
 from HelperMethods import ColoredConsoleHandler, LogFolder, TypeWritter as tw
-from BrokerHandle import BrokerHandle
+from ServerHandle import ServerHandle
 from logging.handlers import TimedRotatingFileHandler
 from typing import NamedTuple, List
 from types import SimpleNamespace
@@ -16,7 +16,7 @@ from selectors import *
 import threading
 
 
-class SSS3:
+class Controller:
     """SSS3 communication utility in conjunction with the CARLA simulator"""
 
     def __init__(self, _max_retrans: int, _server_address = gethostname()) -> None:
@@ -25,7 +25,7 @@ class SSS3:
         self.sel = DefaultSelector()
         self.selector_lock = threading.Lock()
         # self.selector_lock = mp.Lock()
-        self.frame = Frame()
+        self.frame = CANForwarder()
         self.avg_sending_rate = 0
         self.last_frame_sent_time = time()
         self.last_print_time = time()
@@ -33,7 +33,7 @@ class SSS3:
         self.retrans_timeout = 0
         self.devices = {}
         self.devices_keys = []
-        self.broker = BrokerHandle(self.sel, self.selector_lock, _server_address)
+        self.broker = ServerHandle(self.sel, self.selector_lock, _server_address)
         # self.l_thread = threading.Thread(target=self.__listen, args=(0.01,))
         self.l_thread = threading.Thread(target=self.__listen, args=(0,))
         self.l_thread.setDaemon(True)
@@ -111,7 +111,7 @@ class SSS3:
         requested = self.__request_available_devices()
         if requested:
             for i in requested:
-                self.devices[str(i)] = SSS3Device(i)
+                self.devices[str(i)] = NetworkStats(i)
             self.devices_keys = self.devices.keys()
             data = SimpleNamespace(
                     callback = self.__receive_SSE,
@@ -146,7 +146,7 @@ class SSS3:
     def start(self):
         tw.write("Received session setup information from the server.", tw.magenta)
         tw.write("Starting the session!", tw.yellow)
-        self.sss3 = SSS3Sockets(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
+        self.sss3 = CANNode(self.broker.mcast_IP, self.broker.can_port, self.broker.carla_port)
         can_data = SimpleNamespace(callback = self.__receive)
         self.sel.register(self.sss3.can, EVENT_READ, can_data)
         carla_data = SimpleNamespace(
@@ -263,5 +263,5 @@ class SSS3:
 
 
 if __name__ == '__main__':
-    sss3object = SSS3(10)
-    sss3object.setup()
+    controller = Controller(10)
+    controller.setup()

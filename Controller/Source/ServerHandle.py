@@ -11,7 +11,7 @@ from HelperMethods import Schema
 from getmac import get_mac_address as gma
 from threading import Lock
 
-class BrokerHandle(BaseHTTPRequestHandler):
+class ServerHandle(BaseHTTPRequestHandler):
     def __init__(self, _sel: selectors.DefaultSelector, _lock: Lock, _server_address = socket.gethostname()) -> None:
         self.mac = gma()
         self.sel = _sel

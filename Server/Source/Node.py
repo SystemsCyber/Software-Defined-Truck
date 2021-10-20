@@ -5,7 +5,7 @@ from typing import Tuple, Dict, List
 
 SEL = selectors.SelectorKey
 
-class Device:
+class Node:
     def __init__(self, read, write, addr: Tuple[str, int]) -> None:
         self.read = read
         self.write = write
@@ -66,7 +66,7 @@ class Device:
 
     @staticmethod
     def is_client(key: SEL) -> bool:
-        if Device.is_registered(key):
+        if Node.is_registered(key):
             return hasattr(key.data, "type") and key.data.type == "CLIENT"
         else:
             return False
@@ -80,8 +80,8 @@ class Device:
 
     @staticmethod
     def is_available(key: SEL) -> bool:
-        if Device.is_not_listening_socket(key):
-            return Device.is_SSS3(key) and not key.data.in_use
+        if Node.is_not_listening_socket(key):
+            return Node.is_SSS3(key) and not key.data.in_use
 
     @staticmethod
     def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
@@ -89,7 +89,7 @@ class Device:
         sel_map = sel.get_map()
         for fd in sel_map:
             key = sel_map[fd]
-            if Device.is_available(key):
+            if Node.is_available(key):
                 available.append({
                     "ID": fd, 
                     "ECUs": key.data.ECUs

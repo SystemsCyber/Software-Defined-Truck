@@ -2,7 +2,7 @@ import logging
 from socket import *
 from ipaddress import IPv4Address
 
-class SSS3Sockets:
+class CANNode:
 
     def __init__(self, _mcast_IP: IPv4Address, _can_port: int, _carla_port: int) -> None:
         self.mcast_IP = _mcast_IP
