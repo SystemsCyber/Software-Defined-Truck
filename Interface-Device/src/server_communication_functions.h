@@ -5,7 +5,7 @@
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE];  // buffer to hold incoming packet,
 char ReplyBuffer[] = "acknowledged";        // a string to send back
 
-void init_UDP_connection(byte mac[6], unsigned int localPort, IPAddress remoteip){
+void init_UDP_connection(byte mac[6], unsigned int localPort){
 if (Ethernet.begin(mac) == 0) {
 
     Serial.println("Failed to configure Ethernet using DHCP");
