@@ -1,0 +1,13 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "VMware vSphere vCenter Virtual Machine MAC Address",
+    "description": "The EUI-48 MAC address associated with a VMware Virtual Machine. Must start with the VMware vSphere vCenter Virtual Machine OUI 00:0C:29.",
+    "type": "string",
+    "examples": [
+        "00:0C:29:DE:AD:BE",
+        "00:0c:29:de:ad:be"
+    ],
+    "maxLength": 17,
+    "minLength": 17,
+    "pattern": "^00:0[Cc]:29:([0-9A-Fa-f]{2}[:]){2}[0-9A-Fa-f]{2}$"
+}

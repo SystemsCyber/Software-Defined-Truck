@@ -1,0 +1,26 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "Client POST Schema",
+    "description": "POST Schema for Client devices.",
+    "type": "object",
+    "examples": [
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/0"
+            }
+        },
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/1"
+            }
+        }
+    ],
+    "required": [
+        "MAC"
+    ],
+    "properties": {
+        "MAC": {
+            "$ref": "VMMAC.json"
+        }
+    }
+}

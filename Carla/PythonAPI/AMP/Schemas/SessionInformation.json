@@ -1,0 +1,38 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "Session Information",
+    "description": "The session information will contain the multicast addresses for Carla and Can traffic.",
+    "type": "object",
+    "required": [
+        "IP",
+        "CARLA_PORT",
+        "CAN_PORT"
+    ],
+    "properties": {
+        "GROUP_ID": {
+            "$ref": "SessionGroupID.json"
+        },
+        "ID": {
+            "type":"integer",
+            "examples": [
+                1234,
+                4321
+            ],
+            "minimum": 4,
+            "maximum": 65535
+        },
+        "IP": {
+            "$ref": "MulticastIP.json"
+        },
+        "CAN_PORT": {
+            "type": "number",
+            "maximum": 65535,
+            "minimum": 1025
+        },
+        "CARLA_PORT": {
+            "type": "number",
+            "maximum": 65535,
+            "minimum": 1025
+        }
+    }
+}

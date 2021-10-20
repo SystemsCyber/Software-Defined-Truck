@@ -1,0 +1,3 @@
+[submodule "Interface-Device/lib/FlexCAN_T4"]
+	path = Interface-Device/lib/FlexCAN_T4
+	url = https://github.com/SystemsCyber/FlexCAN_T4
