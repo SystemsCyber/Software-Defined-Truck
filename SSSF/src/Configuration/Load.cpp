@@ -2,10 +2,10 @@
 #include <ArduinoJson.h>
 #include <SD.h>
 #include <SPI.h>
-#include <Configuration/LoadConfiguration.h>
+#include <Configuration/Load.h>
 #include <array>
 
-LoadConfiguration::LoadConfiguration(): exConfigWithIP(512), exConfigWithFQDN(512), exECU1(256),
+Load::Load(): exConfigWithIP(512), exConfigWithFQDN(512), exECU1(256),
                                         exECU2(256), mac{0}, config(1024)                   
 {
     exECU1["sn"] = "1a2b3c4d";
@@ -35,14 +35,14 @@ LoadConfiguration::LoadConfiguration(): exConfigWithIP(512), exConfigWithFQDN(51
     ecus2.add(exECU2);
 };
 
-void LoadConfiguration::init()
+void Load::init()
 {
     File file = initializeSD("config.txt");
     deserializeConfiguration(file);
     file.close();
 }
 
-File LoadConfiguration::initializeSD(const char *filename)
+File Load::initializeSD(const char *filename)
 {
     Serial.print("Initializing SD card...");
     if (!SD.begin(BUILTIN_SDCARD))
@@ -56,7 +56,7 @@ File LoadConfiguration::initializeSD(const char *filename)
     return fileExists(filename);
 }
 
-File LoadConfiguration::fileExists(const char *filename)
+File Load::fileExists(const char *filename)
 {
     Serial.print("The SSS3 configuration file \"");
     Serial.print(filename);
@@ -71,7 +71,7 @@ File LoadConfiguration::fileExists(const char *filename)
     return openFile(filename);
 }
 
-File LoadConfiguration::openFile(const char *filename)
+File Load::openFile(const char *filename)
 {
     File file = SD.open(filename);
     if (file.available())
@@ -88,7 +88,7 @@ File LoadConfiguration::openFile(const char *filename)
     return file;
 }
 
-void LoadConfiguration::deserializeConfiguration(File file)
+void Load::deserializeConfiguration(File file)
 {
     Serial.print("Deserializing the configuration file into a JSON object...");
     DeserializationError error = deserializeJson(config, file);
@@ -110,7 +110,7 @@ void LoadConfiguration::deserializeConfiguration(File file)
     }
 }
 
-String LoadConfiguration::readMACAddress()
+String Load::readMACAddress()
 {
     // From http://forum.pjrc.com/threads/91-teensy-3-MAC-address 
 
@@ -129,7 +129,7 @@ String LoadConfiguration::readMACAddress()
     return macString;
 }
 
-void LoadConfiguration::readLowLevelData(uint8_t word, uint8_t loc)
+void Load::readLowLevelData(uint8_t word, uint8_t loc)
 {
     // From http://forum.pjrc.com/threads/91-teensy-3-MAC-address 
 

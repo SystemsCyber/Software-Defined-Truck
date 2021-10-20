@@ -5,13 +5,13 @@
 #include <ArduinoJson.h>
 #include <IPAddress.h>
 #include <Ethernet.h>
-#include <Configuration/LoadConfiguration.h>
+#include <Configuration/Load.h>
 #include <vector>
 
 class HTTPClient
 {
 private:
-    LoadConfiguration config;  // Configuration object containing initailization values.
+    Load config;  // Configuration object containing initailization values.
     IPAddress serverAddress;
     bool ethernetInitialized;
     bool serverUnreachable;

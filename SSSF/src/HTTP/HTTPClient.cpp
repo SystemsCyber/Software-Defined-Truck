@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Ethernet.h>
-#include <HTTPClient/HTTPClient.h>
-#include <Configuration/LoadConfiguration.h>
+#include <HTTP/HTTPClient.h>
+#include <Configuration/Load.h>
 #include <Dns.h>
 #include <vector>
 

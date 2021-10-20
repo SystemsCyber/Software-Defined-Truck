@@ -1,16 +1,16 @@
-#ifndef carla_h_
-#define carla_h_
+#ifndef SSSF_H_
+#define SSSF_H_
 
 #include <Arduino.h>
 #include <EthernetUdp.h>
-#include <HTTPClient/HTTPClient.h>
+#include <HTTP/HTTPClient.h>
 #include <IPAddress.h>
 #include <FlexCAN_T4.h>
 
 #define CAN_message_t_size (size_t) 24
 #define CAN_TX_BUFFER_SIZE (size_t) 36
 
-class Carla
+class SSSF
 {
 private:
     HTTPClient server;
@@ -33,7 +33,7 @@ public:
     uint32_t sequenceNumber;
     uint8_t txCanFrameBuffer[CAN_TX_BUFFER_SIZE];
 
-    Carla() = default;
+    SSSF() = default;
     // Returns 1 if successful, 0 otherwise.
     int init();
     // Begin monitoring all interfaces for activity and respond appropriately.
@@ -58,4 +58,4 @@ private:
     void do_DELETE();
 };
 
-#endif /* carla_h_ */
+#endif /* SSSF_H_ */

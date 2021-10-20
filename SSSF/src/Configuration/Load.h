@@ -1,5 +1,5 @@
-#ifndef load_configuration_h
-#define load_configuration_h
+#ifndef LOAD_H_
+#define LOAD_H_
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -7,7 +7,7 @@
 #include <SPI.h>
 #include <array>
 
-class LoadConfiguration
+class Load
 {
 private:
     DynamicJsonDocument exConfigWithIP;
@@ -20,7 +20,7 @@ public:
     uint8_t mac[6];
     DynamicJsonDocument config;
 
-    LoadConfiguration();
+    Load();
     void init();
 
 private:
@@ -32,4 +32,4 @@ private:
     void readLowLevelData(uint8_t word, uint8_t loc);
 };
 
-#endif /* load_configuration_h */
+#endif /* LOAD_H_ */

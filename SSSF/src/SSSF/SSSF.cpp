@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <EthernetUdp.h>
-#include <Carla/Carla.h>
-#include <HTTPClient/HTTPClient.h>
+#include <SSSF/SSSF.h>
+#include <HTTP/HTTPClient.h>
 #include <Dns.h>
 #include <FlexCAN_T4.h>
 
-int Carla::init()
+int SSSF::init()
 {
     server.init();
     bool connected = server.connect();
@@ -34,7 +34,7 @@ int Carla::init()
     return false;
 }
 
-int Carla::monitor(bool verbose)
+int SSSF::monitor(bool verbose)
 {
     struct HTTPClient::Request sse;
     if (server.read(&sse))
@@ -62,7 +62,7 @@ int Carla::monitor(bool verbose)
     }
 }
 
-int Carla::read(bool verbose)
+int SSSF::read(bool verbose)
 {
     size_t packetSize = carla.parsePacket();
     if (packetSize)
@@ -81,7 +81,7 @@ int Carla::read(bool verbose)
     return packetSize;
 }
 
-int Carla::write(const uint8_t *txBuffer, size_t size)
+int SSSF::write(const uint8_t *txBuffer, size_t size)
 {
     if (canPort == 0)
     {
@@ -110,7 +110,7 @@ int Carla::write(const uint8_t *txBuffer, size_t size)
     }
 }
 
-int Carla::write(const CAN_message_t *txBuffer)
+int SSSF::write(const CAN_message_t *txBuffer)
 {
     if (canPort == 0)
     {
@@ -137,7 +137,7 @@ int Carla::write(const CAN_message_t *txBuffer)
     }
 }
 
-void Carla::dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP)
+void SSSF::dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP)
 {
     Serial.print("Received packet of size ");
     Serial.print(packetSize);
@@ -158,7 +158,7 @@ void Carla::dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP)
     Serial.println(reinterpret_cast<char *>(buffer));
 }
 
-void Carla::dumpFrame(CARLA_UDP frame)
+void SSSF::dumpFrame(CARLA_UDP frame)
 {
     Serial.print("Frame: ");
     Serial.println(frame.frameNumber);
@@ -178,7 +178,7 @@ void Carla::dumpFrame(CARLA_UDP frame)
     Serial.println(frame.gear);
 }
 
-void Carla::do_POST(struct HTTPClient::Request sse)
+void SSSF::do_POST(struct HTTPClient::Request sse)
 {
     DNSClient dns;
     String IP = sse.data["IP"];
@@ -214,7 +214,7 @@ void Carla::do_POST(struct HTTPClient::Request sse)
     Serial.println(canPort);
 }
 
-void Carla::do_DELETE()
+void SSSF::do_DELETE()
 {
     Serial.print("Data operations shutting down...");
     carla.stop();
