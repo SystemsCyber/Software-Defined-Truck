@@ -1,5 +1,5 @@
-#ifndef ethernet_carla_h_
-#define ethernet_carla_h_
+#ifndef carla_h_
+#define carla_h_
 
 #include <Arduino.h>
 #include <EthernetUdp.h>
@@ -58,4 +58,4 @@ private:
     void do_DELETE();
 };
 
-#endif /* ethernet_carla_h_ */
+#endif /* carla_h_ */
