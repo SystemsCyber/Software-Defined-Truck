@@ -1,5 +1,6 @@
 import json
 from http.client import HTTPConnection, HTTPException
+from json.decoder import JSONDecodeError
 import logging
 from Node import Node
 from socket import *
@@ -187,21 +188,14 @@ class HTTPClient(Node, BaseHTTPRequestHandler):
         try:
             data = json.load(self.rfile)
             self.session_schema.validate(data)
-            self.mcast_IP = IPv4Address(data["IP"])
+            self.can_ip = IPv4Address(data["IP"])
             self.can_port = data["CAN_PORT"]
-            self.carla_port = data["CARLA_PORT"]
-        except ValidationError as ve:
+        except (ValidationError,
+                json.decoder.JSONDecodeError,
+                AddressValueError) as ve:
             logging.error(ve)
             self.close_connection = True
             raise SyntaxError from ve
-        except json.decoder.JSONDecodeError as jde:
-            logging.error(jde)
-            self.close_connection = True
-            raise SyntaxError from jde
-        except AddressValueError as ave:
-            logging.error(ave)
-            self.close_connection = True
-            raise SyntaxError from ave
 
     def send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
