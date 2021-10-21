@@ -11,7 +11,7 @@ from socket import *
 from selectors import *
 from threading import Thread
 from TypeWriter import TypeWriter as tw
-from CAN_UDP_Frame import CAN_UDP_Frame
+from Frame import CAN_UDP_Frame
 
 class Controller(SensorNode, HTTPClient):
     def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:

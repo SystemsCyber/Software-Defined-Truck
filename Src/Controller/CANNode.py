@@ -2,7 +2,7 @@ import logging
 import struct
 from Node import Node
 from ipaddress import IPv4Address
-from CAN_UDP_Frame import CAN_UDP_Frame as CANFrame
+from Frame import CAN_UDP_Frame as CANFrame
 from socket import *
 
 class CANNode(Node):

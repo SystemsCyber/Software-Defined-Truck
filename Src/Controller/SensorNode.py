@@ -2,7 +2,7 @@ import struct
 from collections import namedtuple
 from typing import Tuple
 from CANNode import CANNode
-from CAN_Message_T import CAN_Message_T
+from Frame import CAN_Message_T
 
 class SensorNode(CANNode):
     def __init__(self, _max_retransmissions: int) -> None:
