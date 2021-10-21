@@ -1,18 +1,27 @@
 import logging
-from socket import *
+import struct
+from Node import Node
 from ipaddress import IPv4Address
+from CAN_UDP_Frame import CAN_UDP_Frame as CANFrame
+from socket import *
 
-class CANNode:
-
-    def __init__(self, _mcast_IP: IPv4Address, _can_port: int, _carla_port: int) -> None:
-        self.mcast_IP = _mcast_IP
-        self.can_port = _can_port
-        self.carla_port = _carla_port
-        self.iface, self.mreq = self.__create_mcast_info(self.mcast_IP)
-        self.can = self.__create_can_socket(self.can_port, self.mreq)
-        self.carla = self.__create_carla_socket(self.iface)
-
-    def __create_mcast_info(self, ip: IPv4Address) -> bytes:
+class CANNode(Node):
+    def __init__(self) -> None:
+        self.id = None
+        self.last_transmission_time = None
+        self.can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        super(CANNode, self).__init__()
+    
+    def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
+        logging.info("Creating CANNode socket.")
+        self.can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
+        self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
+        self.can_sock.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
+        self.can_sock.setblocking(False)
+        self.can_sock.bind(('', can_port))
+    
+    def __create_group_info(self, ip: IPv4Address) -> bytes:
         device_address = gethostbyname_ex(gethostname())[2][3]
         logging.info(device_address + " was chosen as the interface to subscribe to for multicast messages.")
         iface = inet_aton(device_address)
@@ -20,38 +29,23 @@ class CANNode:
         mreq = group + iface
         return iface, mreq
 
-    def __create_can_socket(self, can_port: int, mreq: bytes) -> socket:
-        logging.info("Creating CAN socket.")
-        can = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        can.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        can.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
-        can.bind(('', can_port))
-        can.setblocking(False)
-        return can
+    def start_session(self) -> None:
+        self.iface, self.mreq = self.__create_group_info(self.can_ip)
+        self.__init_socket(self.can_port, self.mreq, self.iface)
 
-    def __create_carla_socket(self, iface: bytes) -> socket:
-        logging.info("Creating CARLA socket.")
-        carla = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        carla.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        carla.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
-        carla.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
-        carla.setblocking(False)
-        return carla
+    def __unpack(self, buffer) -> CANFrame:
+        return CANFrame(struct.unpack("IIIIHB????Bs8bB?x", buffer))
 
-    def stop(self) -> None:
-        self.mcast_IP = IPv4Address
+    def read(self) -> CANFrame:
+        return self.__unpack(self.can_sock.recv(36))
+
+    def write(self, message: bytes) -> None:
+        self.can_sock.sendto(message, (str(self.can_ip), self.can_port))
+
+    def stop_session(self) -> None:
+        self.can_ip = IPv4Address
         self.can_port = 0
-        self.carla_port = 0
         logging.info("Shutting down CAN socket.")
-        self.can.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.mreq)
-        self.can.shutdown(SHUT_RDWR)
-        self.can.close()
-        logging.info("Shutting down carla socket.")
-        self.carla.shutdown(SHUT_RDWR)
-        self.carla.close()
-
-    def send_carla_frame(self, message: bytes) -> None:
-        self.carla.sendto(message, (str(self.mcast_IP), self.carla_port))
-
-    def receive_can_messages(self) -> bytes:
-        return self.can.recv(36)
+        self.can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.mreq)
+        self.can_sock.shutdown(SHUT_RDWR)
+        self.can_sock.close()

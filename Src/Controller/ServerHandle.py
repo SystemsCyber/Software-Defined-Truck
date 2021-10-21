@@ -1,53 +1,69 @@
-import socket
 import json
-import jsonschema
-import http.client
-import selectors
+from http.client import HTTPConnection, HTTPException, HTTPResponse
 import logging
+from Node import Node
+from socket import *
+from selectors import *
+from os import path, getcwd, walk
+from jsonschema import RefResolver, Draft7Validator, ValidationError
 from ipaddress import IPv4Address, AddressValueError
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler
-from HelperMethods import Schema
-from getmac import get_mac_address as gma
 from threading import Lock
 
-class ServerHandle(BaseHTTPRequestHandler):
-    def __init__(self, _sel: selectors.DefaultSelector, _lock: Lock, _server_address = socket.gethostname()) -> None:
-        self.mac = gma()
-        self.sel = _sel
-        self.selector_lock = _lock
-        self.server_address = _server_address
+class Schema:
+    @staticmethod
+    def compile_schema(schema_name) -> None:
+        dir = Schema.find_schema_folder()
+        schema_path = path.join(dir, schema_name)
+        with open(schema_path, 'rb') as schema_file:
+            schema = json.load(schema_file)
+        r = RefResolver('file:///' + dir.replace("\\", "/") + '/', schema)
+        return Draft7Validator(schema, resolver=r), schema
+
+    @staticmethod
+    def find_schema_folder():
+        base_dir = path.abspath(getcwd())
+        base_dir = base_dir.rpartition(path.sep)[0]
+        for root, dirs, files in walk(base_dir):
+            for name in dirs:
+                if name == "Schemas":
+                    return path.join(root, name)
+        return path.join(base_dir, "Schemas")
+
+class ServerHandle(Node, BaseHTTPRequestHandler):
+    def __init__(self, _server_ip = gethostname()) -> None:
+        Node.__init__()
+        self.sel = DefaultSelector()
+        self.sel_lock = Lock()
+        self.server_ip = _server_ip
+        self.server_port = 80
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
         self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
         self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
-        self.mcast_IP = IPv4Address
-        self.can_port = 0
-        self.carla_port = 0
-        
-        self.mac = "00:0C:29:DE:AD:BE"
 
     # Overrides for the parent functions
 
     def log_error(self, format, *args):
-        logging.error("%s - - %s\n" %
-                         ("SERVER", format%args))
+        logging.error("%s - - %s\n" % ("SERVER", format%args))
 
     def log_message(self, format, *args):
-        logging.info("%s - - %s\n" %
-                         ("SERVER", format%args))
+        logging.info("%s - - %s\n" % ("SERVER", format%args))
     
     # ----------------------------------
     
     def connect(self, retry = True) -> bool:
         try:
-            self.ctrl = http.client.HTTPConnection(self.server_address)
+            logging.info("Connecting to the server.")
+            self.ctrl = HTTPConnection(self.server_ip)
             self.ctrl.connect()
-        except http.client.HTTPException as httpe:
-            logging.error("Unable to connect to server.")
-            self.__handle_connection_errors(httpe)
+            with self.selector_lock:
+                self.sel.register(self.ctrl.sock, EVENT_READ)
+        except HTTPException as httpe:
+            logging.error("Failed to connect to server.")
+            logging.error(httpe)
         else:
-            logging.info("Successfully connected to server")
             return True
         if retry:
             logging.info("Retrying connection to server.")
@@ -56,140 +72,116 @@ class ServerHandle(BaseHTTPRequestHandler):
             logging.error("Server unreachable. Exiting.")
             return False
 
-    def __wait_for_socket(self, timeout=None) -> bool:
-        try:
-            with self.selector_lock:
-                if self.sel.select(timeout=timeout):
-                    return True
-        except TimeoutError:
-            logging.error("Selector timed-out while waiting for a response or SSE.")
-            return False
-        except KeyboardInterrupt:
-            return False
-    
-    def __submit_registration(self, registration: str) -> http.client.HTTPResponse:
-        logging.info("-> Sending registration request.")
-        try:
-            headers = {"Content-Type": "application/json"}
-            self.ctrl.request("POST", "/client/register", registration, headers)
-            logging.info("-> Registration request successfully sent!")
-            self.sel.register(self.ctrl.sock, selectors.EVENT_READ)
-        except http.client.HTTPException as httpe:
-            logging.error("-> Registration request failed to send.")
-            self.__handle_connection_errors(httpe)
-        else:
-            if self.__wait_for_socket():
-                return self.ctrl.getresponse()
-
-    def register(self, retry = True) -> bool:
-        logging.info(f'Attempting to register with server using this MAC address: {self.mac}.')
-        self.response = self.__submit_registration(json.dumps({"MAC": self.mac}))
-        self.response_data = self.response.read(self.response.length)
-        if self.response.status >= 200 and self.response.status < 400:
-            logging.info("Successfully registered with the server.")
+    def __successful(self, error: str, ceiling: int) -> bool:
+        if self.response.status >= 200 and self.response.status < ceiling:
             return True
-        elif retry:
-            logging.error("Bad response from server. Retrying.")
-            return self.register(False)
         else:
-            logging.error("Failed to register with server: ")
+            logging.error("Bad response from server.")
+            logging.error(f"Failed to {error}: ")
             logging.error(f'\tFailure Code: {self.response.status}')
             logging.error(f'\tFailure Reason: {self.response.reason}')
             return False
 
-    def __handle_connection_errors(self, error) -> None:
-        if isinstance(error, http.client.NotConnected):
-            logging.error("Not connected to server.")
-            return
-        if isinstance(error, http.client.RemoteDisconnected):
-            logging.error("Server closed connection.")
-            return
-        elif isinstance(error, http.client.InvalidURL):
-            logging.error("Invalid URL in request.")
-            return
-        elif isinstance(error, http.client.ImproperConnectionState):
-            logging.error("Improper connection state with server.")
-            return
-        else:
-            logging.error("Error occured within the HTTP connection.")
-
-    def get_devices(self) -> list:
+    def __getresponse(self, timeout=None) -> bool:
         try:
-            logging.info("Requesting available devices from the server.")
-            self.ctrl.request("GET", "/sss3")
-        except http.client.HTTPException as httpe:
-            self.__handle_connection_errors(httpe)
+            with self.selector_lock:
+                self.sel.modify(self.ctrl.sock, EVENT_READ)
+                if self.sel.select(timeout=timeout):
+                    self.response = self.ctrl.getresponse()
+                    length = self.response.length
+                    self.response_data = self.response.read(length)
+                    return True
+        except TimeoutError:
+            logging.error("Timed-out waiting for response.")
+            return False
+        except KeyboardInterrupt:
+            return False
+    
+    def __submit_registration(self, retry = True) -> bool:
+        registration = json.dumps({"MAC": self.mac})
+        try:
+            uri = "/client/register"
+            headers = {"Content-Type": "application/json"}
+            self.ctrl.request("POST", uri, registration, headers)
+        except HTTPException as httpe:
+            logging.error("Registration request failed to send.")
+            logging.error(httpe)
+            if retry:
+                logging.info("Retrying.")
+                return self.__submit_registration(False)
+            return False
         else:
-            if self.__wait_for_socket():
-                self.response = self.ctrl.getresponse()
-                self.response_data = self.response.read(self.response.length)
-                return self.__validate_device_list_response(self.response, self.response_data)
+            return self.__getresponse()
 
-    def __validate_device_list_response(self, response: http.client.HTTPResponse, data: bytes) -> list:
-        if response.status >= 200 and response.status < 400:
-            logging.info("Request for available devices was successful.")
-            return self.__deserialize_device_list(data)
+    def register(self, retry = True) -> bool:
+        logging.info(f'MAC Address detected: {self.mac}.')
+        logging.info(f'Registering with server.')
+        if not self.__submit_registration():
+            return False
+        elif self.__successful("register with server", 400):
+            return True
+        elif retry:
+            logging.info("Retrying.")
+            return self.register(False)
         else:
-            logging.error("Request for available devices failed.")
-            logging.error(f'\tFailure Code: {response.status}')
-            logging.error(f'\tFailure Reason: {response.reason}')
-            return []
+            return False
 
     def __deserialize_device_list(self, data: bytes) -> list:
         try:
             logging.info("Deserializing device list.")
-            available_devices = json.loads(data)
+            devices = json.loads(data)
             logging.info("Validating device list against request schema.")
-            if len(available_devices) > 0:
-                self.request_schema.validate(available_devices)
-            return available_devices
-        except jsonschema.ValidationError as ve:
+            if len(devices) > 0:
+                self.request_schema.validate(devices)
+        except ValidationError as ve:
+            logging.error("Device list failed validation.")
             logging.error(ve)
-            logging.error("Device list failed validation again request schema.")
-            return []
         except json.decoder.JSONDecodeError as jde:
-            logging.error(jde)
             logging.error("Device list could not be deserialized.")
-            return []
-
-    def request_devices(self, requested_devices: list, devices: list) -> bool:
-        req_to_ecu_list = [i for i in devices if i["ID"] in requested_devices]
-        requestJSON = json.dumps({"MAC": self.mac, "ECUs": req_to_ecu_list})
+            logging.error(jde)
+        else:
+            return devices
+        return []
+    
+    def get_devices(self) -> list:
+        msg = "request available devices from the server"
         try:
-            logging.info("Requesting devices from the server.")
+            logging.info(f"Requesting {msg[7:]}.")
+            self.ctrl.request("GET", "/sss3")
+        except HTTPException as httpe:
+            logging.error(f"Failed to {msg}.")
+            logging.error(httpe)
+        else:
+            if self.__getresponse() and self.__successful(msg, 400):
+                return self.__deserialize_device_list(self.response_data)
+
+    def request_devices(self, _devices: list) -> bool:
+        msg = "request desired devices from the server"
+        logging.info(f"Requesting {msg[7:]}")
+        req = [i for i in self.devices if i["ID"] in _devices]
+        requestJSON = json.dumps({"MAC": self.mac, "ECUs": req})
+        try:
+            uri = "/client/session"
             headers = {"Content-Type": "application/json"}
-            self.ctrl.request("POST", "/client/session", requestJSON, headers)
-        except http.client.HTTPException as httpe:
-            self.__handle_connection_errors(httpe)
+            self.ctrl.request("POST", uri, requestJSON, headers)
+        except HTTPException as httpe:
+            logging.error(f"Failed to {msg}.")
+            logging.error(httpe)
             return False
         else:
-            if self.__wait_for_socket():
-                self.response = self.ctrl.getresponse()
-                response_data = self.response.read(self.response.length)
-                return self.__validate_request_device_response(self.response, response_data)
+            return self.__getresponse() and self.__successful(msg, 300)
 
-    def __validate_request_device_response(self, response: http.client.HTTPResponse, response_data: bytes) -> bool:
-        if response.status >= 200 and response.status < 300:
-            with BytesIO(response_data) as self.rfile:
-                self.do_POST()
-            logging.info("Request for selected devices was successful.")
-            return True
-        else:
-            logging.error("Request for selected devices failed.")
-            logging.error(f'\tFailure Code: {response.status}')
-            logging.error(f'\tFailure Reason: {response.reason}')
-            return False
-
-    def receive_SSE(self, key: selectors.SelectorKey):
+    def receive_SSE(self, key: SelectorKey):
         logging.debug("Received an SSE.")
-        self.__handle_SSE(self.ctrl.sock.recv(4096))
+        message = self.ctrl.sock.recv(4096)
+        with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
+            try:
+                self.handle_one_request()
+            except SyntaxError as se:
+                logging.error(se)
         if self.close_connection:
             logging.error("Server closed the connection.")
-            self.shutdown_connection(key)
-
-    def __handle_SSE(self, message: bytes):
-        with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
-            self.handle_one_request()
+            self.shutdown(False)
 
     def do_POST(self):
         try:
@@ -198,7 +190,7 @@ class ServerHandle(BaseHTTPRequestHandler):
             self.mcast_IP = IPv4Address(data["IP"])
             self.can_port = data["CAN_PORT"]
             self.carla_port = data["CARLA_PORT"]
-        except jsonschema.ValidationError as ve:
+        except ValidationError as ve:
             logging.error(ve)
             self.close_connection = True
             raise SyntaxError from ve
@@ -211,45 +203,23 @@ class ServerHandle(BaseHTTPRequestHandler):
             self.close_connection = True
             raise SyntaxError from ave
 
-    def do_DELETE(self):
-        logging.info("Closing the current session.")
-        self.mcast_IP = IPv4Address
-        self.can_port = 0
-        self.carla_port = 0
-
-    def send_delete(self, path: str, close = False):
+    def send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
-        response = None
         try:
             headers = {"Connection": "keep-alive"}
             self.ctrl.request("DELETE", path, headers=headers)
-            with self.selector_lock:
-                self.sel.modify(self.ctrl.sock, selectors.EVENT_READ)
-        except http.client.HTTPException as httpe:
+            with self.sel_lock:
+                self.sel.modify(self.ctrl.sock, EVENT_READ)
+        except HTTPException as httpe:
             logging.error("-> Delete request failed to send.")
-            self.__handle_connection_errors(httpe)
             logging.error(httpe)
         else:
-            if self.__wait_for_socket():
-                response = self.ctrl.getresponse()
-                response.read(response.length)
-        finally:
-            if close:
-                key = self.sel.get_key(self.ctrl.sock)
-                self.shutdown_connection(key)
-                self.do_DELETE()
-            return response
-
-    def shutdown_connection(self, key: selectors.SelectorKey):
-        logging.debug("Unregistering the file object.")
-        self.sel.unregister(key.fileobj)
-        logging.debug("Shutting down the socket.")
-        key.fileobj.shutdown(socket.SHUT_RDWR)
-        logging.debug("Closing the socket object.")
-        key.fileobj.close()
-
-
-
-# Time out for frame -> max(1/retries * fps, average rtt)
-# Time before declaring sss3 dead is 1 second.
-# Make sure we receive confirmation of last frame before sending the next frame to the server.
+            self.__getresponse()
+    
+    def shutdown(self, notify_server = True):
+        logging.debug("Shutting down server connection.")
+        if notify_server:
+            self.send_delete("/client/register")
+        self.sel.unregister(self.ctrl.sock)
+        self.ctrl.sock.shutdown(SHUT_RDWR)
+        self.ctrl.sock.close()
