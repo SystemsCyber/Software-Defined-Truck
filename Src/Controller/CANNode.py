@@ -1,16 +1,76 @@
 import logging
 import struct
-from Node import Node
+import copy
+from os import path, walk, getcwd
+from logging.handlers import TimedRotatingFileHandler
 from ipaddress import IPv4Address
 from Frame import CAN_UDP_Frame as CANFrame
+from getmac import get_mac_address as gma
 from socket import *
 
-class CANNode(Node):
+# COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
+class ColoredConsoleHandler(logging.StreamHandler):
+    def emit(self, record):
+        # Need to make a actual copy of the record
+        # to prevent altering the message for other loggers
+        myrecord = copy.copy(record)
+        levelno = myrecord.levelno
+        if(levelno >= 50):  # CRITICAL / FATAL
+            color = '\x1b[31m'  # red
+        elif(levelno >= 40):  # ERROR
+            color = '\x1b[31m'  # red
+        elif(levelno >= 30):  # WARNING
+            color = '\x1b[33m'  # yellow
+        elif(levelno >= 20):  # INFO
+            color = '\x1b[32m'  # green
+        elif(levelno >= 10):  # DEBUG
+            color = '\x1b[35m'  # pink
+        else:  # NOTSET and anything else
+            color = '\x1b[0m'  # normal
+        myrecord.levelname = color + str(myrecord.levelname) + '\x1b[0m'  # normal
+        logging.StreamHandler.emit(self, myrecord)
+# ------------------------------------------------------------
+
+class CANNode:
     def __init__(self) -> None:
+        self.__init_logging()
         self.id = None
+        self.mac = gma()
+        self.can_ip = IPv4Address
+        self.can_port = 0
         self.last_transmission_time = None
         self.can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        super(CANNode, self).__init__()
+
+        self.mac = "00:0C:29:DE:AD:BE"
+
+    def __findpath(log_name):
+        base_dir = path.abspath(getcwd())
+        for root, dirs, files in walk(base_dir):
+            for name in dirs:
+                if name == "Logs":
+                    log_path = path.join(root, name)
+                    return path.join(log_path, log_name)
+        log_path = path.join(base_dir, "Logs")
+        return path.join(log_path, log_name)
+    
+    def __init_logging(self) -> None:
+        filename = self.__findpath("sss3_log")
+        logging.basicConfig(
+            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
+            level=logging.DEBUG,
+            handlers=[
+                TimedRotatingFileHandler(
+                    filename=filename,
+                    when="midnight",
+                    interval=1,
+                    backupCount=7,
+                    encoding='utf-8'
+                    ),
+                ColoredConsoleHandler()
+                ]
+            )
+        # self.logger = logging.getLogger(__name__)
+        # self.logger.setLevel(logging.DEBUG)
     
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
@@ -29,7 +89,9 @@ class CANNode(Node):
         mreq = group + iface
         return iface, mreq
 
-    def start_session(self) -> None:
+    def start_session(self, _ip: IPv4Address, _port: int) -> None:
+        self.can_ip = _ip
+        self.can_port = _port
         self.iface, self.mreq = self.__create_group_info(self.can_ip)
         self.__init_socket(self.can_port, self.mreq, self.iface)
 

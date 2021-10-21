@@ -12,6 +12,7 @@ from selectors import *
 from threading import Thread
 from TypeWriter import TypeWriter as tw
 from Frame import CAN_UDP_Frame
+from ipaddress import IPv4Address
 
 class Controller(SensorNode, HTTPClient):
     def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:
@@ -86,7 +87,7 @@ class Controller(SensorNode, HTTPClient):
             ), tw.red)
             return []
 
-    def __provision_devices(self) -> bool:
+    def __provision_devices(self):
         requested = self.__request_available_devices()
         if requested:
             for i in requested:
@@ -96,65 +97,41 @@ class Controller(SensorNode, HTTPClient):
                     outgoing_message = None
                     )
             self.sel.modify(self.ctrl.sock, EVENT_READ, data)
-            return True
-        return False
+        else:
+            tw.write("Exiting", tw.red)
 
     def setup(self):
         if self.connect() and self.register():
-            if self.__provision_devices():
-                self.do_POST()
-            else:
-                tw.write("Exiting", tw.red)
-                self.do_DELETE()
+            self.__provision_devices()
 
     def do_POST(self):
-        try:
-            super().do_POST()
-        except SyntaxError as se:
-            logging.error(se)
+        super().do_POST()
+        tw.write((
+            "Received session setup information "
+            "from the server."
+        ), tw.magenta)
+        tw.write("Starting the session!", tw.yellow)
+        if self.l_thread.is_alive():
+            self.listen = False
+            self.l_thread.join(1)
+            self.listen = True
+            self.l_thread.start()
         else:
-            tw.write((
-                "Received session setup information "
-                "from the server."
-            ), tw.magenta)
-            tw.write("Starting the session!", tw.yellow)
-            self.start_session()
-            can_data = SimpleNamespace(
-                callback = self.read,
-                outgoing_message = None
-                )
-            self.key = self.sel.register(self.can_sock, EVENT_READ, can_data)
-            if self.l_thread.is_alive():
-                self.listen = False
-                self.l_thread.join(1)
-                self.listen = True
-                self.l_thread.start()
-            else:
-                self.listen = True
-                self.l_thread.start()
-                # control = SimpleNamespace(
-                #     throttle = 1.0,
-                #     steer = 1.0,
-                #     brake = 1.0,
-                #     hand_brake = 1,
-                #     reverse = 1,
-                #     manual_gear_shift = 1,
-                #     gear = 1
-                # )
-                # try:
-                #     while True:
-                #         self.send_control_frame(control)
-                #         sleep(1)
-                # except KeyboardInterrupt:
-                #     pass
+            self.listen = True
+            self.l_thread.start()
+            # control = SimpleNamespace(throttle = 1.0, steer = 1.0, brake = 1.0, hand_brake = 1, reverse = 1,manual_gear_shift = 1, gear = 1)
+            # try:
+            #     while True:
+            #         self.write(control)
+            #         sleep(1)
+            # except KeyboardInterrupt:
+            #     pass
 
     def do_DELETE(self):
         tw.write("Stopping session.", tw.red)
         self.listen = False
         self.devices = {}
-        self.send_delete("/client/session")
-        self.sel.unregister(self.can_sock)
-        self.stop_session()
+        return super().do_POST()
 
     def write(self, key) -> None:
         if isinstance(key, SelectorKey):
@@ -166,7 +143,7 @@ class Controller(SensorNode, HTTPClient):
                 # new_rate -= self.avg_sending_rate
                 # self.avg_sending_rate += ((new_rate) / self.frame.last_frame)
                 # self.retrans_timeout = 1 / (self.max_retrans * self.avg_sending_rate)
-                self.last_frame_sent_time = current_time
+                self.last_transmission_time = current_time
                 key.data.callback = self.read
                 key.data.outgoing_message = None
                 self.sel.modify(key.fileobj, EVENT_READ, key.data)
@@ -191,7 +168,7 @@ class Controller(SensorNode, HTTPClient):
         id = str(can_frame.device_id)
         if id in self.devices.keys():
             self.devices[id].last_can_message_time = current_time
-            self.devices[id].calculate_stats(can_frame, self.last_frame, self.last_frame_sent_time)
+            self.devices[id].calculate_stats(can_frame, self.last_frame, self.last_transmission_time)
             if verbose: self.__print_stats(current_time)
         else:
             logging.error("Received a CAN frame from an out-of-band device.")

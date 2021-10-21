@@ -2,7 +2,6 @@ import json
 from http.client import HTTPConnection, HTTPException
 from json.decoder import JSONDecodeError
 import logging
-from Node import Node
 from socket import *
 from selectors import *
 from os import path, getcwd, walk
@@ -11,6 +10,8 @@ from ipaddress import IPv4Address, AddressValueError
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler
 from threading import Lock
+from CANNode import CANNode
+from types import SimpleNamespace
 
 class Schema:
     @staticmethod
@@ -32,9 +33,8 @@ class Schema:
                     return path.join(root, name)
         return path.join(base_dir, "Schemas")
 
-class HTTPClient(Node, BaseHTTPRequestHandler):
+class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def __init__(self, _server_ip = gethostname()) -> None:
-        Node.__init__()
         self.sel = DefaultSelector()
         self.sel_lock = Lock()
         self.server_ip = _server_ip
@@ -43,6 +43,7 @@ class HTTPClient(Node, BaseHTTPRequestHandler):
         self.close_connection = False
         self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
         self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
+        super(HTTPClient, self).__init__()
 
     # Overrides for the parent functions
 
@@ -176,26 +177,34 @@ class HTTPClient(Node, BaseHTTPRequestHandler):
         logging.debug("Received an SSE.")
         message = self.ctrl.sock.recv(4096)
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
-            try:
-                self.handle_one_request()
-            except SyntaxError as se:
-                logging.error(se)
+            self.handle_one_request()
         if self.close_connection:
             logging.error("Server closed the connection.")
             self.shutdown(False)
+
+    def start_session(self, _ip: IPv4Address, _port: int) -> None:
+        super().start_session(_ip, _port)
+        can_data = SimpleNamespace(
+                callback = self.read,
+                outgoing_message = None
+                )
+        self.key = self.sel.register(self.can_sock, EVENT_READ, can_data)
 
     def do_POST(self):
         try:
             data = json.load(self.rfile)
             self.session_schema.validate(data)
-            self.can_ip = IPv4Address(data["IP"])
-            self.can_port = data["CAN_PORT"]
+            self.start_session(IPv4Address(data["IP"]), data["CAN_PORT"])
         except (ValidationError,
-                json.decoder.JSONDecodeError,
+                JSONDecodeError,
                 AddressValueError) as ve:
             logging.error(ve)
             self.close_connection = True
-            raise SyntaxError from ve
+
+    def do_DELETE(self):
+        self.send_delete("/client/session")
+        self.sel.unregister(self.can_sock)
+        self.stop_session()
 
     def send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
