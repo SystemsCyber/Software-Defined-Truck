@@ -2,8 +2,8 @@ import atexit
 import logging
 from NetworkStats import NetworkStats
 from SensorNode import SensorNode
-from ServerHandle import ServerHandle
-from typing import NamedTuple, List
+from HTTPClient import HTTPClient
+from typing import List
 from types import SimpleNamespace
 from time import time, sleep
 from pprint import pprint
@@ -13,10 +13,10 @@ from threading import Thread
 from TypeWriter import TypeWriter as tw
 from CAN_UDP_Frame import CAN_UDP_Frame
 
-class Controller(SensorNode, ServerHandle):
+class Controller(SensorNode, HTTPClient):
     def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:
         SensorNode.__init__(_max_retrans)
-        ServerHandle.__init__(_server_ip)
+        HTTPClient.__init__(_server_ip)
         atexit.register(self.shutdown)
         self.last_print_time = time()
         self.devices = {}

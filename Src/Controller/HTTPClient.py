@@ -1,5 +1,5 @@
 import json
-from http.client import HTTPConnection, HTTPException, HTTPResponse
+from http.client import HTTPConnection, HTTPException
 import logging
 from Node import Node
 from socket import *
@@ -31,7 +31,7 @@ class Schema:
                     return path.join(root, name)
         return path.join(base_dir, "Schemas")
 
-class ServerHandle(Node, BaseHTTPRequestHandler):
+class HTTPClient(Node, BaseHTTPRequestHandler):
     def __init__(self, _server_ip = gethostname()) -> None:
         Node.__init__()
         self.sel = DefaultSelector()
