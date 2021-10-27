@@ -2,67 +2,81 @@
 #define http_client_h_
 
 #include <Arduino.h>
+#include <CANNode/CANNode.h>
+#include <ArduinoHttpClient.h>
+#include <ArduinoHttpServer.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
 #include <Ethernet.h>
 #include <Configuration/Load.h>
 #include <vector>
 
-class HTTPClient
+using ArduinoHttpServer::StreamHttpRequest;
+using ArduinoHttpServer::StreamHttpReply;
+using ArduinoHttpServer::StreamHttpErrorReply;
+using ArduinoHttpServer::Method;
+
+enum ConnectionStatus
 {
+    Unreachable,
+    Disconnected,
+    Connected
+};
+
+class HTTPClient: public CANNode
+{
+public:
+    EthernetClient httpSock;
+
 private:
-    Load config;  // Configuration object containing initailization values.
-    IPAddress serverAddress;
-    bool ethernetInitialized;
-    bool serverUnreachable;
+    HttpClient client;
+    DynamicJsonDocument attachedDevice;
+    const char *serverAddress;
+    IPAddress serverIP;
+    uint16_t serverPort;
+    volatile int connectionStatus;
+
+protected:
+    uint32_t id;
 
 public:
-    struct Request {
+    struct Request
+    {
         String method;
         String uri;
-        StaticJsonDocument<1024> data;
-        String error;
+        StaticJsonDocument<1024> json;
         String raw;
-    } request;
+    };
 
-    struct Response {
-        String version;
-        long code;
+    struct Response
+    {
+        uint16_t code;
         String reason;
-        String data;
         String error;
+        StaticJsonDocument<1024> json;
         String raw;
-    } response;
-    EthernetClient server;      // Connection object for the server.
+    };
 
-    HTTPClient() : ethernetInitialized(false), serverUnreachable(false) {};
-    // Send configuration info to the server. If the connection to the server
-    // fails, retry every minute and print the time to show that the program is
-    // still running.
-    // Returns once it has successfully send the data to the server.
-    int init();
-    bool connect(bool retry = true);
-    // Maintain connection and read Server Side Events if any exist.
-    bool read(struct Request *req);
-    // Maintain connection and write Client Side Events if any exist.
-    bool write(struct Request req, struct Response *res, bool retry = true);
+    HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort = 80);
+    
+    virtual bool connect();
+    virtual void listen();
+    virtual bool read(StreamHttpRequest<4096> *request);
+    virtual bool write(StreamHttpReply *response);
+    virtual int write(StreamHttpRequest<4096> *request, StreamHttpReply *response);
 
 private:
-    // Initialise the Ethernet shield to use the provided MAC address and
-    // gain the rest of the configuration through DHCP.
-    // Returns 0 if the DHCP configuration failed, and 1 if it succeeded.
-    int initEthernet(int success);
-    static void checkHardware();
-    static void checkLink();
+    int attemptConnection(bool retry = true);
+    int connectionSuccessful(bool retry = true);
+    int connectionFailed(int code, bool retry = true);
 
-    bool tryToConnect(const char *serverAddress, unsigned long *lastAttempt);
-    bool getResponse(struct Request req, struct Response *res, bool retry = true);
-    bool waitForResponse();
-    bool parseResponse(struct Response *res);
     bool parseRequest(struct Request *req);
-    bool validateJSON(struct Request *req);
-    std::array<String, 2> splitMessage(String message);
-    std::vector<String> tokenizeHTTPMessage(String message);
+    bool parseHeaders(int endOfHeaders, struct Request *req);
+    bool parseData(int startOfData, struct Request *req);
+    bool tokenizeRequestLine(String headers, String params[3]);
+    bool validateRequestData(struct Request *request);
 };
 
 #endif /* http_client_h_ */

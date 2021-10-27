@@ -3,25 +3,19 @@
 
 #include <Arduino.h>
 #include <EthernetUdp.h>
+#include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
 #include <IPAddress.h>
+#include <NTPClient.h>
 #include <FlexCAN_T4.h>
 
-#define CAN_message_t_size (size_t) 24
-#define CAN_TX_BUFFER_SIZE (size_t) 36
-
-class SSSF
+class SSSF: public SensorNode, public HTTPClient
 {
 private:
-    HTTPClient server;
-    EthernetUDP carla;      // Multicast socket to receive CARLA frames from.
-    EthernetUDP can;        // Multicast socket to send CAN frames on.
+    EthernetUDP ntpSock;
+    NTPClient timeClient;
 
 public:
-    IPAddress mcastIP;
-    int carlaPort;
-    int canPort;
-
     struct CARLA_UDP // CARLA frame information struct
     {
         uint32_t frameNumber;
@@ -31,9 +25,10 @@ public:
     } _frame;
     uint32_t id;
     uint32_t sequenceNumber;
-    uint8_t txCanFrameBuffer[CAN_TX_BUFFER_SIZE];
 
-    SSSF() = default;
+    SSSF();
+
+    virtual void maintain();
     // Returns 1 if successful, 0 otherwise.
     int init();
     // Begin monitoring all interfaces for activity and respond appropriately.

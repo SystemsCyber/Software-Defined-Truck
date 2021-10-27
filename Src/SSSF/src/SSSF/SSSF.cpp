@@ -1,9 +1,28 @@
 #include <Arduino.h>
 #include <EthernetUdp.h>
 #include <SSSF/SSSF.h>
+#include <TimeLib.h>
+#include <NTPClient.h>
 #include <HTTP/HTTPClient.h>
 #include <Dns.h>
 #include <FlexCAN_T4.h>
+
+SSSF::SSSF(): SensorNode(), timeClient(ntpSock)
+{
+    timeClient.begin();
+    setSyncProvider(getExternalTime(Teensy3Clock.get()));
+    setSyncInterval(1);
+}
+
+void SSSF::maintain()
+{
+    if (timeClient.update())
+    {
+        Teensy3Clock.set(timeClient.getEpochTime());
+        setTime(timeClient.getEpochTime());
+        Ethernet.maintain(); //Only tries to renew if 3/4 through lease
+    }
+}
 
 int SSSF::init()
 {

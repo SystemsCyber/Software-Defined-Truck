@@ -76,7 +76,7 @@ class CAN_message_t(Structure):
 class WCANFrame(Union):
     _fields_ = [
         ("can_frame", CAN_message_t),
-        ("can_frame", CANFD_message_t)
+        ("can_FD_frame", CANFD_message_t)
     ]
 
 
@@ -98,8 +98,8 @@ class WCANBlock(COMMBLOCK):
         ("sequence_number", c_uint32),
         ("timestamp", c_uint32),
         ("need_response", c_bool),
+        ("fd", c_bool),
         ("can_frame", WCANFrame)
-        ("can_frame", CAN_message_t)
     ]
 
     def __repr__(self) -> str:
