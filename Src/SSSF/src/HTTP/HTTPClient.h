@@ -4,17 +4,11 @@
 #include <Arduino.h>
 #include <CANNode/CANNode.h>
 #include <ArduinoHttpClient.h>
-#include <ArduinoHttpServer.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
 #include <Ethernet.h>
 #include <Configuration/Load.h>
 #include <vector>
-
-using ArduinoHttpServer::StreamHttpRequest;
-using ArduinoHttpServer::StreamHttpReply;
-using ArduinoHttpServer::StreamHttpErrorReply;
-using ArduinoHttpServer::Method;
 
 enum ConnectionStatus
 {
@@ -23,21 +17,18 @@ enum ConnectionStatus
     Connected
 };
 
-class HTTPClient: public CANNode
+class HTTPClient: public virtual CANNode
 {
-public:
-    EthernetClient httpSock;
-
 private:
+    EthernetClient clientSock;
     HttpClient client;
+
     DynamicJsonDocument attachedDevice;
     const char *serverAddress;
     IPAddress serverIP;
     uint16_t serverPort;
-    volatile int connectionStatus;
 
-protected:
-    uint32_t id;
+    volatile int connectionStatus;
 
 public:
     struct Request
@@ -52,9 +43,9 @@ public:
     {
         uint16_t code;
         String reason;
-        String error;
         StaticJsonDocument<1024> json;
         String raw;
+        String error;
     };
 
     HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort = 80);
@@ -62,10 +53,9 @@ public:
     HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort = 80);
     
     virtual bool connect();
-    virtual void listen();
-    virtual bool read(StreamHttpRequest<4096> *request);
-    virtual bool write(StreamHttpReply *response);
-    virtual int write(StreamHttpRequest<4096> *request, StreamHttpReply *response);
+    virtual bool read(struct Request *request, bool respondOnError = true);
+    virtual bool write(struct Response *response);
+    virtual int write(struct Request *request, struct Response *response);
 
 private:
     int attemptConnection(bool retry = true);

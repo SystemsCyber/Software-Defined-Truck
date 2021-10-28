@@ -19,13 +19,13 @@ private:
     EthernetUDP canSock;
     IPAddress canIP;
     uint16_t canPort;
-    volatile boolean sessionStatus;
 
 protected:
     uint8_t mac[6];  //MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
+    uint32_t sequenceNumber;
+    volatile boolean sessionStatus;
 
 public:
-    uint32_t sequenceNumber;
 
     union WCANFrame  //TODO: Deconstructor? It doesn't envoke dynamic memory so not sure.
     {
@@ -70,15 +70,14 @@ public:
     };
     
     CANNode();
-    int init();
-    virtual int startSession(IPAddress _ip, uint16_t _port);
+    virtual int init();
+    virtual bool startSession(IPAddress _ip, uint16_t _port);
+    virtual bool startSession(String _ip, uint16_t _port);
     virtual int read(uint8_t *buffer, size_t size);
     virtual int read(struct WCANBlock *buffer);
     virtual int beginPacket(struct WCANBlock *canBlock);
     virtual int write(const uint8_t *buffer, size_t size);
     virtual int write(struct WCANBlock *canFrame);
-    virtual int write(struct WCANBlock *canBlock, struct CAN_message_t *frame, bool _needResponse = false);
-    virtual int write(struct WCANBlock *canBlock, struct CANFD_message_t *frame, bool _needResponse = false);
     virtual int endPacket();
     virtual void stopSession();
 

@@ -1,11 +1,10 @@
 #include <Arduino.h>
 #include <SSSF/SSSF.h>
+#include <Configuration/Load.h>
 #include <FlexCAN_T4.h>
 
-SSSF client;
-FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
-FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
-CAN_message_t msg;
+Load config;
+SSSF *sssf;
 
 void setup() {
     // Open serial communications and wait for port to open:
@@ -16,15 +15,11 @@ void setup() {
             break;
         }
     }
-    can0.begin();
-    can0.setBaudRate(500000);
-    can1.begin();
-    can1.setBaudRate(500000);
-    client.init();
+    config.init();
+    sssf = new SSSF(config.config["attachedDevice"], 250000);
+    sssf->setup();
 }
 
 void loop() {
-    client.monitor(true);
-    if (client.canPort && can0.read(msg)) client.write(&msg);
-    if (client.canPort && can1.read(msg)) client.write(&msg);
+    sssf->forwardingLoop();
 }

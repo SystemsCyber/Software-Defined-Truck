@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <CANNode/CANNode.h>
 
-class SensorNode: public CANNode
+class SensorNode: public virtual CANNode
 {
 public:
     struct CARLA_UDP: public Printable // CARLA frame information struct

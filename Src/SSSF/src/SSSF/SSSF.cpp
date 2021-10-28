@@ -1,20 +1,114 @@
 #include <Arduino.h>
-#include <EthernetUdp.h>
 #include <SSSF/SSSF.h>
+#include <SensorNode/SensorNode.h>
+#include <HTTP/HTTPClient.h>
+#include <EthernetUdp.h>
+#include <ArduinoJson.h>
 #include <TimeLib.h>
 #include <NTPClient.h>
-#include <HTTP/HTTPClient.h>
 #include <Dns.h>
 #include <FlexCAN_T4.h>
 
-SSSF::SSSF(): SensorNode(), timeClient(ntpSock)
+SSSF::SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate):
+    SensorNode(),
+    HTTPClient(_attachedDevice, serverAddress),
+    timeClient(ntpSock),
+    can0BaudRate(_can0Baudrate)
+    {}
+
+SSSF::SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+    SensorNode(),
+    HTTPClient(_attachedDevice, serverAddress),
+    timeClient(ntpSock),
+    can0BaudRate(_can0Baudrate),
+    can1BaudRate(_can1Baudrate)
+    {}
+
+bool SSSF::setup()
+{
+    if (init() && connect())
+    {
+        Log.noticeln("Setting up the Teensys Real Time Clock.");
+        setupClock();
+        setupCANChannels();
+    }
+}
+
+void SSSF::forwardingLoop()
+{
+    pollClock();
+    pollServer();
+    if (sessionStatus == Active)
+    {
+        struct COMMBlock msg = {0};
+        struct CAN_message_t canFrame;
+        if (can0BaudRate && can0.read(canFrame))
+            write(&canFrame);
+        if (can1BaudRate && can1.read(canFrame))
+            write(&canFrame);
+        if (CANNode::read(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock)))
+        {
+            if (msg.type == 1)
+            {
+                can0.write(msg.canFrame.frame.can);
+            }
+            else if (msg.type == 2)
+            {
+                frameNumber = msg.frameNumber;
+            }
+        }
+    }
+}
+
+void SSSF::write(struct CAN_message_t *canFrame)
+{
+    struct COMMBlock msg = {0};
+    msg.id = id;
+    msg.frameNumber = frameNumber;
+    msg.type = 1;
+    CANNode::beginPacket(&msg.canFrame);
+    msg.canFrame.fd = false;
+    msg.canFrame.needResponse = false;
+    msg.canFrame.frame = canFrame;
+    CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
+    CANNode::endPacket();
+}
+
+void SSSF::write(struct CANFD_message_t *canFrame)
+{
+    struct COMMBlock msg = {0};
+    msg.id = id;
+    msg.frameNumber = frameNumber;
+    msg.type = 1;
+    CANNode::beginPacket(&msg.canFrame);
+    msg.canFrame.fd = true;
+    msg.canFrame.needResponse = false;
+    msg.canFrame.frame = canFrame;
+    CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
+    CANNode::endPacket();
+}
+
+void SSSF::setupClock()
 {
     timeClient.begin();
     setSyncProvider(getExternalTime(Teensy3Clock.get()));
     setSyncInterval(1);
 }
 
-void SSSF::maintain()
+void SSSF::setupCANChannels()
+{
+    Log.noticeln("Setting up can0 with a bitrate of %d", can0BaudRate);
+    can0.begin();
+    can0.setBaudRate(can0BaudRate);
+    if (can1BaudRate)
+    {
+        Log.noticeln("Setting up can1 with a bitrate of %d", can1BaudRate);
+        can1.begin();
+        can1.setBaudRate(can1BaudRate);
+    }
+}
+
+void SSSF::pollClock()
 {
     if (timeClient.update())
     {
@@ -24,232 +118,36 @@ void SSSF::maintain()
     }
 }
 
-int SSSF::init()
+void SSSF::pollServer()
 {
-    server.init();
-    bool connected = server.connect();
-    if (connected && (server.response.code >= 200 && server.response.code < 400))
+    struct Request request;
+    if(HTTPClient::read(&request))
     {
-        Serial.println("Successfully registered with the server.");
-        return true;
-    }
-    else if (connected && (server.response.error == ""))
-    {
-        Serial.println("Server did not accept this devices registration.");
-        Serial.print("Response Code: ");
-        Serial.println(String(server.response.code));
-        Serial.print("Response Reason: ");
-        Serial.println(server.response.reason);
-        Serial.print("Response Message: ");
-        Serial.println(server.response.data);
-        return false;
-    }
-    else
-    {
-        Serial.print("Failed to parse server response because ");
-        Serial.println(server.response.error);
-        return false;
-    }
-    return false;
-}
-
-int SSSF::monitor(bool verbose)
-{
-    struct HTTPClient::Request sse;
-    if (server.read(&sse))
-    {
-        if (sse.method.equalsIgnoreCase("POST"))
+        if (request.method.equalsIgnoreCase("POST"))
         {
-            do_POST(sse);
+            startSession(&request);
         }
-        else if (sse.method.equalsIgnoreCase("DELETE"))
+        else if (request.method.equalsIgnoreCase("DELETE"))
         {
-            do_DELETE();
+            id = 0;
+            frameNumber = 0;
+            stopSession();
         }
         else
         {
-            Serial.println("Bad command received... discarding.");
+            struct Response notImplemented = {501, "NOT IMPLEMENTED"};
+            HTTPClient::write(&notImplemented);
         }
-    }
-    if (carlaPort == 0)
-    {
-        return false;
-    }
-    else
-    {
-        return read(verbose);
     }
 }
 
-int SSSF::read(bool verbose)
+void SSSF::startSession(struct Request *request)
 {
-    size_t packetSize = carla.parsePacket();
-    if (packetSize)
+    id = request->json["ID"];
+    frameNumber = 0;
+    String ip = request->json["IP"];
+    if (CANNode::startSession(ip, request->json["PORT"]))
     {
-        uint8_t rxBuffer[packetSize];
-        if (carla.read(rxBuffer, packetSize))
-        {
-            memcpy(&_frame, rxBuffer, sizeof(_frame));
-        }
-        else
-        {
-            Serial.println("parsePacket indicated available message. Failed to read them.");
-        }
-        if (verbose) dumpFrame(_frame);
+        Log.noticeln("\tID: %d", id);
     }
-    return packetSize;
-}
-
-int SSSF::write(const uint8_t *txBuffer, size_t size)
-{
-    if (canPort == 0)
-    {
-        return 0;
-    }
-    else
-    {
-        size_t newSize = size + (size_t) 12;
-        uint8_t txBufferWithFrameNumber[newSize];
-        memcpy(txBufferWithFrameNumber, &id, (size_t) 4);
-        memcpy(txBufferWithFrameNumber+4, &_frame.frameNumber, (size_t) 4);
-        memcpy(txBufferWithFrameNumber + 8, &sequenceNumber, (size_t) 4);
-        sequenceNumber += 1;
-        memcpy(txBufferWithFrameNumber + 12, txBuffer, size);
-        can.beginPacket(mcastIP, canPort);
-        if (can.write(txBufferWithFrameNumber, newSize) == 0)
-        {
-            Serial.println("Failed to write the message.");
-        }
-        int successfullySent = can.endPacket();
-        if (successfullySent == 0)
-        {
-            Serial.println("Unknown Error occured while sending the message.");
-        }
-        return successfullySent;
-    }
-}
-
-int SSSF::write(const CAN_message_t *txBuffer)
-{
-    if (canPort == 0)
-    {
-        return 0;
-    }
-    else
-    {
-        memcpy(txCanFrameBuffer + 0, &id, (size_t) 4);
-        memcpy(txCanFrameBuffer + 4, &_frame.frameNumber, (size_t) 4);
-        memcpy(txCanFrameBuffer + 8, &sequenceNumber, (size_t) 4);
-        sequenceNumber += 1;
-        memcpy(txCanFrameBuffer + 12, txBuffer, CAN_message_t_size);
-        can.beginPacket(mcastIP, canPort);
-        if (can.write(txCanFrameBuffer, CAN_TX_BUFFER_SIZE) == 0)
-        {
-            Serial.println("Failed to write the message.");
-        }
-        int successfullySent = can.endPacket();
-        if (successfullySent == 0)
-        {
-            Serial.println("Unknown Error occured while sending the message.");
-        }
-        return successfullySent;
-    }
-}
-
-void SSSF::dumpPacket(uint8_t *buffer, int packetSize, IPAddress remoteIP)
-{
-    Serial.print("Received packet of size ");
-    Serial.print(packetSize);
-    Serial.print(" bytes. From ");
-    for (int i = 0; i < 4; i++)
-    {
-        Serial.print(remoteIP[i], DEC);
-        if (i < 3)
-        {
-            Serial.print(".");
-        }
-    }
-    Serial.print(", port ");
-    Serial.print(remoteIP);
-    Serial.println(".");
-
-    Serial.print("Packet Data:");
-    Serial.println(reinterpret_cast<char *>(buffer));
-}
-
-void SSSF::dumpFrame(CARLA_UDP frame)
-{
-    Serial.print("Frame: ");
-    Serial.println(frame.frameNumber);
-    Serial.print("Throttle: ");
-    Serial.print(frame.throttle, 5);
-    Serial.print("  Steer:   ");
-    Serial.print(frame.steer, 5);
-    Serial.print("  Brake:  ");
-    Serial.println(frame.brake, 5);
-    Serial.print("Reverse:  ");
-    Serial.print(frame.reverse);
-    Serial.print("  E-Brake: ");
-    Serial.print(frame.handBrake);
-    Serial.print("  Manual: ");
-    Serial.print(frame.manualGearShift);
-    Serial.print("  Gear: ");
-    Serial.println(frame.gear);
-}
-
-void SSSF::do_POST(struct HTTPClient::Request sse)
-{
-    DNSClient dns;
-    String IP = sse.data["IP"];
-    if (dns.inet_aton(IP.c_str(), mcastIP))
-    {
-        Serial.println("Successfully parsed multicast IP address.");
-    }
-    else
-    {
-        Serial.println("Failed to parse multicast IP address.");
-    }
-    id = sse.data["ID"];
-    canPort = sse.data["CAN_PORT"];
-    carlaPort = sse.data["CARLA_PORT"];
-    sequenceNumber = 0;
-    int carlaMulticast = carla.beginMulticast(mcastIP, carlaPort);
-    int canMulticast = can.beginMulticast(mcastIP, canPort);
-    if (carlaMulticast && canMulticast)
-    {
-        Serial.println("Successfully created udp multicast sockets.");
-    }
-    else
-    {
-        Serial.println("Failed to create the udp multicast sockets.");
-    }
-    Serial.println("Starting new session...");
-    Serial.println("Configuration: ");
-    Serial.print("IP: ");
-    Serial.println(mcastIP);
-    Serial.print("CARLA Port: ");
-    Serial.println(carlaPort);
-    Serial.print("CAN Port: ");
-    Serial.println(canPort);
-}
-
-void SSSF::do_DELETE()
-{
-    Serial.print("Data operations shutting down...");
-    carla.stop();
-    can.stop();
-    mcastIP = IPAddress();
-    canPort = 0;
-    carlaPort = 0;
-    _frame.frameNumber = 0;
-    _frame.throttle = 0.0;
-    _frame.steer = 0.0;
-    _frame.brake = 0.0;
-    _frame.handBrake = false;
-    _frame.reverse = false;
-    _frame.manualGearShift = false;
-    _frame.gear = (uint8_t) 0;
-    sequenceNumber = 0;
-    Serial.println("complete.");
-    Serial.println("Waiting for next setup command.");
 }

@@ -7,12 +7,11 @@
 #include <Dns.h>
 #include <vector>
 #include <ArduinoHttpClient.h>
-#include <ArduinoHttpServer.h>
 #include <TeensyID.h>
 
 HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort):
     CANNode(),
-    client(httpSock, _serverAddress, _serverPort),
+    client(clientSock, _serverAddress, _serverPort),
     attachedDevice(_attachedDevice),
     serverAddress(_serverAddress),
     serverIP(),
@@ -26,7 +25,7 @@ HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddres
 
 HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort):
     CANNode(),
-    client(httpSock, _serverIP, _serverPort),
+    client(clientSock, _serverIP, _serverPort),
     attachedDevice(_attachedDevice),
     serverAddress(NULL),
     serverIP(_serverIP),
@@ -58,26 +57,21 @@ bool HTTPClient::connect()
     return true;
 }
 
-bool HTTPClient::read(StreamHttpRequest<4096> *request)
+bool HTTPClient::read(struct Request *request, bool respondOnError)
 {
-    if (httpSock.available())
+    if (client.available())
     {
-        if (request->readRequest() && parseRequest(request))
+        request->raw = clientSock.readString((size_t) 4096);
+        if (parseRequest(request))
         {
-            Log.noticeln("New command from: %p", httpSock.remoteIP());
-            Log.noticeln("%s %s\r\n%s",
-                request->getMethod(),
-                request->getResource().toString(),
-                request->getBody()
-                );
+            Log.noticeln("New command from: %p", clientSock.remoteIP());
+            Log.noticeln(request->raw);
             return true;
         }
-        else
+        else if (respondOnError)
         {
-            StreamHttpErrorReply httpReply(httpSock, request->getContentType());
-            const char *error(request->getError().cStr());
-            httpReply.send(String(error));
-            return false;
+            struct Response response = {400, "BAD REQUEST"};
+            write(&response);
         }
     }
     else if (!client.connected() && (connectionStatus != Unreachable))
@@ -90,12 +84,12 @@ bool HTTPClient::read(StreamHttpRequest<4096> *request)
 
 bool HTTPClient::write(struct Response *res)
 {
-    if (httpSock.connected())
+    if (clientSock.connected())
     {
         String msg = res->code + " " + res->reason + " HTTP/1.1\r\n";
         msg += "Connection: keep-alive\r\n";
-        httpSock.write(msg.c_str());
-        httpSock.flush();
+        clientSock.write(msg.c_str());
+        clientSock.flush();
         return true;
     }
     else if (connectionStatus != Unreachable)
@@ -106,7 +100,7 @@ bool HTTPClient::write(struct Response *res)
     }
 }
 
-int HTTPClient::write(StreamHttpRequest<4096> *request, StreamHttpReply *response)
+int HTTPClient::write(struct Request *req, struct Response *res)
 {
     if (client.connected())
     {
@@ -262,12 +256,12 @@ bool HTTPClient::parseData(int startOfData, struct Request *req)
 
 bool HTTPClient::validateRequestData(struct Request *req)
 {
-    String error;
+    bool id = req->json.containsKey("ID");
     bool ip = req->json.containsKey("IP");
     bool port = req->json.containsKey("PORT");
     if (req->method.equalsIgnoreCase("POST"))
     {
-        if (!ip || !port)
+        if (!ip || !port || !id)
         {
             Log.errorln("Request JSON is missing 1+ required keys.");
             return false;

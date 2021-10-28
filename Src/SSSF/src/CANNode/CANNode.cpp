@@ -4,6 +4,7 @@
 #include <TeensyID.h>
 #include <ArduinoLog.h>
 #include <FlexCAN_T4.h>
+#include <Dns.h>
 
 CANNode::CANNode(): sessionStatus(Inactive), mac{0}
 {
@@ -38,7 +39,7 @@ int CANNode::init()
     }
 }
 
-int CANNode::startSession(IPAddress _ip, uint16_t _port)
+bool CANNode::startSession(IPAddress _ip, uint16_t _port)
 {
     canIP = _ip;
     canPort = _port;
@@ -50,15 +51,27 @@ int CANNode::startSession(IPAddress _ip, uint16_t _port)
         Log.noticeln("Starting new session...");
         Log.noticeln("Session Information: ");
         Log.noticeln("\tIP: %p", canIP);
-        Log.noticeln("\tPort: %p", canPort);
-        return 1;
+        Log.noticeln("\tPort: %d", canPort);
+        return true;
     }
     else
     {
         Log.errorln("Failed to start new session.");
         Log.errorln("No available sockets.");
-        return 0;
+        return false;
     }
+}
+
+bool CANNode::startSession(String _ip, uint16_t _port)
+{
+    DNSClient dns;
+    IPAddress ipConverted;
+    if (!dns.inet_aton(_ip.c_str(), ipConverted))
+    {
+        Log.errorln("Failed to parse multicast IP address.");
+        return false;
+    }
+    return startSession(ipConverted, _port);
 }
 
 int CANNode::read(uint8_t *buffer, size_t size)
@@ -92,22 +105,6 @@ int CANNode::write(const uint8_t *buffer, size_t size)
 int CANNode::write(struct WCANBlock *canFrame)
 {
     return write(reinterpret_cast<uint8_t*>(canFrame), sizeof(struct WCANBlock));
-}
-
-int CANNode::write(struct WCANBlock *canBlock, struct CAN_message_t *frame, bool _needResponse)
-{
-    canBlock->needResponse = _needResponse;
-    canBlock->fd = false;
-    canBlock->frame = frame;
-    return write(canBlock);
-}
-
-int CANNode::write(struct WCANBlock *canBlock, struct CANFD_message_t *frame, bool _needResponse)
-{
-    canBlock->needResponse = _needResponse;
-    canBlock->fd = true;
-    canBlock->frame = frame;
-    return write(canBlock);
 }
 
 int CANNode::endPacket()
