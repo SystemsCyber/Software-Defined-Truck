@@ -5,8 +5,13 @@
 #include <Configuration/Load.h>
 #include <array>
 
-Load::Load(): exConfigWithIP(512), exConfigWithFQDN(512), exECU1(256),
-                                        exECU2(256), mac{0}, config(1024)                   
+Load::Load():
+    exConfigWithIP(512),
+    exConfigWithFQDN(512),
+    exECU1(256),
+    exECU2(256),
+    mac{0},
+    config(1024)                   
 {
     exECU1["sn"] = "1a2b3c4d";
     exECU1["make"] = "Cummins";

@@ -1,362 +1,305 @@
 #include <Arduino.h>
+#include <CANNode/CANNode.h>
 #include <ArduinoJson.h>
 #include <Ethernet.h>
 #include <HTTP/HTTPClient.h>
 #include <Configuration/Load.h>
 #include <Dns.h>
 #include <vector>
+#include <ArduinoHttpClient.h>
+#include <TeensyID.h>
 
-int HTTPClient::init()
-{
-    config.init();
-    Serial.println("Setting up Ethernet:");
-    Serial.println("\t-> Initializing the Ethernet shield to use the provided MAC address");
-    Serial.println("\t   and retreving network configuration parameters through DHCP.");
-    ethernetInitialized = initEthernet(Ethernet.begin(&(config.mac[0])));
-    return ethernetInitialized;
-}
+HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort):
+    CANNode(),
+    client(clientSock, _serverAddress, _serverPort),
+    attachedDevice(_attachedDevice),
+    serverAddress(_serverAddress),
+    serverIP(),
+    serverPort(_serverPort),
+    connectionStatus(Disconnected)
+    {};
 
-bool HTTPClient::connect(bool retry)
+HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddress, uint16_t _serverPort):
+    HTTPClient(_attachedDevice, _serverAddress.c_str(), _serverPort)
+    {};
+
+HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort):
+    CANNode(),
+    client(clientSock, _serverIP, _serverPort),
+    attachedDevice(_attachedDevice),
+    serverAddress(NULL),
+    serverIP(_serverIP),
+    serverPort(_serverPort),
+    connectionStatus(Disconnected)
+    {};
+
+bool HTTPClient::connect()
 {
-    if (ethernetInitialized)
+    unsigned long lastAttempt = millis();
+    const unsigned long retryInterval = 60 * 1000;
+    client.connectionKeepAlive();
+    connectionStatus = attemptConnection();
+    while (connectionStatus != Connected)
     {
-        request = {"POST", "/sss3/register", config.config};
-        unsigned long lastAttempt = millis();
-        const unsigned long retryInterval = 60 * 1000;
-        bool submitted = tryToConnect(config.config["serverAddress"], &lastAttempt);
-        while (!submitted)
+        if (millis() - lastAttempt > retryInterval)
         {
-            if (millis() - lastAttempt > retryInterval)
-            {
-                submitted = tryToConnect(config.config["serverAddress"], &lastAttempt);
-            }
+            connectionStatus = attemptConnection();
         }
-        return write(request, &response, retry);
+        if (connectionStatus == Disconnected)
+        {
+            lastAttempt = millis();
+        }
+        else if (connectionStatus == Unreachable)
+        {
+            return false;
+        }
     }
-    else
-    {
-        Serial.println("Cannot connect to server until HTTPClient has been initialized.");
-        return false;
-    }
+    return true;
 }
 
-bool HTTPClient::read(struct Request *req)
+bool HTTPClient::read(struct Request *request, bool respondOnError)
 {
-    if (server.available())
+    if (client.available())
     {
-        Ethernet.maintain(); //Keep current address assigned by DHCP server. Not sure how often to call this.
-        req->raw = server.readString((size_t) 4096);
-        if ((req->raw).length() > 0 && parseRequest(req))
+        request->raw = clientSock.readString((size_t) 4096);
+        if (parseRequest(request))
         {
-            Serial.print("New command from: ");
-            Serial.println(server.remoteIP());
-            Serial.println(req->raw);
+            Log.noticeln("New command from: %p", clientSock.remoteIP());
+            Log.noticeln(request->raw);
             return true;
         }
-        Serial.println(req->error);
+        else if (respondOnError)
+        {
+            struct Response response = {400, "BAD REQUEST"};
+            write(&response);
+        }
     }
-    else if (!server.connected() && !serverUnreachable)
+    else if (!client.connected() && (connectionStatus != Unreachable))
     {
-        Serial.println("Lost connection to the Control Server. Trying to re-connect...");
+        Log.errorln("Lost connection to the server. Trying to re-connect...");
         connect();
     }
     return false;
 }
 
-bool HTTPClient::write(struct Request req, struct Response *res, bool retry)
+bool HTTPClient::write(struct Response *res)
 {
-    Ethernet.maintain();
-    if (server.connected())
+    if (clientSock.connected())
     {
-        String message = req.method + " " + req.uri + " HTTP/1.1\r\n";
-        message += "Connection: keep-alive\r\n";
-        if (!req.data.isNull())
-        {
-            message += "Content-Type: application/json\r\n";
-            message += "\r\n";
-            String data;
-            serializeJson(req.data, data);
-            message += data;
-        }
-        else
-        {
-            message += "\r\n";
-        }
-        server.write(message.c_str());
-        server.flush();
-        return getResponse(req, res, retry);
-    }
-    else if (retry)
-    {
-        Serial.println("Lost connection to the Control Server. Trying to re-connect...");
-        if (connect(false))
-        {
-            Serial.println("Successfully reconnected and re-registered with the server.");
-            Serial.println("Attempting to send message again.");
-            return write(req, res, false);
-        }
-        else
-        {
-            Serial.println("Could not re-connect to the Control Server.");
-            return false;
-        }
-    }
-    else
-    {
-        serverUnreachable = true;
-        return false;
-    }
-}
-
-int HTTPClient::initEthernet(int success)
-{
-    if (success) // Ethernet begin returns 0 when successful
-    {
-        checkHardware();
-        Serial.println("\t***Successfully configured Ethernet using DHCP.***");
-        Serial.println();
-        Serial.println("Network Configuration:");
-        Serial.print("\tHostname: ");
-        Serial.print("WIZnet");
-        Serial.print(config.mac[3], HEX);
-        Serial.print(config.mac[4], HEX);
-        Serial.println(config.mac[5], HEX);
-        Serial.print("\tIP Address: ");
-        Serial.println(Ethernet.localIP());
-        Serial.print("\tNetmask: ");
-        Serial.println(Ethernet.subnetMask());
-        Serial.print("\tGateway IP: ");
-        Serial.println(Ethernet.gatewayIP());
-        Serial.print("\tDNS Server IP: ");
-        Serial.println(Ethernet.dnsServerIP());
-    }
-    else
-    {
-        checkHardware();
-        Serial.println("\t***Failed to configure Ethernet using DHCP***");
-    }
-    return success;
-}
-
-void HTTPClient::checkHardware()
-{
-    Serial.println("\t\t-> Checking for valid Ethernet shield.");
-    if (Ethernet.hardwareStatus() == EthernetNoHardware)
-    {
-        Serial.println("\t\t***Failed to find valid Ethernet shield.***");
-    }
-    else
-    {
-        Serial.println("\t\t***Valid Ethernet shield was detected.***");
-    }
-    checkLink();
-}
-
-void HTTPClient::checkLink()
-{
-    Serial.println("\t\t-> Checking if Ethernet cable is connected.");
-    if (Ethernet.linkStatus() == LinkOFF)
-    {
-        Serial.println("\t\t***Ethernet cable is not connected or the WIZnet chip was not");
-        Serial.println("\t\t   able to establish a link with the router or switch.***");
-    }
-    else
-    {
-        Serial.println("\t\t***Ethernet cable is connected and a valid link was established.***");
-    }
-}
-
-bool HTTPClient::tryToConnect(const char *serverAddress, unsigned long *lastAttempt)
-{
-    Serial.print("Connecting to the Control Server at ");
-    Serial.print(serverAddress);
-    Serial.print("... ");
-    if (server.connect(serverAddress, 80))
-    {
-        Serial.println("connected.");
+        String msg = res->code + " " + res->reason + " HTTP/1.1\r\n";
+        msg += "Connection: keep-alive\r\n";
+        clientSock.write(msg.c_str());
+        clientSock.flush();
         return true;
     }
+    else if (connectionStatus != Unreachable)
+    {
+        Log.errorln("Lost connection to the Server. Trying to re-connect...");
+        connect();
+        return false;
+    }
+}
+
+int HTTPClient::write(struct Request *req, struct Response *res)
+{
+    if (client.connected())
+    {
+        String contentType = NULL;
+        String content;
+        int contentLength = -1;
+        if (!req->json.isNull())
+        {
+            contentType = "application/json\r\n";
+            serializeJson(req->json, content);
+            contentLength = content.length();
+        }
+        int code = client.startRequest(
+            req->uri.c_str(),
+            req->method.toUpperCase().c_str(),
+            contentType.c_str(),
+            contentLength,
+            (const byte*)content.c_str()
+            );
+        if (code == 0)
+        {
+            res->code = client.responseStatusCode();
+            String data = client.responseBody();
+            if (data.length() > 0)
+            {
+                DeserializationError e = deserializeJson(res->json, data);
+                if (e)
+                {
+                    Log.errorln("Deserializing the response data failed.");
+                    Log.errorln("Code: %s", e.c_str());
+                    return -4;
+                }
+            }
+        }
+        return code;
+    }
+    else if (connectionStatus != Unreachable)
+    {
+        Log.errorln("Lost connection to the Server. Trying to re-connect...");
+        connect();
+        return false;
+    }
+}
+
+int HTTPClient::attemptConnection(bool retry)
+{
+    if (serverAddress)
+    {
+        Log.noticeln("Connecting to and registering with %s.", serverAddress);
+    }
     else
     {
-        *lastAttempt = millis();
-        Serial.println("connection failed.");
-        Serial.println("Retrying in 60 seconds.");
-        Serial.println();
-        return false;
+        Log.noticeln("Connecting to and registering with %p.", serverIP);
     }
-}
-
-bool HTTPClient::getResponse(struct Request req, struct Response *res, bool retry)
-{
-    if (!waitForResponse()) return false;
-    Serial.println("Server replied to request. Reading response.");
-    res->raw = server.readString((size_t) 4096);
-    bool didResponseParse = parseResponse(res);
-    if (!didResponseParse && retry)
+    String body;
+    DynamicJsonDocument registration(attachedDevice);
+    registration["MAC"] = teensyMAC();
+    serializeJson(registration, body);
+    int code = client.post("/sss3/register", "application/json", body);
+    if (code == 0)
     {
-        Serial.println("Received a poorly formatted response. Retrying.");
-        return write(req, res, false);
-    }
-    else if (didResponseParse && !(res->code >= 200 && res->code < 400) && retry)
-    {
-        Serial.println("Received a bad response code. Retrying in case message got corrupted.");
-        return write(req, res, false);
+        return connectionSuccessful(retry);
     }
     else
     {
-        return didResponseParse;
+        return connectionFailed(code, retry);
     }
 }
 
-bool HTTPClient::waitForResponse()
+int HTTPClient::connectionSuccessful(bool retry)
 {
-    unsigned long originalTime = millis();
-    int count = 0;
-    while (!server.available())
+    int statusCode = client.responseStatusCode();
+    if ((statusCode >= 200) && (statusCode < 400))
     {
-        if (millis() - originalTime >= (uint32_t) 500)
-        {
-            count += 1;
-            originalTime = millis();
-            Serial.println("Waiting on server to reply to request.");
-        }
-        else if (count > 10)
-        {
-            Serial.println("No response heard for 5 seconds.");
-            return false;
-        }
+        return Connected;
     }
-    return true;
+    else
+    {
+        Log.errorln("Received a bad status code.");
+        return retry ? attemptConnection(false) : Unreachable;
+    }
 }
 
-bool HTTPClient::parseResponse(struct Response *res)
+int HTTPClient::connectionFailed(int code, bool retry)
 {
-    if (res->raw.length() <= 0) return false;
-    std::array<String, 2> messageSplit = splitMessage(res->raw);
-    std::vector<String> responseArray = tokenizeHTTPMessage(messageSplit[0]);
-    if (responseArray.size() < 2)
+    if ((code == -1) || (code == -3))
     {
-        res->error = "Response is incorrectly formatted";
-        return false;
+        Log.errorln("Connection failed. Retrying in 60 seconds."CR);
+        return Disconnected;
     }
-    else if (responseArray[0] != "HTTP/1.1")
+    else if (code == -4)
     {
-        res->error = "Response is missing HTTP/1.1";
-        return false;
+        Log.errorln("Server returned an invalid response."CR);
+        return retry ? attemptConnection(false) : Unreachable;
     }
-    res->code = responseArray[1].toInt();
-    if (res->code == 0) {
-        res->error = "Response error code could not be convert to a long";
-        return false;
+    else
+    {
+        Log.errorln("Connection failed due to improper use of HTTP library."CR);
+        return retry ? attemptConnection(false) : Unreachable;
     }
-    if (responseArray.size() >= 3) res->reason = responseArray[2];
-    if (messageSplit[1].length() > 0) res->data = messageSplit[1];
-    return true;
 }
 
 bool HTTPClient::parseRequest(struct Request *req)
 {
-    if (req->raw.length() <= 0) return false;
-    std::array<String, 2> messageSplit = splitMessage(req->raw);
-    std::vector<String> requestArray = tokenizeHTTPMessage(messageSplit[0]);
-    if (requestArray.size() < 3)
+    int endOfHeaders = req->raw.indexOf("\r\n\r\n");
+    if (endOfHeaders == -1 || endOfHeaders == 0)
     {
-        req->error = "Request is incorrectly formatted";
-        return false;
-    }
-    else if (requestArray[2] != "HTTP/1.1")
-    {
-        req->error = "Request is missing HTTP/1.1";
-        return false;
-    }
-    req->method = requestArray[0];
-    if (messageSplit[1].length() > 3)
-    {
-        DynamicJsonDocument data(1024);
-        DeserializationError error = deserializeJson(data, messageSplit[1]);
-        if (error)
-        {
-            req->error = "Deserializing the request data failed with code ";
-            req->error += error.c_str();
+        endOfHeaders = req->raw.indexOf("\n\n");
+        if (endOfHeaders == -1 || endOfHeaders == 0)
             return false;
-        }
-        req->data = data;
     }
-    return validateJSON(req);
+    if (parseHeaders(endOfHeaders, req) && parseData(endOfHeaders+1, req))
+    {
+        return validateRequestData(req);
+    }
+    else
+    {
+        return false;
+    }
 }
 
-bool HTTPClient::validateJSON(struct Request *req)
+bool HTTPClient::parseHeaders(int endOfHeaders, struct Request *req)
 {
-    bool containsIP = req->data.containsKey("IP");
-    bool containsCAN_PORT = req->data.containsKey("CAN_PORT");
-    bool containsCARLA_PORT = req->data.containsKey("CARLA_PORT");
-    bool isPOST = req->method.equalsIgnoreCase("POST");
-    if (!containsIP && !containsCAN_PORT && !containsCARLA_PORT && !isPOST)
+    String headers = req->raw.substring(0, endOfHeaders);
+    String params[3];
+    if (tokenizeRequestLine(headers, params) && params[2] == "HTTP/1.1")
     {
-        return true;
+        req->method == params[0];
+        req->uri == params[1];
     }
-    else if (!containsIP || !containsCAN_PORT || !containsCARLA_PORT)
+    else
     {
-        req->error = "Request JSON is missing one of the required keys.";
+        Log.errorln("Request line is incorrectly formatted.");
         return false;
     }
-    String IP = req->data["IP"];
-    if (!IP.startsWith("239.255."))
+}
+
+bool HTTPClient::parseData(int startOfData, struct Request *req)
+{
+    if (startOfData != ((signed) req->raw.length()))
     {
-        req->error = "IP in request JSON does not start with 239.255.";
-        return false;
-    }
-    else if (req->data["CAN_PORT"] < 1025 || req->data["CAN_PORT"] > 65535)
-    {
-        req->error = "CAN port in request is out of range.";
-        return false;
-    }
-    else if (req->data["CARLA_PORT"] < 1025 || req->data["CARLA_PORT"] > 65535)
-    {
-        req->error = "CARLA port in request is out of range.";
-        return false;
+        String data = req->raw.substring(startOfData);
+        DeserializationError error = deserializeJson(req->json, data);
+        if (error)
+        {
+            Log.errorln("Deserializing the request data failed.");
+            Log.errorln("Code: %s", error.c_str());
+            return false;
+        }
     }
     return true;
 }
 
-std::array<String, 2> HTTPClient::splitMessage(String message)
+bool HTTPClient::validateRequestData(struct Request *req)
 {
-    std::array<String, 2> messageSplit;
-    int startOfData = message.indexOf("\r\n\r\n");
-    if (startOfData == -1)
+    bool id = req->json.containsKey("ID");
+    bool ip = req->json.containsKey("IP");
+    bool port = req->json.containsKey("PORT");
+    if (req->method.equalsIgnoreCase("POST"))
     {
-        startOfData = message.indexOf("\n\n");
-        if (startOfData == -1)
+        if (!ip || !port || !id)
         {
-            messageSplit[0] = message;
-            messageSplit[1] = "";
-            return messageSplit;
+            Log.errorln("Request JSON is missing 1+ required keys.");
+            return false;
+        }
+        String IP = req->json["IP"];
+        if (!IP.startsWith("239.255."))
+        {
+            Log.errorln("Error in the provided multicast IP.");
+            return false;
+        }
+        else if (req->json["PORT"] < 1025 || req->json["PORT"] > 65535)
+        {
+            Log.errorln("CAN port in request is out of range.");
+            return false;
         }
     }
-    messageSplit[0] = message.substring(0, startOfData);
-    if (startOfData < (signed) message.length() - 1)
+    else if (req->method.equalsIgnoreCase("DELETE"))
     {
-        messageSplit[1] = message.substring(startOfData + 1);
+        if (!req->json.isNull())
+        {
+            Log.errorln("DELETE method cannot contain data.");
+            return false;
+        }
     }
-    else
-    {
-        messageSplit[1] = "";
-    }
-    return messageSplit;
+    return true;
 }
 
-std::vector<String> HTTPClient::tokenizeHTTPMessage(String message)
+bool HTTPClient::tokenizeRequestLine(String headers, String params[3])
 {
-    char message_c_str[message.length()];
-    message.toCharArray(message_c_str, message.length());
-    char *tokenized;
-    tokenized = strtok(message_c_str, " \r\n");
-    std::vector<String> messageArray;
-    while (tokenized != NULL)
+    int count = 0;
+    char headers_c_str[headers.length()];
+    headers.toCharArray(headers_c_str, headers.length());
+    char *tokenized = strtok(headers_c_str, " \r\n");
+    while ((tokenized != NULL) && (count < 3))
     {
-        String token = tokenized;
-        messageArray.push_back(token);
+        params[count] = String(tokenized);
         tokenized = strtok(NULL, " \r\n");
+        count++;
     }
-    return messageArray;
+    return (count == 3) ? true : false;
 }

@@ -16,8 +16,6 @@ private:
     DynamicJsonDocument exECU2;
 
 public:
-    // MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
-    uint8_t mac[6];
     DynamicJsonDocument config;
 
     Load();
@@ -28,8 +26,6 @@ private:
     File fileExists(const char *filename);
     File openFile(const char *filename);
     void deserializeConfiguration(File file);
-    String readMACAddress();
-    void readLowLevelData(uint8_t word, uint8_t loc);
 };
 
 #endif /* LOAD_H_ */

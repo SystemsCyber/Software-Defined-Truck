@@ -17,16 +17,21 @@ Software-defined X-in-the-loop Testbench for Controller Area Network Experiments
 title <u> System Components</u>
 class "Smart Sensor Simulator 3" as SSSF
 class Controller
+class HTTPClient
+note right of HTTPClient: I'm not sure if we want to include\nthis but this is the module both of\nthem use to communicate with the\nserver.
 class CANNode{
     OverlayIP: some local multicast IP
 }
 class SensorNode{
     OverlayIP: some local multicast IP
 }
-CANNode <|-d- Controller
+note right of SensorNode: I tried to separate sensorNode from\nthe CANNode (Like in the original\ndiagram) but the code became\nredundent since the Sensor Node/Layer\n relies on the CANNode to provide the\nbasic functionality.
+CANNode <|-d- SensorNode
+CANNode <|-d- HTTPClient
+HTTPClient <|-d- Controller
+HTTPClient <|-d- SSSF
 SensorNode <|-d- Controller
-CANNode <|-d- SSSF
-SensorNode -- SSSF: multicast UDP overlay
+SensorNode <|-d- SSSF
 CANNode -- CANNode: multicast UDP overlay
 @enduml
 ```
@@ -37,10 +42,11 @@ CANNode -- CANNode: multicast UDP overlay
     title <u>Communication Data Structures</u>
 
     abstract class COMMBLOCK{
+        uint32_t id
         uint32_t frame_number
         {abstract} # uint8_t type
     }
-
+    note right of COMMBLOCK: The id is the device id of the \nsender not the receiver.
     class WSenseBlock{
         type = 2
         uint8_t num_signals
@@ -54,7 +60,8 @@ CANNode -- CANNode: multicast UDP overlay
         uint64_t data
         char[4] iface
     }
-    WCANFrame .|> FlexCAN.CANFrame
+    WCANFrame .|> FlexCAN.CAN_message_t
+    WCANFrame .|> FlexCAN.CANFD_message_t
     note right of WCANFrame: for data, we can try uint64_t but \nonly if the compiler permits, \nelse we should move to uint32_t[2]
     class WCANBlock{
         type = 1
