@@ -65,7 +65,7 @@ bool HTTPClient::read(struct Request *request, bool respondOnError)
         if (parseRequest(request))
         {
             Log.noticeln("New command from: %p", clientSock.remoteIP());
-            Log.noticeln(request->raw);
+            Log.noticeln(request->raw.c_str());
             return true;
         }
         else if (respondOnError)
@@ -96,15 +96,15 @@ bool HTTPClient::write(struct Response *res)
     {
         Log.errorln("Lost connection to the Server. Trying to re-connect...");
         connect();
-        return false;
     }
+    return false;
 }
 
 int HTTPClient::write(struct Request *req, struct Response *res)
 {
     if (client.connected())
     {
-        String contentType = NULL;
+        String contentType;
         String content;
         int contentLength = -1;
         if (!req->json.isNull())
@@ -141,8 +141,8 @@ int HTTPClient::write(struct Request *req, struct Response *res)
     {
         Log.errorln("Lost connection to the Server. Trying to re-connect...");
         connect();
-        return false;
     }
+    return false;
 }
 
 int HTTPClient::attemptConnection(bool retry)
@@ -188,17 +188,17 @@ int HTTPClient::connectionFailed(int code, bool retry)
 {
     if ((code == -1) || (code == -3))
     {
-        Log.errorln("Connection failed. Retrying in 60 seconds."CR);
+        Log.errorln("Connection failed. Retrying in 60 seconds." CR);
         return Disconnected;
     }
     else if (code == -4)
     {
-        Log.errorln("Server returned an invalid response."CR);
+        Log.errorln("Server returned an invalid response." CR);
         return retry ? attemptConnection(false) : Unreachable;
     }
     else
     {
-        Log.errorln("Connection failed due to improper use of HTTP library."CR);
+        Log.errorln("Connection failed due to improper use of HTTP library." CR);
         return retry ? attemptConnection(false) : Unreachable;
     }
 }
@@ -230,6 +230,7 @@ bool HTTPClient::parseHeaders(int endOfHeaders, struct Request *req)
     {
         req->method == params[0];
         req->uri == params[1];
+        return true;
     }
     else
     {
