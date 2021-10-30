@@ -27,18 +27,10 @@ protected:
 
 public:
 
-    union WCANFrame  //TODO: Deconstructor? It doesn't envoke dynamic memory so not sure.
+    union WCANFrame
     {
         struct CAN_message_t can;
         struct CANFD_message_t canFD;
-
-        WCANFrame() { memset(this, 0, sizeof(WCANFrame));};
-        ~WCANFrame() = default;
-        WCANFrame(struct CAN_message_t *_can): can(*_can) {};
-        WCANFrame(struct CAN_message_t _can): can(_can) {};
-        WCANFrame(struct CANFD_message_t *_canFD): canFD(*_canFD) {};
-        WCANFrame(struct CANFD_message_t _canFD): canFD(_canFD) {};
-        WCANFrame(union WCANFrame *frame) {memcpy(this, &frame, sizeof(WCANFrame));};
     };
 
     struct WCANBlock: public Printable
@@ -51,21 +43,23 @@ public:
 
         size_t printTo(Print &p) const
         {
-            p.printf("Sequence Number: %d Timestamp: %d Need Response: %d\n", sequenceNumber, timestamp, needResponse);
+            size_t s = 0;
+            s += p.printf("Sequence Number: %d Timestamp: %d Need Response: %d\n", sequenceNumber, timestamp, needResponse);
             if (fd)
             {
                 struct CANFD_message_t f = frame.canFD;
-                p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-                p.printf("Length: %d Data: ", f.len);
-                p.write(f.buf, size_t(f.len));
+                s += p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
+                s += p.printf("Length: %d Data: ", f.len);
+                s += p.write(f.buf, size_t(f.len));
             }
             else
             {
                 struct CAN_message_t f = frame.can;
-                p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-                p.printf("Length: %d Data: ", f.len);
-                p.write(f.buf, size_t(f.len));
+                s += p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
+                s += p.printf("Length: %d Data: ", f.len);
+                s += p.write(f.buf, size_t(f.len));
             }
+            return s;
         };
     };
     
@@ -84,6 +78,11 @@ public:
 private:
     static void checkHardware();
     static void checkLink();
+
+    static void printPrefix(Print* _logOutput, int logLevel);
+    static void printTimestamp(Print* _logOutput);
+    static void printLogLevel(Print* _logOutput, int logLevel);
+    static void printSuffix(Print* _logOutput, int logLevel);
 };
 
 #endif /* CANNode_h_ */
