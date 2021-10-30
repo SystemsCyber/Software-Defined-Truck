@@ -16,14 +16,16 @@ public:
 
         size_t printTo(Print &p) const
         {
-            p.printf("Frame: %d\n", frameNumber);
-            p.printf("Throttle: %5f", throttle);
-            p.printf("  Steer: %5f", steer);
-            p.printf("  Brake: %5f\n", brake);
-            p.printf("Reverse: %d", reverse);
-            p.printf("  E-Brake: %d", handBrake);
-            p.printf("  Manual: %d", manualGearShift);
-            p.printf("  Gear: %d\n\n", gear);
+            size_t s = 0;
+            s += p.printf("Frame: %d\n", frameNumber);
+            s += p.printf("Throttle: %5f", throttle);
+            s += p.printf("  Steer: %5f", steer);
+            s += p.printf("  Brake: %5f\n", brake);
+            s += p.printf("Reverse: %d", reverse);
+            s += p.printf("  E-Brake: %d", handBrake);
+            s += p.printf("  Manual: %d", manualGearShift);
+            s += p.printf("  Gear: %d\n\n", gear);
+            return s;
         };
     } _frame;
 
@@ -34,11 +36,13 @@ public:
 
         size_t printTo(Print &p) const
         {
+            size_t s = 0;
             for(uint8_t i = 0; i < numSignals; i++)
             {
-                p.printf("%d: %3f ", i, (signals + i));
+                s += p.printf("%d: %3f ", i, (signals + i));
             }
-            p.print("\n");
+            s += p.print("\n");
+            return s;
         }
     };
 
