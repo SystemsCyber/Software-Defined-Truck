@@ -43,10 +43,10 @@ public:
     virtual bool setup();
     virtual void forwardingLoop();
 
-    virtual void write(struct CAN_message_t *canFrame);
-    virtual void write(struct CANFD_message_t *canFrame);
-
 private:
+    void write(struct CAN_message_t *canFrame);
+    void write(struct CANFD_message_t *canFrame);
+
     void setupClock();
     void setupCANChannels();
 
