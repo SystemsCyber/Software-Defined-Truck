@@ -10,7 +10,6 @@ Load::Load():
     exConfigWithFQDN(512),
     exECU1(256),
     exECU2(256),
-    mac{0},
     config(1024)                   
 {
     exECU1["sn"] = "1a2b3c4d";
@@ -109,49 +108,7 @@ void Load::deserializeConfiguration(File file)
     else
     {
         Serial.println("Done.");
-        config["MAC"] = readMACAddress();
         Serial.println("Configuration read from SD card:");
         serializeJsonPretty(config, Serial);
     }
-}
-
-String Load::readMACAddress()
-{
-    // From http://forum.pjrc.com/threads/91-teensy-3-MAC-address 
-
-    // Retrieve the 6 byte MAC address Paul burnt into two 32 bit words
-    // at the end of the "READ ONCE" area of the flash controller.
-    Serial.print("Reading Teensy's burned-in MAC address...");
-    readLowLevelData(0xe,0);
-    readLowLevelData(0xf,3);
-    String macString = "";
-    for(uint8_t i = 0; i < 6; ++i) {
-        if (i!=0) macString += ":";
-        macString += String((*(mac+i) & 0xF0) >> 4, 16);
-        macString += String(*(mac+i) & 0x0F, 16);
-    }
-    Serial.println("Done");
-    return macString;
-}
-
-void Load::readLowLevelData(uint8_t word, uint8_t loc)
-{
-    // From http://forum.pjrc.com/threads/91-teensy-3-MAC-address 
-
-    // To understand what's going on here, see
-    // "Kinetis Peripheral Module Quick Reference" page 85 and
-    // "K20 Sub-Family Reference Manual" page 548.
-
-    cli();
-    FTFL_FCCOB0 = 0x41;             // Selects the READONCE command
-    FTFL_FCCOB1 = word;             // read the given word of read once area
-                                    // -- this is one half of the mac addr.
-    FTFL_FSTAT = FTFL_FSTAT_CCIF;   // Launch command sequence
-    while(!(FTFL_FSTAT & FTFL_FSTAT_CCIF)) {
-                                    // Wait for command completion
-    }
-    *(mac+loc) =   FTFL_FCCOB5;       // collect only the top three bytes,
-    *(mac+loc+1) = FTFL_FCCOB6;       // in the right orientation (big endian).
-    *(mac+loc+2) = FTFL_FCCOB7;       // Skip FTFL_FCCOB4 as it's always 0.
-    sei();
 }

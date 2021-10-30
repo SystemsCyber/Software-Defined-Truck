@@ -31,7 +31,9 @@ bool SSSF::setup()
         Log.noticeln("Setting up the Teensys Real Time Clock.");
         setupClock();
         setupCANChannels();
+        return true;
     }
+    return false;
 }
 
 void SSSF::forwardingLoop()
@@ -69,7 +71,7 @@ void SSSF::write(struct CAN_message_t *canFrame)
     CANNode::beginPacket(&msg.canFrame);
     msg.canFrame.fd = false;
     msg.canFrame.needResponse = false;
-    msg.canFrame.frame = canFrame;
+    memcpy(&msg.canFrame.frame, canFrame, sizeof(CAN_message_t));
     CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
     CANNode::endPacket();
 }
@@ -83,7 +85,7 @@ void SSSF::write(struct CANFD_message_t *canFrame)
     CANNode::beginPacket(&msg.canFrame);
     msg.canFrame.fd = true;
     msg.canFrame.needResponse = false;
-    msg.canFrame.frame = canFrame;
+    memcpy(&msg.canFrame.frame, canFrame, sizeof(CANFD_message_t));
     CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
     CANNode::endPacket();
 }

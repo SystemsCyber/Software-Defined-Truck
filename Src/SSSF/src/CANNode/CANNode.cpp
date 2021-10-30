@@ -6,12 +6,12 @@
 #include <FlexCAN_T4.h>
 #include <Dns.h>
 
-CANNode::CANNode(): sessionStatus(Inactive), mac{0}
+CANNode::CANNode(): mac{0}, sessionStatus(Inactive)
 {
-    Log.setPrefix(printPrefix); // set prefix similar to NLog
-    Log.setSuffix(printSuffix); // set suffix 
+    Log.setPrefix(printPrefix);
+    Log.setSuffix(printSuffix);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.setShowLevel(false);    // Do not show loglevel, we will do this in the prefix
+    Log.setShowLevel(false);
     teensyMAC(mac);
 }
 
@@ -154,39 +154,39 @@ void CANNode::checkLink()
 
 // ******** From the Arduino Log Example Code ********
 
-void printPrefix(Print* _logOutput, int logLevel)
+void CANNode::printPrefix(Print* _logOutput, int logLevel)
 {
     printTimestamp(_logOutput);
     printLogLevel (_logOutput, logLevel);
 }
 
-void printTimestamp(Print* _logOutput)
+void CANNode::printTimestamp(Print* _logOutput)
 {
 
   // Division constants
-  const unsigned long MSECS_PER_SEC       = 1000;
-  const unsigned long SECS_PER_MIN        = 60;
-  const unsigned long SECS_PER_HOUR       = 3600;
-  const unsigned long SECS_PER_DAY        = 86400;
+  const unsigned int MSECS_PER_SEC       = 1000;
+  const unsigned int SECS_PER_MIN        = 60;
+  const unsigned int SECS_PER_HOUR       = 3600;
+  const unsigned int SECS_PER_DAY        = 86400;
 
   // Total time
-  const unsigned long msecs               =  millis() ;
-  const unsigned long secs                =  msecs / MSECS_PER_SEC;
+  const unsigned int msecs               =  millis() ;
+  const unsigned int secs                =  msecs / MSECS_PER_SEC;
 
   // Time in components
-  const unsigned long MiliSeconds         =  msecs % MSECS_PER_SEC;
-  const unsigned long Seconds             =  secs  % SECS_PER_MIN ;
-  const unsigned long Minutes             = (secs  / SECS_PER_MIN) % SECS_PER_MIN;
-  const unsigned long Hours               = (secs  % SECS_PER_DAY) / SECS_PER_HOUR;
+  const unsigned int MiliSeconds         =  msecs % MSECS_PER_SEC;
+  const unsigned int Seconds             =  secs  % SECS_PER_MIN ;
+  const unsigned int Minutes             = (secs  / SECS_PER_MIN) % SECS_PER_MIN;
+  const unsigned int Hours               = (secs  % SECS_PER_DAY) / SECS_PER_HOUR;
 
   // Time as string
   char timestamp[20];
-  sprintf(timestamp, "%02d:%02d:%02d.%03d ", Hours, Minutes, Seconds, MiliSeconds);
+  sprintf(timestamp, "%02u:%02u:%02u.%03u ", Hours, Minutes, Seconds, MiliSeconds);
   _logOutput->print(timestamp);
 }
 
 
-void printLogLevel(Print* _logOutput, int logLevel)
+void CANNode::printLogLevel(Print* _logOutput, int logLevel)
 {
     /// Show log description based on log level
     switch (logLevel)
@@ -202,7 +202,7 @@ void printLogLevel(Print* _logOutput, int logLevel)
     }   
 }
 
-void printSuffix(Print* _logOutput, int logLevel)
+void CANNode::printSuffix(Print* _logOutput, int logLevel)
 {
   _logOutput->print("");
 }
