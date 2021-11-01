@@ -105,10 +105,7 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
     msg.timestamp = millis();
     msg.type = 4;
     CANNode::beginPacket();
-    size_t baseCOMMBlockSize = sizeof(COMMBlock::id) + 
-                                sizeof(COMMBlock::frameNumber) +
-                                sizeof(COMMBlock::timestamp) + 
-                                sizeof(COMMBlock::type);
+    size_t baseCOMMBlockSize = sizeof(COMMBlock) - sizeof(WCANBlock);
     uint8_t report[baseCOMMBlockSize + networkHealth->size];
     memcpy(&msg, report, baseCOMMBlockSize);
     memcpy(healthReport, report + baseCOMMBlockSize, networkHealth->size);
