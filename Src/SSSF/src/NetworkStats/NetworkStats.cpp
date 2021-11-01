@@ -27,7 +27,7 @@ void NetworkStats::update(uint16_t _id, int packetSize, uint32_t timestamp, uint
             basics.count++;
             calculate(node.latency, basics.count, now - timestamp);
             calculate(node.jitter, basics.count, node.latency.variance);
-            node.packetLoss = (sequenceNumber - basics.count) / sequenceNumber;
+            node.packetLoss = ((sequenceNumber - basics.count) / sequenceNumber) * 100;
             float ellapsedSeconds = (now - basics.lastMessageTime) / 1000;
             calculate(node.throughput, basics.count, (packetSize * 8) / ellapsedSeconds);
             basics.lastMessageTime = now;
