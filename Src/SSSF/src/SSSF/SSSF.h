@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
+#include <NetworkStats/NetworkStats.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
@@ -14,7 +15,8 @@ class SSSF: private SensorNode, private HTTPClient
 {
 private:
     const char *serverAddress = "ETS00853";
-    uint32_t id;
+    uint16_t id;
+    uint16_t *members;
     uint32_t frameNumber;
     EthernetUDP ntpSock;
     NTPClient timeClient;
@@ -24,11 +26,14 @@ private:
     uint32_t can0BaudRate;
     uint32_t can1BaudRate;
 
+    NetworkStats *networkHealth;
+
 public:
     struct COMMBlock
     {
         uint32_t id;
         uint32_t frameNumber;
+        uint32_t timestamp;
         uint8_t type;
         union
         {
@@ -46,6 +51,7 @@ public:
 private:
     void write(struct CAN_message_t *canFrame);
     void write(struct CANFD_message_t *canFrame);
+    void write(NetworkStats::NodeReport *healthReport);
 
     void setupClock();
     void setupCANChannels();
@@ -54,7 +60,8 @@ private:
     void pollServer();
     void pollCANNetwork();
 
-    void startSession(struct Request *request);
+    void start(struct Request *request);
+    void stop();
 };
 
 #endif /* SSSF_H_ */

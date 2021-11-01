@@ -2,6 +2,7 @@
 #include <SSSF/SSSF.h>
 #include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
+#include <NetworkStats/NetworkStats.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <TimeLib.h>
@@ -44,20 +45,24 @@ void SSSF::forwardingLoop()
     {
         struct COMMBlock msg = {0};
         struct CAN_message_t canFrame;
-        if (can0BaudRate && can0.read(canFrame))
-            write(&canFrame);
-        if (can1BaudRate && can1.read(canFrame))
-            write(&canFrame);
-        if (CANNode::read(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock)))
+        if (can0BaudRate && can0.read(canFrame)) write(&canFrame);
+        if (can1BaudRate && can1.read(canFrame)) write(&canFrame);
+        int packetSize = CANNode::read(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
+        if (packetSize)
         {
             if (msg.type == 1)
             {
+                //adding 28 for UDP header
+                networkHealth->update(msg.id, packetSize + 28, msg.timestamp, msg.canFrame.sequenceNumber);
                 can0.write(msg.canFrame.frame.can);
+                if (can1BaudRate) can1.write(msg.canFrame.frame.can);
             }
             else if (msg.type == 2)
             {
+                networkHealth->update(msg.id, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
             }
+            else if (msg.type == 3) write(networkHealth->HealthReport);
         }
     }
 }
@@ -67,8 +72,9 @@ void SSSF::write(struct CAN_message_t *canFrame)
     struct COMMBlock msg = {0};
     msg.id = id;
     msg.frameNumber = frameNumber;
+    msg.timestamp = millis();
     msg.type = 1;
-    CANNode::beginPacket(&msg.canFrame);
+    CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = false;
     msg.canFrame.needResponse = false;
     memcpy(&msg.canFrame.frame, canFrame, sizeof(CAN_message_t));
@@ -81,13 +87,33 @@ void SSSF::write(struct CANFD_message_t *canFrame)
     struct COMMBlock msg = {0};
     msg.id = id;
     msg.frameNumber = frameNumber;
+    msg.timestamp = millis();
     msg.type = 1;
-    CANNode::beginPacket(&msg.canFrame);
+    CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = true;
     msg.canFrame.needResponse = false;
     memcpy(&msg.canFrame.frame, canFrame, sizeof(CANFD_message_t));
     CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
     CANNode::endPacket();
+}
+
+void SSSF::write(NetworkStats::NodeReport *healthReport)
+{
+    struct COMMBlock msg = {0};
+    msg.id = id;
+    msg.frameNumber = frameNumber;
+    msg.timestamp = millis();
+    msg.type = 4;
+    CANNode::beginPacket();
+    size_t baseCOMMBlockSize = sizeof(COMMBlock::id) + 
+                                sizeof(COMMBlock::frameNumber) +
+                                sizeof(COMMBlock::timestamp) + 
+                                sizeof(COMMBlock::type);
+    uint8_t report[baseCOMMBlockSize + networkHealth->size];
+    memcpy(&msg, report, baseCOMMBlockSize);
+    memcpy(healthReport, report + baseCOMMBlockSize, networkHealth->size);
+    CANNode::write(report, baseCOMMBlockSize + networkHealth->size);
+    CANNode::endPacket(false);
 }
 
 void SSSF::setupClock()
@@ -112,6 +138,7 @@ void SSSF::setupCANChannels()
 
 void SSSF::pollClock()
 {
+    now();
     if (timeClient.update())
     {
         Teensy3Clock.set(timeClient.getEpochTime());
@@ -127,13 +154,13 @@ void SSSF::pollServer()
     {
         if (request.method.equalsIgnoreCase("POST"))
         {
-            startSession(&request);
+            start(&request);
         }
         else if (request.method.equalsIgnoreCase("DELETE"))
         {
             id = 0;
             frameNumber = 0;
-            stopSession();
+            stop();
         }
         else
         {
@@ -143,13 +170,28 @@ void SSSF::pollServer()
     }
 }
 
-void SSSF::startSession(struct Request *request)
+void SSSF::start(struct Request *request)
 {
     id = request->json["ID"];
+    size_t membersSize = request->json["MEMBERS"].size();
+    members = new uint16_t [membersSize];
+    for (size_t i = 0; i < membersSize; i++)
+    {
+        members[i] = request->json["MEMBERS"][i].as<uint16_t>();
+    }
     frameNumber = 0;
+    networkHealth = new NetworkStats(id, members, membersSize);
     String ip = request->json["IP"];
     if (CANNode::startSession(ip, request->json["PORT"]))
     {
         Log.noticeln("\tID: %d", id);
     }
+}
+
+void SSSF::stop()
+{
+    id = 0;
+    delete &members;
+    delete &networkHealth;
+    CANNode::stopSession();
 }

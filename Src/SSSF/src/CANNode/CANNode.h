@@ -22,7 +22,7 @@ private:
 
 protected:
     uint8_t mac[6];  //MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
-    uint32_t sequenceNumber;
+    uint32_t sequenceNumber = 1;
     volatile boolean sessionStatus;
 
 public:
@@ -36,7 +36,6 @@ public:
     struct WCANBlock: public Printable
     {
         uint32_t sequenceNumber;
-        uint32_t timestamp;
         bool needResponse;
         bool fd;
         union WCANFrame frame;
@@ -44,7 +43,7 @@ public:
         size_t printTo(Print &p) const
         {
             size_t s = 0;
-            s += p.printf("Sequence Number: %d Timestamp: %d Need Response: %d\n", sequenceNumber, timestamp, needResponse);
+            s += p.printf("Sequence Number: %d Need Response: %d\n", sequenceNumber,  needResponse);
             if (fd)
             {
                 struct CANFD_message_t f = frame.canFD;
@@ -69,10 +68,11 @@ public:
     virtual bool startSession(String _ip, uint16_t _port);
     virtual int read(uint8_t *buffer, size_t size);
     virtual int read(struct WCANBlock *buffer);
-    virtual int beginPacket(struct WCANBlock *canBlock);
+    virtual int beginPacket();
+    virtual int beginPacket(struct WCANBlock &canBlock);
     virtual int write(const uint8_t *buffer, size_t size);
     virtual int write(struct WCANBlock *canFrame);
-    virtual int endPacket();
+    virtual int endPacket(bool incrementSequenceNumber = true);
     virtual void stopSession();
 
 private:
