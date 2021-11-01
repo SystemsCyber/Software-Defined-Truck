@@ -90,11 +90,15 @@ int CANNode::read(struct WCANBlock *buffer)
     return read(reinterpret_cast<unsigned char*>(buffer), sizeof(struct WCANBlock));
 }
 
-int CANNode::beginPacket(struct WCANBlock *canBlock)
+int CANNode::beginPacket()
 {
-    canBlock->sequenceNumber = sequenceNumber;
-    canBlock->timestamp = micros();
     return canSock.beginPacket(canIP, canPort);
+}
+
+int CANNode::beginPacket(struct WCANBlock &canBlock)
+{
+    canBlock.sequenceNumber = sequenceNumber;
+    return beginPacket();
 }
 
 int CANNode::write(const uint8_t *buffer, size_t size)
@@ -107,9 +111,9 @@ int CANNode::write(struct WCANBlock *canFrame)
     return write(reinterpret_cast<uint8_t*>(canFrame), sizeof(struct WCANBlock));
 }
 
-int CANNode::endPacket()
+int CANNode::endPacket(bool incrementSequenceNumber)
 {
-    sequenceNumber += 1;
+    if (incrementSequenceNumber) sequenceNumber += 1;
     return canSock.endPacket();
 }
 
@@ -119,7 +123,7 @@ void CANNode::stopSession()
     canSock.stop();
     canIP = IPAddress();
     canPort = 0;
-    sequenceNumber = 0;
+    sequenceNumber = 1;
     sessionStatus = Inactive;
     Log.noticeln("Waiting for next session.");
 }
