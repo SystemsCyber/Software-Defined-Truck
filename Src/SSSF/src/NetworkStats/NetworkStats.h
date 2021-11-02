@@ -27,8 +27,8 @@ public:
         float min = std::numeric_limits<float>::max();
         float max = -std::numeric_limits<float>::max();
         float mean = 0.0;
-        float variance = 0;
-        float M2 = 0;
+        float variance = 0.0;
+        float M2 = 0.0;
     };
 
     struct NodeReport

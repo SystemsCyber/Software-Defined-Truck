@@ -1,17 +1,17 @@
-import json
-from http.client import HTTPConnection, HTTPException
-from json.decoder import JSONDecodeError
 import logging
-from socket import *
-from selectors import *
-from os import path, getcwd, walk
-from jsonschema import RefResolver, Draft7Validator, ValidationError
-from ipaddress import IPv4Address, AddressValueError
+import json
 from io import BytesIO
-from http.server import BaseHTTPRequestHandler
-from threading import Lock
 from CANNode import CANNode
 from types import SimpleNamespace
+from time import sleep
+from json.decoder import JSONDecodeError
+from http.client import HTTPConnection, HTTPException
+from http.server import BaseHTTPRequestHandler
+from jsonschema import RefResolver, Draft7Validator, ValidationError
+from ipaddress import IPv4Address, AddressValueError
+from os import path, getcwd, walk
+from socket import *
+from selectors import *
 
 class Schema:
     @staticmethod
@@ -35,10 +35,8 @@ class Schema:
 
 class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def __init__(self, _server_ip = gethostname()) -> None:
-        self.sel = DefaultSelector()
-        self.sel_lock = Lock()
-        self.server_ip = _server_ip
-        self.server_port = 80
+        self.__server_ip = _server_ip
+        self.__server_port = 80
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
         self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
@@ -58,9 +56,9 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def connect(self, retry = True) -> bool:
         try:
             logging.info("Connecting to the server.")
-            self.ctrl = HTTPConnection(self.server_ip)
+            self.ctrl = HTTPConnection(self.__server_ip)
             self.ctrl.connect()
-            with self.selector_lock:
+            with self.sel_lock:
                 self.sel.register(self.ctrl.sock, EVENT_READ)
         except HTTPException as httpe:
             logging.error("Failed to connect to server.")
@@ -86,7 +84,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
 
     def __getresponse(self, timeout=None) -> bool:
         try:
-            with self.selector_lock:
+            with self.sel_lock:
                 self.sel.modify(self.ctrl.sock, EVENT_READ)
                 if self.sel.select(timeout=timeout):
                     self.response = self.ctrl.getresponse()
@@ -175,38 +173,29 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
 
     def receive_SSE(self, key: SelectorKey):
         logging.debug("Received an SSE.")
+        sleep(0.1)
         message = self.ctrl.sock.recv(4096)
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
             self.handle_one_request()
         if self.close_connection:
             logging.error("Server closed the connection.")
             self.shutdown(False)
-
-    def start_session(self, _ip: IPv4Address, _port: int) -> None:
-        super().start_session(_ip, _port)
-        can_data = SimpleNamespace(
-                callback = self.read,
-                outgoing_message = None
-                )
-        self.key = self.sel.register(self.can_sock, EVENT_READ, can_data)
-
+        
     def do_POST(self):
         try:
-            data = json.load(self.rfile)
-            self.session_schema.validate(data)
-            self.start_session(IPv4Address(data["IP"]), data["CAN_PORT"])
+            self.request_data = json.load(self.rfile)
+            self.session_schema.validate(self.request_data)
+            self.start_session(
+                IPv4Address(self.request_data["IP"]),
+                self.request_data["PORT"]
+                )
         except (ValidationError,
                 JSONDecodeError,
                 AddressValueError) as ve:
             logging.error(ve)
             self.close_connection = True
 
-    def do_DELETE(self):
-        self.send_delete("/client/session")
-        self.sel.unregister(self.can_sock)
-        self.stop_session()
-
-    def send_delete(self, path: str):
+    def __send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
         try:
             headers = {"Connection": "keep-alive"}
@@ -219,10 +208,14 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         else:
             self.__getresponse()
     
+    def do_DELETE(self):
+        self.__send_delete("/client/session")
+        self.stop_session()
+
     def shutdown(self, notify_server = True):
         logging.debug("Shutting down server connection.")
         if notify_server:
-            self.send_delete("/client/register")
+            self.__send_delete("/client/register")
         self.sel.unregister(self.ctrl.sock)
         self.ctrl.sock.shutdown(SHUT_RDWR)
         self.ctrl.sock.close()

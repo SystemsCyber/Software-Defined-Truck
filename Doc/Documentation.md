@@ -44,14 +44,18 @@ CANNode -- CANNode: multicast UDP overlay
     abstract class COMMBLOCK{
         uint32_t id
         uint32_t frame_number
+        uint32_t timestamp
         {abstract} # uint8_t type
     }
     note right of COMMBLOCK: The id is the device id of the \nsender not the receiver.
+    note right of COMMBLOCK: I moved the timestamp into the\nCOMMBLOCK so that SSSFs can\nmeasure the network performance\n of the controller. 
+
     class WSenseBlock{
         type = 2
         uint8_t num_signals
-        float* signals
+        float signals[19]
     }
+    note right of WSenseBlock: capped signals to a max size of 19 because it makes\nit much easier to work with for the time being. I\nknow that eventually we probably want it to be\nunrestricted. 19 was chosen because then the size\nof WSenseBlock = the size of WCANBlock.
     COMMBLOCK <|- WSenseBlock
 
     class WCANFrame{
@@ -80,16 +84,21 @@ CANNode -- CANNode: multicast UDP overlay
 @startuml
     title <u>Health Monitoring Data Structures</u>
     class HealthCore{
+        uint32_t count
         float min
         float max
         float avg
         float variance
+        float m2
     }
+    note right of HealthCore: added count and m2 because they\nare necessary for the welford algorithm.\nIf necessary we can remove them before\nsending the data structure.
     class NodeReport{
         latency: HealthCore
-        dropCount: HealthCore
+        jitter: HealthCore
+        packetLoss: float
         dataRate: HealthCore
     }
+    note right of NodeReport: Added jitter and changed dropCount to packetLoss.\nI also changed packetLoss to a float since\ncalculating min, max, mean, etc. on a sort of\nstatic number didnt make sense. I changed\nPacketLoss to be a percent since thats what I\noften see in other applications but I can change it\nback if you want. Also should we call dataRate\n"goodput" as it seems to more accurately describe\nwhat were measuring.
     class HealthReport
     HealthReport *--"1..n" NodeReport
 @enduml

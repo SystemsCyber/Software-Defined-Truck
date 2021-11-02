@@ -32,7 +32,7 @@ public:
     struct WSensorBlock: public Printable
     {
         uint8_t numSignals;
-        float *signals;
+        float signals[19];
 
         size_t printTo(Print &p) const
         {

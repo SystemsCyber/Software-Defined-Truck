@@ -1,12 +1,15 @@
 import logging
-import struct
 import copy
 from os import path, walk, getcwd
 from logging.handlers import TimedRotatingFileHandler
 from ipaddress import IPv4Address
-from Frame import CAN_UDP_Frame as CANFrame
+from enum import Enum, auto
 from getmac import get_mac_address as gma
+from threading import Lock
+from types import SimpleNamespace
 from socket import *
+from selectors import *
+from ctypes import *
 
 # COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
 class ColoredConsoleHandler(logging.StreamHandler):
@@ -31,19 +34,125 @@ class ColoredConsoleHandler(logging.StreamHandler):
         logging.StreamHandler.emit(self, myrecord)
 # ------------------------------------------------------------
 
+class FLAGS_FD(Structure):
+    _fields_ = [
+        ("extended", c_bool),
+        ("overrun", c_bool),
+        ("reserved", c_bool)
+        ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\textended: {self.extended} overrun: {self.overrun} reserved: {self.reserved}\n'
+        )
+
+class CANFD_message_t(Structure):
+    _fields_ = [
+        ("can_id", c_uint32),
+        ("can_timestamp", c_uint16),
+        ("idhit", c_uint8),
+        ("brs", c_bool),
+        ("esi", c_bool),
+        ("edl", c_bool),
+        ("flags", FLAGS_FD),
+        ("len", c_uint8),
+        ("buf", c_uint8 * 64),
+        ("mb", c_int8),
+        ("bus", c_uint8),
+        ("seq", c_bool)
+        ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.id_hit}\n'
+            f'\tbrs: {self.brs} esi: {self.esi} edl: {self.edl}\n'
+            f'{self.flags}'
+            f'\tlen: {self.len} buf: {self.buf}\n'
+            f'\tmb: {self.mb} bus: {self.bus} seq: {self.seq}\n'
+            )
+
+class FLAGS(Structure):
+    _fields_ = [
+        ("extended", c_bool),
+        ("remote", c_bool),
+        ("overrun", c_bool),
+        ("reserved", c_bool)
+        ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\textended: {self.extended} remote: {self.remote} overrun: {self.overrun} reserved: {self.reserved}\n'
+        )
+
+class CAN_message_t(Structure):
+    _fields_ = [
+        ("can_id", c_uint32),
+        ("can_timestamp", c_uint16),
+        ("idhit", c_uint8),
+        ("flags", FLAGS),
+        ("len", c_uint8),
+        ("buf", c_uint8 * 8),
+        ("mb", c_int8),
+        ("bus", c_uint8),
+        ("seq", c_bool)
+        ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.id_hit}\n'
+            f'{self.flags}'
+            f'\tlen: {self.len} buf: {self.buf}\n'
+            f'\tmb: {self.mb} bus: {self.bus} seq: {self.seq}\n'
+            )
+
+class WCANFrame(Union):
+    _fields_ = [
+        ("can", CAN_message_t),
+        ("can_FD", CANFD_message_t)
+    ]
+
+class WCANBlock(Structure):
+    _anonymous_ = ("frame",)
+    _fields_ = [
+        ("sequence_number", c_uint32),
+        ("need_response", c_bool),
+        ("fd", c_bool),
+        ("frame", WCANFrame)
+    ]
+
+    def __repr__(self) -> str:
+        s = (
+            f'Sequence Number: {self.sequence_number} Timestamp: {self.timestamp}\n'
+            f'Need Response: {self.need_response} FD: {self.fd}\n'
+        )
+        if self.fd:
+            s += f'Frame:\n{self.frame.can}\n'
+        else:
+            s += f'Frame:\n{self.frame.can_FD}\n'
+        return s
+
 class CANNode:
+    class SessionStatus(Enum):
+        Inactive = auto()
+        Active = auto()
+
     def __init__(self) -> None:
         self.__init_logging()
-        self.id = None
+        self.__can_ip = IPv4Address
+        self.__can_port = 0
+
+        self.sel = DefaultSelector()
+        self.sel_lock = Lock()
+
+        self.id = 0
         self.mac = gma()
-        self.can_ip = IPv4Address
-        self.can_port = 0
-        self.last_transmission_time = None
-        self.can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        self.sequence_number = 1
+        self.session_status = self.SessionStatus.Inactive
 
         self.mac = "00:0C:29:DE:AD:BE"
+        logging.debug(f"The testing MAC address is: {self.mac}")
 
-    def __findpath(log_name):
+    def __findpath(self, log_name):
         base_dir = path.abspath(getcwd())
         for root, dirs, files in walk(base_dir):
             for name in dirs:
@@ -74,6 +183,7 @@ class CANNode:
     
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
+        self.can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         self.can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
         self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
@@ -90,24 +200,54 @@ class CANNode:
         return iface, mreq
 
     def start_session(self, _ip: IPv4Address, _port: int) -> None:
-        self.can_ip = _ip
-        self.can_port = _port
-        self.iface, self.mreq = self.__create_group_info(self.can_ip)
-        self.__init_socket(self.can_port, self.mreq, self.iface)
+        self.__can_ip = _ip
+        self.__can_port = _port
+        self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
+        self.__init_socket(self.__can_port, self.__mreq, self.__iface)
+        can_data = SimpleNamespace(
+            callback = self.read(),
+            outgoing_message = None
+            )
+        with self.sel_lock:
+            self.sel.register(self.can_sock, EVENT_READ, can_data)
+        self.session_status = self.SessionStatus.Active
 
-    def __unpack(self, buffer) -> CANFrame:
-        return CANFrame(struct.unpack("IIIIHB????Bs8bB?x", buffer))
+    def read(self, size: int) -> bytes:
+        return self.can_sock.recv(size)
 
-    def read(self) -> CANFrame:
-        return self.__unpack(self.can_sock.recv(36))
+    def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
+        message = WCANBlock(
+            self.sequence_number,
+            False,
+            False,
+            WCANFrame(can_frame)
+            )
+        self.sequence_number += 1
+        return message
 
-    def write(self, message: bytes) -> None:
-        self.can_sock.sendto(message, (str(self.can_ip), self.can_port))
+    def packCANFD(self, can_frame: CANFD_message_t) -> WCANBlock:
+        message = WCANBlock(
+            self.sequence_number,
+            False,
+            True,
+            WCANFrame(can_frame)
+            )
+        self.sequence_number += 1
+        return message
+
+    def write(self, message: bytes) -> int:
+        return self.can_sock.sendto(
+            message,
+            (str(self.__can_ip), self.__can_port)
+            )
 
     def stop_session(self) -> None:
-        self.can_ip = IPv4Address
-        self.can_port = 0
+        self.__can_ip = IPv4Address
+        self.__can_port = 0
         logging.info("Shutting down CAN socket.")
-        self.can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.mreq)
+        with self.sel_lock:
+            self.sel.unregister(self.can_sock)
+        self.can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
         self.can_sock.shutdown(SHUT_RDWR)
         self.can_sock.close()
+        self.session_status = self.SessionStatus.Inactive
