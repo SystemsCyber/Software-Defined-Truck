@@ -1,7 +1,8 @@
 import atexit
 import logging
 from NetworkStats import NetworkStats
-from SensorNode import SensorNode
+from CANNode import WCANBlock
+from SensorNode import SensorNode, WSenseBlock
 from HTTPClient import HTTPClient
 from typing import List
 from types import SimpleNamespace
@@ -11,16 +12,42 @@ from socket import *
 from selectors import *
 from threading import Thread
 from TypeWriter import TypeWriter as tw
-from Frame import CAN_UDP_Frame
-from ipaddress import IPv4Address
+from ctypes import *
+
+
+class WCOMMFrame(Union):
+    _fields_ = [
+        ("can", WCANBlock),
+        ("signals", WSenseBlock)
+    ]
+
+class COMMBlock(Structure):
+    _fields_ = [
+        ("id", c_uint32),
+        ("frame_number", c_uint32),
+        ("timestamp", c_uint32),
+        ("type", c_uint8),
+        ("frame", WCOMMFrame)
+    ]
+
+    def __repr__(self) -> str:
+        s =  (
+            f'Device: {self.id} Frame Number: {self.frame_number}\n'
+            f'Timestamp: {self.timestamp} Type: {self.type}\n'
+        )
+        if self.type == 1:
+            s += f'Frame:\n{self.frame.can}\n'
+        elif self.type == 2:
+            s += f'Frame:\n{self.frame.signals}\n'
+        return s
 
 class Controller(SensorNode, HTTPClient):
     def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:
         SensorNode.__init__(_max_retrans)
         HTTPClient.__init__(_server_ip)
         atexit.register(self.shutdown)
-        self.last_print_time = time()
-        self.devices = {}
+        self.id = None
+        self.members = None
         self.l_thread = Thread(target=self.__listen, args=(0,))
         self.l_thread.setDaemon(True)
         self.listen = True
@@ -90,8 +117,6 @@ class Controller(SensorNode, HTTPClient):
     def __provision_devices(self):
         requested = self.__request_available_devices()
         if requested:
-            for i in requested:
-                self.devices[str(i)] = NetworkStats(i)
             data = SimpleNamespace(
                     callback = self.receive_SSE,
                     outgoing_message = None
@@ -106,6 +131,9 @@ class Controller(SensorNode, HTTPClient):
 
     def do_POST(self):
         super().do_POST()
+        self.id = self.request_data["ID"]
+        self.members = self.request_data["MEMBERS"]
+        self.network_stats = NetworkStats(self.id, self.members)
         tw.write((
             "Received session setup information "
             "from the server."
@@ -130,8 +158,9 @@ class Controller(SensorNode, HTTPClient):
     def do_DELETE(self):
         tw.write("Stopping session.", tw.red)
         self.listen = False
-        self.devices = {}
-        return super().do_POST()
+        self.id = None
+        self.members = list
+        return super().do_DELETE()
 
     def write(self, key) -> None:
         if isinstance(key, SelectorKey):
@@ -153,35 +182,31 @@ class Controller(SensorNode, HTTPClient):
                 logging.error("Socket is currently blocked and cannot send messages.")
         else:
             with self.sel_lock:
-                self.key.data.callback = self.write
-                self.key.data.outgoing_message = key
-                self.sel.modify(self.key.fileobj, EVENT_WRITE, self.key.data)
-
-    def __print_stats(self, current_time: float):
-        if current_time - self.last_print_time > 1:
-            self.last_print_time = current_time
-            for device in self.devices.values():
-                print(device)
-
-    def __process_can_frame(self, can_frame: CAN_UDP_Frame, verbose = False) -> None:
-        current_time = time()
-        id = str(can_frame.device_id)
-        if id in self.devices.keys():
-            self.devices[id].last_can_message_time = current_time
-            self.devices[id].calculate_stats(can_frame, self.last_frame, self.last_transmission_time)
-            if verbose: self.__print_stats(current_time)
-        else:
-            logging.error("Received a CAN frame from an out-of-band device.")
+                key = self.sel.get_key(self.can_sock)
+                key.data.callback = self.write
+                key.data.outgoing_message = key
+                self.sel.modify(key.fileobj, EVENT_WRITE, key.data)
 
     def read(self, key: SelectorKey) -> None:
         try:
-            data = super().read()
+            data = COMMBlock.from_buffer_copy(super().read(len(COMMBlock)))
         except timeout:
             logging.warning(f'Socket timed out.')
         except OSError as oe:
             logging.error(oe)
         else:
-            self.__process_can_frame(data)
+            if data.id in self.members:
+                if data.type == 1:
+                    self.network_stats.update(
+                        data.id,
+                        len(COMMBlock),
+                        data.timestamp,
+                        data.sequence_number
+                        )
+                elif data.type == 4:
+                    pass
+            else:
+                logging.error("Received data from an out of band device.")
 
     def shutdown(self, notify_server = True):
         self.do_DELETE()
