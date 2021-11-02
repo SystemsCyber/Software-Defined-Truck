@@ -53,8 +53,9 @@ CANNode -- CANNode: multicast UDP overlay
     class WSenseBlock{
         type = 2
         uint8_t num_signals
-        float* signals
+        float signals[19]
     }
+    note right of WSenseBlock: capped signals to a max size of 19 because it makes\nit much easier to work with for the time being. I\nknow that eventually we probably want it to be\nunrestricted. 19 was chosen because then the size\nof WSenseBlock = the size of WCANBlock.
     COMMBLOCK <|- WSenseBlock
 
     class WCANFrame{
