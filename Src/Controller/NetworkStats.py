@@ -1,53 +1,50 @@
 from time import time
 from typing import NamedTuple
 
+class HealthBasics(NamedTuple):
+    count = 0
+    last_message_time = time()
+
+class HealthCore(NamedTuple):
+    min = float('inf')
+    max = -float('inf')
+    mean = 0.0
+    variance = 0.0
+    M2 = 0.0
+
+class NodeReport(NamedTuple):
+    packetLoss = 0.0
+    latency = HealthCore()
+    jitter = HealthCore()
+    throughput = HealthCore()
 
 class NetworkStats:
-
-    def __init__(self, _id: int) -> None:
+    def __init__(self, _id: int, _members: list) -> None:
         self.id = _id
-        self.latency = 0.0
-        self.msg_count = 0
-        self.last_frame_number = 0
-        self.last_seq_number = 0
-        self.dropped_can_frames = 0
-        self.dropped_carla_frames = 0
-        self.last_can_message_time = time()
+        self.members = _members
+        self.basics = [HealthBasics()] * len(_members)
+        self.health_report = [NodeReport()] * len(_members)
 
-    def calculate_stats(self, can_frame: NamedTuple, last_frame: int, sent_time: float) -> None:
-        self.msg_count += 1
-        self.last_frame_number = max(self.last_frame_number, can_frame.control_frame_ref)
-        self.latency = self.__calc_latency(sent_time, self.msg_count, self.latency)
-        self.dropped_can_frames = self.__check_can_frame(can_frame, self.last_seq_number)
-        self.dropped_carla_frames = self.__check_carla_frame(can_frame, last_frame)
-        if can_frame.sequence_number == 4294967296:
-            self.last_seq_number = -1
-        else:
-            self.last_seq_number = can_frame.sequence_number
+    def update(self, id: int, packetSize: int, timestamp: int, sequence_number: int):
+        for i in range(len(self.members)):
+            if self.members[i] == id:
+                node = self.health_report[i]
+                basics = self.basics[i]
+                now = time()
+                basics.count += 1
+                self.calculate(node.latency, basics.count, now - timestamp)
+                self.calculate(node.jitter, basics.count, node.latency.variance)
+                node.packetLoss = ((sequence_number - basics.count) / sequence_number) * 100
+                ellapsedSeconds = (now - basics.last_message_time) / 1000
+                self.calculate(node.throughput, basics.count, (packetSize * 8) / ellapsedSeconds)
+                basics.last_message_time = now
 
-    def __calc_latency(self, sent_time: float, msg_count: int, avg_rtt: float) -> float:
-        # From: https://stackoverflow.com/questions/22999487/update-the-average-of-a-continuous-sequence-of-numbers-in-constant-time
-        new_rtt = self.last_can_message_time - sent_time
-        return avg_rtt + ((new_rtt - avg_rtt) / msg_count)
-
-    def __check_can_frame(self, can_frame: NamedTuple, last_seq_number: int) -> int:
-        sequence_difference = can_frame.sequence_number - last_seq_number
-        if sequence_difference > 1:
-            return sequence_difference
-        else:
-            return 0
-
-    def __check_carla_frame(self, can_frame: NamedTuple, last_frame: int) -> int:
-        frame_difference = last_frame - can_frame.control_frame_ref
-        if frame_difference > 1:
-            return frame_difference
-        else:
-            return 0
-
-    def __repr__(self):
-        return (
-            f'[{self.id}]:\n'
-            f'\tLatency: {self.latency:>5.2f}ms\n'
-            f'\tDropped Carla Frames: {self.dropped_carla_frames}\n'
-            f'\tDropped CAN Frames: {self.dropped_can_frames}\n'
-        )
+    def calculate(edge: HealthCore, count: int, n: float):
+        # From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+        edge.min = min(edge.min, n)
+        edge.max = max(edge.max, n)
+        delta = n - edge.mean
+        edge.mean += delta / count
+        delta2 = n - edge.mean
+        edge.M2 += delta * delta2
+        edge.variance = edge.M2 / count
