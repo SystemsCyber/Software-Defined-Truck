@@ -18,17 +18,18 @@ private:
 public:
     struct HealthBasics
     {
-        uint32_t count;
         uint32_t lastMessageTime = millis();
+        uint32_t lastSequenceNumber = 0;
+        float M2 = 0.0;
     };
 
     struct HealthCore
     {
+        uint32_t count = 0;
         float min = std::numeric_limits<float>::max();
         float max = -std::numeric_limits<float>::max();
         float mean = 0.0;
         float variance = 0.0;
-        float M2 = 0.0;
     };
 
     struct NodeReport
@@ -47,6 +48,7 @@ public:
     ~NetworkStats();
     void update(uint16_t _id, int packetSize, uint32_t timestamp, uint32_t sequenceNumber);
     void reset();
+    // TODO: Reset every health report keep last seen sequence number
 
 private:
     void calculate(struct HealthCore &edge, uint32_t &count, float n);
