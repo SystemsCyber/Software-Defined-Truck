@@ -183,13 +183,13 @@ class CANNode:
     
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
-        self.can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        self.can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
-        self.can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
-        self.can_sock.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
-        self.can_sock.setblocking(False)
-        self.can_sock.bind(('', can_port))
+        self.__can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        self.__can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
+        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
+        self.__can_sock.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
+        self.__can_sock.setblocking(False)
+        self.__can_sock.bind(('', can_port))
     
     def __create_group_info(self, ip: IPv4Address) -> bytes:
         device_address = gethostbyname_ex(gethostname())[2][3]
@@ -206,14 +206,15 @@ class CANNode:
         self.__init_socket(self.__can_port, self.__mreq, self.__iface)
         can_data = SimpleNamespace(
             callback = self.read(),
-            outgoing_message = None
+            outgoing_message = None,
+            timeout = None
             )
         with self.sel_lock:
-            self.sel.register(self.can_sock, EVENT_READ, can_data)
+            self.can_key = self.sel.register(self.__can_sock, EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self, size: int) -> bytes:
-        return self.can_sock.recv(size)
+        return self.__can_sock.recv(size)
 
     def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
         message = WCANBlock(
@@ -236,7 +237,7 @@ class CANNode:
         return message
 
     def write(self, message: bytes) -> int:
-        return self.can_sock.sendto(
+        return self.__can_sock.sendto(
             message,
             (str(self.__can_ip), self.__can_port)
             )
@@ -246,8 +247,8 @@ class CANNode:
         self.__can_port = 0
         logging.info("Shutting down CAN socket.")
         with self.sel_lock:
-            self.sel.unregister(self.can_sock)
-        self.can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
-        self.can_sock.shutdown(SHUT_RDWR)
-        self.can_sock.close()
+            self.sel.unregister(self.__can_sock)
+        self.__can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
+        self.__can_sock.shutdown(SHUT_RDWR)
+        self.__can_sock.close()
         self.session_status = self.SessionStatus.Inactive

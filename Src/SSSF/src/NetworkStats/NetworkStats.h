@@ -20,7 +20,6 @@ public:
     {
         uint32_t lastMessageTime = millis();
         uint32_t lastSequenceNumber = 0;
-        float M2 = 0.0;
     };
 
     struct HealthCore
@@ -30,6 +29,7 @@ public:
         float max = -std::numeric_limits<float>::max();
         float mean = 0.0;
         float variance = 0.0;
+        float sumOfSquaredDifferences = 0.0;
     };
 
     struct NodeReport
@@ -37,7 +37,7 @@ public:
         float packetLoss;
         struct HealthCore latency;
         struct HealthCore jitter;
-        struct HealthCore throughput;
+        struct HealthCore goodput;
     };
 
     size_t size = 0;
@@ -51,7 +51,7 @@ public:
     // TODO: Reset every health report keep last seen sequence number
 
 private:
-    void calculate(struct HealthCore &edge, uint32_t &count, float n);
+    void calculate(struct HealthCore &edge, float n);
 };
 
 #endif /* network_stats_h_ */

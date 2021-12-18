@@ -4,7 +4,7 @@ from NetworkStats import NetworkStats
 from CANNode import WCANBlock
 from SensorNode import SensorNode, WSenseBlock
 from HTTPClient import HTTPClient
-from typing import List
+from typing import List, NamedTuple
 from types import SimpleNamespace
 from time import time, sleep
 from pprint import pprint
@@ -13,6 +13,7 @@ from selectors import *
 from threading import Thread
 from TypeWriter import TypeWriter as tw
 from ctypes import *
+from pandas import DataFrame
 
 
 class WCOMMFrame(Union):
@@ -42,13 +43,19 @@ class COMMBlock(Structure):
         return s
 
 class Controller(SensorNode, HTTPClient):
-    def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:
-        SensorNode.__init__(_max_retrans)
+    def __init__(self, _max_retrans = 3, _max_frame_rate = 60, _server_ip = gethostname()) -> None:
+        SensorNode.__init__()
         HTTPClient.__init__(_server_ip)
         atexit.register(self.shutdown)
         self.id = None
-        self.members = None
-        self.l_thread = Thread(target=self.__listen, args=(0,))
+        self.members = {}
+        self.max_retransmissions = _max_retrans
+        self.attempts = 0
+        self.max_frame_rate = _max_frame_rate
+        self.timeout = (1/self.max_frame_rate) * (_max_retrans)
+        self.read_length = len(COMMBlock)
+        self.frame_number = 1
+        self.l_thread = Thread(target=self.__listen, args=(self.timeout,))
         self.l_thread.setDaemon(True)
         self.listen = True
 
@@ -60,7 +67,7 @@ class Controller(SensorNode, HTTPClient):
                     for key, mask in connection_events:
                         callback = key.data.callback
                         callback(key)
-                    # self.__check_connection()
+                self.__check_connections()
             except TimeoutError:
                 continue
             except KeyboardInterrupt:
@@ -129,11 +136,20 @@ class Controller(SensorNode, HTTPClient):
         if self.connect() and self.register():
             self.__provision_devices()
 
-    def do_POST(self):
+    def do_POST(self):  # Equivalent of start
         super().do_POST()
         self.id = self.request_data["ID"]
-        self.members = self.request_data["MEMBERS"]
-        self.network_stats = NetworkStats(self.id, self.members)
+        for i in self.request_data["MEMBERS"]:
+            self.members[int(i)] = SimpleNamespace(
+                last_received_frame = 0,
+                health_report = None
+            )
+        l = len(self.members)
+        k = self.members.keys()
+        self.network_stats = NetworkStats(self.id, k)
+        self.health_report = {
+            
+        }
         tw.write((
             "Received session setup information "
             "from the server."
@@ -155,74 +171,84 @@ class Controller(SensorNode, HTTPClient):
             # except KeyboardInterrupt:
             #     pass
 
-    def do_DELETE(self):
+    def do_DELETE(self):  # Equivalent of stop
         tw.write("Stopping session.", tw.red)
         self.listen = False
         self.id = None
-        self.members = list
+        self.members = {}
         return super().do_DELETE()
 
     def write(self, key) -> None:
         if isinstance(key, SelectorKey):
             try:
                 super().write(key.data.outgoing_message)
-                current_time = time()
-                # timepassed = current_time - self.last_frame_sent_time
-                # new_rate = 1 / timepassed
-                # new_rate -= self.avg_sending_rate
-                # self.avg_sending_rate += ((new_rate) / self.frame.last_frame)
-                # self.retrans_timeout = 1 / (self.max_retrans * self.avg_sending_rate)
-                self.last_transmission_time = current_time
+                key.data.timeout = time() + self.timeout
                 key.data.callback = self.read
-                key.data.outgoing_message = None
                 self.sel.modify(key.fileobj, EVENT_READ, key.data)
             except InterruptedError:
                 logging.error("Message was interrupted while sending.")
             except BlockingIOError:
                 logging.error("Socket is currently blocked and cannot send messages.")
         else:
+            self.can_key.data.callback = self.write
+            self.can_key.data.outgoing_message = key
+            self.attempts = 0
+            self.frame_number += 1
             with self.sel_lock:
-                key = self.sel.get_key(self.can_sock)
-                key.data.callback = self.write
-                key.data.outgoing_message = key
-                self.sel.modify(key.fileobj, EVENT_WRITE, key.data)
+                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+
+    def __process_message(self, msg: COMMBlock, msg_size: int) -> None:
+        device = self.members[msg.id]
+        device.last_received_frame = msg.frame_number
+        if msg.type == 1:
+            self.network_stats.update(msg, msg_size)
+        elif msg.type == 4:
+            pass
+            # for row in self.health_report.columns()
 
     def read(self, key: SelectorKey) -> None:
         try:
-            data = COMMBlock.from_buffer_copy(super().read(len(COMMBlock)))
+            # TODO: Read length for health messages will be longer than current COMMBlock size.
+            buffer = super().read(self.read_length)
+            self.__process_message(COMMBlock.from_buffer_copy(buffer), len(buffer))
         except timeout:
             logging.warning(f'Socket timed out.')
         except OSError as oe:
             logging.error(oe)
-        else:
-            if data.id in self.members:
-                if data.type == 1:
-                    self.network_stats.update(
-                        data.id,
-                        len(COMMBlock),
-                        data.timestamp,
-                        data.sequence_number
-                        )
-                elif data.type == 4:
-                    pass
-            else:
-                logging.error("Received data from an out of band device.")
-
+        except (AttributeError, ValueError) as ae:
+            logging.error("Received data from an out of band device.")
+            logging.error(ae)
+            
     def shutdown(self, notify_server = True):
         self.do_DELETE()
         super().shutdown(notify_server)
         self.l_thread.join(1)
+
+    def __retransmit(self, id: int):
+        if self.attempts < self.max_retransmissions:
+            self.attempts += 1
+            with self.sel_lock:
+                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+        elif self.attempts == self.max_retransmissions:
+            logging.error(
+                f"Have not received frame #{self.frame_number} "
+                f"from device {id} after "
+                f"{self.max_retransmissions} attempts."
+                )
+            self.attempts += 1
     
-    # def __check_connection(self):
-    #     for device in self.devices:
-    #         if device.last_frame_number < self.frame.last_frame:
-    #             self.__retransmit_if_needed()
-    #         if time() - device.last_can_message_time() > 1:
-    #             logging.warning(f'[{device.id}] hasnt sent can messages in at least 1 second!')
-            
-    # def __retransmit_if_needed(self):
-    #     if (time() - self.last_frame_sent_time) > self.retrans_timeout:
-    #         self.send_control_frame(self.last_control_frame)
+    def __check_connections(self):
+        now = time()
+        for k,v in self.members.items():
+            not_recv_frame = v.last_received_frame != self.frame_number
+            timedout = now >= v.timeout
+            if not_recv_frame and timedout:
+                self.__retransmit(k)
+                break
+    
+    def __update_health_view(self):
+        pass
+
 
 
 if __name__ == '__main__':

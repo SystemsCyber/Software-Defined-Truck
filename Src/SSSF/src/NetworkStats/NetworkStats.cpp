@@ -17,22 +17,17 @@ NetworkStats::~NetworkStats()
 
 void NetworkStats::update(uint16_t _id, int packetSize, uint32_t timestamp, uint32_t sequenceNumber)
 {
-    for (size_t i = 0; i < size; i++)
-    {
-        if (members[i] == _id)
-        {
-            struct NodeReport &node = HealthReport[i];
-            struct HealthBasics &basics = Basics[i];
-            float now = float(millis());
-            basics.count++;
-            calculate(node.latency, basics.count, now - timestamp);
-            calculate(node.jitter, basics.count, node.latency.variance);
-            node.packetLoss = ((sequenceNumber - basics.count) / sequenceNumber) * 100;
-            float ellapsedSeconds = (now - basics.lastMessageTime) / 1000;
-            calculate(node.throughput, basics.count, (packetSize * 8) / ellapsedSeconds);
-            basics.lastMessageTime = now;
-        }
-    }
+    float now = float(millis());
+    uint32_t seqNumOffset = sequenceNumber - Basics[_id].lastSequenceNumber;
+    float ellapsedSeconds = (now - Basics[_id].lastMessageTime) / 1000;
+
+    calculate(HealthReport[_id].latency, now - timestamp);
+    calculate(HealthReport[_id].jitter, HealthReport[_id].latency.variance);
+    HealthReport[_id].packetLoss = seqNumOffset - HealthReport[_id].latency.count;
+    calculate(HealthReport[_id].goodput, (packetSize * 8) / ellapsedSeconds);
+    
+    Basics[_id].lastMessageTime = now;
+    Basics[_id].lastSequenceNumber = sequenceNumber;
 }
 
 void NetworkStats::reset()
@@ -45,13 +40,14 @@ void NetworkStats::reset()
     }
 }
 
-void NetworkStats::calculate(struct HealthCore &edge, uint32_t &count, float n)
+void NetworkStats::calculate(struct HealthCore &edge, float n)
 {// From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
     edge.min = min(edge.min, n);
     edge.max = max(edge.max, n);
+    edge.count++;
     delta = n - edge.mean;
-    edge.mean += delta / count;
+    edge.mean += delta / edge.count;
     delta2 = n - edge.mean;
-    edge.M2 += delta * delta2;
-    edge.variance = edge.M2 / count;
+    edge.sumOfSquaredDifferences += delta * delta2;
+    edge.variance = edge.sumOfSquaredDifferences / edge.count;
 }

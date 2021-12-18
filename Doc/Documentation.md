@@ -18,14 +18,12 @@ title <u> System Components</u>
 class "Smart Sensor Simulator 3" as SSSF
 class Controller
 class HTTPClient
-note right of HTTPClient: I'm not sure if we want to include\nthis but this is the module both of\nthem use to communicate with the\nserver.
 class CANNode{
     OverlayIP: some local multicast IP
 }
 class SensorNode{
     OverlayIP: some local multicast IP
 }
-note right of SensorNode: I tried to separate sensorNode from\nthe CANNode (Like in the original\ndiagram) but the code became\nredundent since the Sensor Node/Layer\n relies on the CANNode to provide the\nbasic functionality.
 CANNode <|-d- SensorNode
 CANNode <|-d- HTTPClient
 HTTPClient <|-d- Controller
@@ -47,15 +45,12 @@ CANNode -- CANNode: multicast UDP overlay
         uint32_t timestamp
         {abstract} # uint8_t type
     }
-    note right of COMMBLOCK: The id is the device id of the \nsender not the receiver.
-    note right of COMMBLOCK: I moved the timestamp into the\nCOMMBLOCK so that SSSFs can\nmeasure the network performance\n of the controller. 
 
     class WSenseBlock{
         type = 2
         uint8_t num_signals
         float signals[19]
     }
-    note right of WSenseBlock: capped signals to a max size of 19 because it makes\nit much easier to work with for the time being. I\nknow that eventually we probably want it to be\nunrestricted. 19 was chosen because then the size\nof WSenseBlock = the size of WCANBlock.
     COMMBLOCK <|- WSenseBlock
 
     class WCANFrame{
@@ -70,7 +65,6 @@ CANNode -- CANNode: multicast UDP overlay
     class WCANBlock{
         type = 1
         uin32_t sequence_number
-        uint32_t timestamp 
         uint8_t buffer_size
         bool need_response
     }
@@ -83,22 +77,27 @@ CANNode -- CANNode: multicast UDP overlay
 ```plantuml
 @startuml
     title <u>Health Monitoring Data Structures</u>
-    class HealthCore{
-        uint32_t count
-        float min
-        float max
-        float avg
-        float variance
-        float m2
+    class HealthBasics {
+        uint32_t lastMessageTime
+        uint32_t lastSequenceNumber
     }
-    note right of HealthCore: added count and m2 because they\nare necessary for the welford algorithm.\nIf necessary we can remove them before\nsending the data structure.
+    note right of HealthBasics: The difference between HealthBasics and HealthCore,\nis that HealthBasics contains "per-node"\ninformation, where as HealthCore contains\n"per-node-per-statistic" information.
+    class HealthCore{
+        -uint32_t count
+        +float min
+        +float max
+        +float avg
+        +float variance
+        -float sumOfSquaredDifferences
+    }
+    note right of HealthCore: How would we actually implement count and\nsumOfSquaredDifferences in a private way?
+
     class NodeReport{
         latency: HealthCore
         jitter: HealthCore
         packetLoss: float
-        dataRate: HealthCore
+        goodput: HealthCore
     }
-    note right of NodeReport: Added jitter and changed dropCount to packetLoss.\nI also changed packetLoss to a float since\ncalculating min, max, mean, etc. on a sort of\nstatic number didnt make sense. I changed\nPacketLoss to be a percent since thats what I\noften see in other applications but I can change it\nback if you want. Also should we call dataRate\n"goodput" as it seems to more accurately describe\nwhat were measuring.
     class HealthReport
     HealthReport *--"1..n" NodeReport
 @enduml
