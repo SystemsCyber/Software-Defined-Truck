@@ -21,7 +21,7 @@ private:
     uint16_t canPort;
 
 protected:
-    uint8_t mac[6];  //MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
+    uint8_t mac[6];  // Hostname is "WIZnet" + last three bytes of the MAC.
     uint32_t sequenceNumber = 1;
     volatile boolean sessionStatus;
 

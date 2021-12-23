@@ -66,6 +66,8 @@ bool CANNode::startSession(String _ip, uint16_t _port)
 {
     DNSClient dns;
     IPAddress ipConverted;
+    /* Manually converts IP address here because the ethernet
+       class will try to convert it before every message */
     if (!dns.inet_aton(_ip.c_str(), ipConverted))
     {
         Log.errorln("Failed to parse multicast IP address.");
@@ -87,7 +89,7 @@ int CANNode::read(uint8_t *buffer, size_t size)
 
 int CANNode::read(struct WCANBlock *buffer)
 {
-    return read(reinterpret_cast<unsigned char*>(buffer), sizeof(struct WCANBlock));
+    return read(reinterpret_cast<unsigned char*>(buffer), sizeof(WCANBlock));
 }
 
 int CANNode::beginPacket()
@@ -108,7 +110,7 @@ int CANNode::write(const uint8_t *buffer, size_t size)
 
 int CANNode::write(struct WCANBlock *canFrame)
 {
-    return write(reinterpret_cast<uint8_t*>(canFrame), sizeof(struct WCANBlock));
+    return write(reinterpret_cast<uint8_t*>(canFrame), sizeof(WCANBlock));
 }
 
 int CANNode::endPacket(bool incrementSequenceNumber)
