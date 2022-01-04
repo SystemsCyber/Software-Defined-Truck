@@ -144,12 +144,11 @@ class CANNode:
         self.sel = DefaultSelector()
         self.sel_lock = Lock()
 
-        self.id = 0
         self.mac = gma()
         self.sequence_number = 1
         self.session_status = self.SessionStatus.Inactive
 
-        self.mac = "00:0C:29:DE:AD:BE"
+        self.mac = "00:0C:29:DE:AD:BE"  # For testing purposes
         logging.debug(f"The testing MAC address is: {self.mac}")
 
     def __findpath(self, log_name):
@@ -204,17 +203,16 @@ class CANNode:
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
         self.__init_socket(self.__can_port, self.__mreq, self.__iface)
-        can_data = SimpleNamespace(
-            callback = self.read(),
-            outgoing_message = None,
-            timeout = None
-            )
+        can_data = SimpleNamespace(callback = self.read(), message = None)
         with self.sel_lock:
             self.can_key = self.sel.register(self.__can_sock, EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self, size: int) -> bytes:
-        return self.__can_sock.recv(size)
+        try:
+            return self.__can_sock.recv(size)
+        except OSError as oe:
+            logging.error(oe)
 
     def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
         message = WCANBlock(
@@ -237,10 +235,13 @@ class CANNode:
         return message
 
     def write(self, message: bytes) -> int:
-        return self.__can_sock.sendto(
-            message,
-            (str(self.__can_ip), self.__can_port)
-            )
+        try:
+            return self.__can_sock.sendto(
+                message,
+                (str(self.__can_ip), self.__can_port)
+                )
+        except OSError as oe:
+            logging.error(oe)
 
     def stop_session(self) -> None:
         self.__can_ip = IPv4Address

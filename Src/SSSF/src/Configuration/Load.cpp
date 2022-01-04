@@ -6,8 +6,7 @@
 #include <array>
 
 Load::Load():
-    exConfigWithIP(512),
-    exConfigWithFQDN(512),
+    exConfig(512),
     exECU1(256),
     exECU2(256),
     config(1024)                   
@@ -28,15 +27,9 @@ Load::Load():
     ecuType2.add("ECM");
     ecuType2.add("Engine Control Module");
 
-    exConfigWithIP["serverAddress"] = "123.456.789.101";
-    JsonArray ecus1 = exConfigWithIP.createNestedArray("ECUs");
+    JsonArray ecus1 = exConfig.createNestedArray("attachedDevices");
     ecus1.add(exECU1);
     ecus1.add(exECU2);
-
-    exConfigWithFQDN["serverAddress"] = "aHostName";
-    JsonArray ecus2 = exConfigWithFQDN.createNestedArray("ECUs");
-    ecus2.add(exECU1);
-    ecus2.add(exECU2);
 };
 
 void Load::init()

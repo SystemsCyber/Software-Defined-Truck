@@ -16,7 +16,7 @@ void setup() {
         }
     }
     config.init();
-    sssf = new SSSF(config.config["attachedDevice"], 250000);
+    sssf = new SSSF(config.config["attachedDevices"], 250000);
     sssf->setup();
 }
 

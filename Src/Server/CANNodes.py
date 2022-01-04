@@ -28,7 +28,7 @@ class CANNodes:
         self._key = key
         self.__log_info("Requested available devices.")
         if Node.is_client(key):
-            devices = json.dumps(Node.get_available_ECUs(self.sel))
+            devices = json.dumps(Node.get_available_devices(self.sel))
             wfile.write(bytes(devices, "UTF-8"))
             return HTTPStatus.FOUND
         else:
@@ -75,7 +75,7 @@ class CANNodes:
     def __register(self, data: Node) -> HTTPStatus:
         self._key.data.MAC = data["MAC"]
         self._key.data.type = "SSS3"
-        self._key.data.ECUs = data["ECUs"]
+        self._key.data.devices = data["attachedDevices"]
         registration_check = self.__check_registration()
         if registration_check == HTTPStatus.ACCEPTED:
             self.__log_registration()
@@ -117,8 +117,8 @@ class CANNodes:
         msg = f'Successfully registered!\n'
         msg += f'\tType: {self._key.data.type}\n'
         msg += f'\tMAC: {self._key.data.MAC}\n'
-        msg += "\tECUs: \n"
-        for i in self._key.data.ECUs:
+        msg += "\tdevices: \n"
+        for i in self._key.data.devices:
             msg += f'\t\tType: {i["type"]}\n'
             msg += f'\t\tYear: {i["year"]}\n'
             msg += f'\t\tMake: {i["make"]}\n'

@@ -8,31 +8,31 @@
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/0"
             },
-            "ECUs": {
-                "$ref": "ECUCollection.json/#/examples/0"
+            "attachedDevices": {
+                "$ref": "DeviceCollection.json/#/examples/0"
             }
         },
         {
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/1"
             },
-            "ECUs": {
-                "$ref": "ECUCollection.json/#/examples/1"
+            "attachedDevices": {
+                "$ref": "DeviceCollection.json/#/examples/1"
             }
         }
     ],
     "required": [
         "MAC",
-        "ECUs"
+        "attachedDevices"
     ],
     "properties": {
         "MAC": {
             "$ref": "SSS3MAC.json"
         },
-        "ECUs": {
-            "title": "Attached ECUs",
-            "description": "The ECU(s) attached to the registering SSS3.",
-            "$ref": "ECUCollection.json"
+        "attachedDevices": {
+            "title": "Attached Devices",
+            "description": "The Device(s) attached to the registering SSS3.",
+            "$ref": "DeviceCollection.json"
         }
     }
 }

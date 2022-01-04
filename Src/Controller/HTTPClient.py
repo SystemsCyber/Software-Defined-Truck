@@ -36,7 +36,6 @@ class Schema:
 class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def __init__(self, _server_ip = gethostname()) -> None:
         self.__server_ip = _server_ip
-        self.__server_port = 80
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
         self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
@@ -183,17 +182,17 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         
     def do_POST(self):
         try:
-            self.request_data = json.load(self.rfile)
-            self.session_schema.validate(self.request_data)
-            self.start_session(
-                IPv4Address(self.request_data["IP"]),
-                self.request_data["PORT"]
-                )
+            request_data = json.load(self.rfile)
+            self.session_schema.validate(request_data)
+            ip = IPv4Address(request_data["IP"])
+            port = request_data["PORT"]
+            return ip, port, request_data
         except (ValidationError,
                 JSONDecodeError,
                 AddressValueError) as ve:
             logging.error(ve)
             self.close_connection = True
+            return None
 
     def __send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
@@ -210,7 +209,6 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     
     def do_DELETE(self):
         self.__send_delete("/client/session")
-        self.stop_session()
 
     def shutdown(self, notify_server = True):
         logging.debug("Shutting down server connection.")

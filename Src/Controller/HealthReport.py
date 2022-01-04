@@ -43,11 +43,10 @@ class NodeReport(NamedTuple):
 
 
 class NetworkStats:
-    def __init__(self, _id: int, _members: list) -> None:
+    def __init__(self, _id: int, _num_members: int) -> None:
         self.id = _id
-        self.members = _members
-        self.basics = [HealthBasics()] * len(_members)
-        self.health_report = [NodeReport()] * len(_members)
+        self.basics = [HealthBasics()] * len(_num_members)
+        self.health_report = [NodeReport()] * len(_num_members)
 
     def update(self, msg: COMMBlock, packet_size: int):
         index = self.members.index(msg.id)

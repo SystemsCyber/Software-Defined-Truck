@@ -1,7 +1,7 @@
 # The ArduinoHttpClient library being used has some ERRORs
 There are pull requests to fix these issues that havent been pulled yet. Not sure when they will fix them. Might want to fork it and apply fixes.
 ## Timed Read Error
-Replace with this:
+Replace the line causing the error in HttpClient where the error occurs, not in stream:
 ```c++
 int c;
 bool timedout = true;

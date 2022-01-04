@@ -12,7 +12,7 @@
 HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort):
     CANNode(),
     client(clientSock, _serverAddress, _serverPort),
-    attachedDevice(_attachedDevice),
+    attachedDevices(_attachedDevice),
     serverAddress(_serverAddress),
     serverIP(),
     serverPort(_serverPort),
@@ -26,7 +26,7 @@ HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddres
 HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort):
     CANNode(),
     client(clientSock, _serverIP, _serverPort),
-    attachedDevice(_attachedDevice),
+    attachedDevices(_attachedDevice),
     serverAddress(NULL),
     serverIP(_serverIP),
     serverPort(_serverPort),
@@ -44,14 +44,14 @@ bool HTTPClient::connect()
         if (millis() - lastAttempt > retryInterval)
         {
             connectionStatus = attemptConnection();
-        }
-        if (connectionStatus == Disconnected)
-        {
-            lastAttempt = millis();
-        }
-        else if (connectionStatus == Unreachable)
-        {
-            return false;
+            if (connectionStatus == Disconnected)
+            {
+                lastAttempt = millis();
+            }
+            else if (connectionStatus == Unreachable)
+            {
+                return false;
+            }
         }
     }
     return true;
@@ -156,13 +156,17 @@ int HTTPClient::attemptConnection(bool retry)
         Log.noticeln("Connecting to and registering with %p.", serverIP);
     }
     String body;
-    DynamicJsonDocument registration(attachedDevice);
+    DynamicJsonDocument registration(1024);
     registration["MAC"] = teensyMAC();
+    registration["attachedDevices"] = attachedDevices;
     serializeJson(registration, body);
+    Serial.println(body);
     int code = client.post("/sss3/register", "application/json", body);
+    int statusCode = client.responseStatusCode();
+    String response = client.responseBody();  //Must be called after responseStatusCode
     if (code == 0)
     {
-        return connectionSuccessful(retry);
+        return connectionSuccessful(statusCode, retry);
     }
     else
     {
@@ -170,9 +174,8 @@ int HTTPClient::attemptConnection(bool retry)
     }
 }
 
-int HTTPClient::connectionSuccessful(bool retry)
+int HTTPClient::connectionSuccessful(int statusCode, bool retry)
 {
-    int statusCode = client.responseStatusCode();
     if ((statusCode >= 200) && (statusCode < 400))
     {
         return Connected;

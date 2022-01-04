@@ -11,8 +11,7 @@ class Load
 {
 private:
     // Example Configuration Json(s)
-    DynamicJsonDocument exConfigWithIP;
-    DynamicJsonDocument exConfigWithFQDN;
+    DynamicJsonDocument exConfig;
     DynamicJsonDocument exECU1;
     DynamicJsonDocument exECU2;
 

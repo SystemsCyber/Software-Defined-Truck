@@ -18,29 +18,29 @@
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/0"
             },
-            "ECUs": {
-                "$ref": "RequestECUs.json/#/examples/0"
+            "devices": {
+                "$ref": "RequestDevices.json/#/examples/0"
             }
         },
         {
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/1"
             },
-            "ECUs": {
-                "$ref": "RequestECUs.json/#/examples/1"
+            "devices": {
+                "$ref": "RequestDevices.json/#/examples/1"
             }
         }
     ],
     "required": [
         "MAC",
-        "ECUs"
+        "devices"
     ],
     "properties": {
         "MAC": {
             "$ref": "VMMAC.json"
         },
-        "ECUs": {
-            "$ref": "RequestECUs.json"
+        "devices": {
+            "$ref": "RequestDevices.json"
         }
     }
 }

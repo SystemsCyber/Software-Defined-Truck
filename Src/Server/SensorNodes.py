@@ -169,14 +169,14 @@ class SensorNodes:
 
     def __gather_requested_devices(self, requested: Dict) -> List:
         self.__log_info("Gathering requested devices.")
-        available = Node.get_available_ECUs(self.sel)
+        available = Node.get_available_devices(self.sel)
         members = [self._key.fd]
         mapping = self.sel.get_map()
-        for ecu in requested["ECUs"]:
-            key = mapping[ecu["ID"]]
-            if ecu in available:
+        for device in requested["devices"]:
+            key = mapping[device["ID"]]
+            if device in available:
                 self.__log_info(f'{key.data.addr[0]} is available.')
-                members.append(ecu["ID"])
+                members.append(device["ID"])
             else:
                 self.__log_error(f'{key.data.addr[0]} is not available.')
                 return []

@@ -109,7 +109,7 @@ class Broker(BaseHTTPRequestHandler):
     def listen(self):
         lsock = socket(AF_INET, SOCK_STREAM)
         lsock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        device_address = gethostbyname_ex(gethostname())[2][3]
+        device_address = gethostbyname_ex(gethostname())[2][0]
         lsock.bind((device_address, 80))
         # lsock.bind(("127.0.0.1", 80))
         lsock.listen()
@@ -269,6 +269,8 @@ class Broker(BaseHTTPRequestHandler):
             self.send_response(response)
         except AttributeError as ae:
             logging.debug(f'{ae}')
+            print(self.path)
+            print(self.command)
             self.log_error("Requested a method that is not implemented.")
             self.send_error(HTTPStatus.NOT_IMPLEMENTED)
 
@@ -301,10 +303,13 @@ class Broker(BaseHTTPRequestHandler):
 
     def __shutdown_connection(self, key: SelectorKey):
         logging.info(f'{key.data.addr[0]} - - Closing connection.')
-        if getattr(key.data, "type"):
-            list_name = getattr(self, key.data.type + "s")
-            del_method = getattr(list_name, "do_DELETE_register")
-            del_method(key)
+        try:
+            if getattr(key.data, "type"):
+                list_name = getattr(self, key.data.type + "s")
+                del_method = getattr(list_name, "do_DELETE_register")
+                del_method(key)
+        except AttributeError as ae:
+            logging.error(ae)
         self.sel.unregister(key.fileobj)
         key.fileobj.shutdown(SHUT_RDWR)
         key.fileobj.close()

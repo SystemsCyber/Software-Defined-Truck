@@ -84,7 +84,7 @@ class Node:
             return Node.is_SSS3(key) and not key.data.in_use
 
     @staticmethod
-    def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
+    def get_available_devices(sel: selectors.DefaultSelector) -> List:
         available = []
         sel_map = sel.get_map()
         for fd in sel_map:
@@ -92,6 +92,6 @@ class Node:
             if Node.is_available(key):
                 available.append({
                     "ID": fd, 
-                    "ECUs": key.data.ECUs
+                    "devices": key.data.devices
                 })
         return available

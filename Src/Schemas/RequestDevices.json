@@ -1,23 +1,23 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
-    "title": "Requested ECUs",
-    "description": "The ECU(s) and their IDs being requested by the client.",
+    "title": "Requested Devices",
+    "description": "The device(s) and their IDs being requested by the client.",
     "type": "array",
     "examples": [
         {
             "ID": {
                 "$ref": "#/items/properties/examples/0"
             },
-            "ECUs": {
-                "$ref": "ECUCollection.json/#/examples/0"
+            "devices": {
+                "$ref": "DeviceCollection.json/#/examples/0"
             }
         },
         {
             "ID": {
                 "$ref": "#/items/properties/examples/1"
             },
-            "ECUs": {
-                "$ref": "ECUCollection.json/#/examples/1"
+            "devices": {
+                "$ref": "DeviceCollection.json/#/examples/1"
             }
         }
     ],
@@ -28,12 +28,12 @@
         "type":"object",
         "required": [
             "ID",
-            "ECUs"
+            "devices"
         ],
         "properties": {
             "ID": {
                 "title": "ID",
-                "description": "The ID of the ECU(s) being requested.",
+                "description": "The ID of the device(s) being requested.",
                 "type":"integer",
                 "examples": [
                     1234,
@@ -42,10 +42,10 @@
                 "minimum": 4,
                 "maximum": 65535
             },
-            "ECUs": {
-                "title": "Requested ECUs",
-                "description": "The requested ECU(s) associated with the requested ID.",
-                "$ref": "ECUCollection.json"
+            "devices": {
+                "title": "Requested Devices",
+                "description": "The requested device(s) associated with the requested ID.",
+                "$ref": "DeviceCollection.json"
             }
         }
     }

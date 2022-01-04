@@ -10,9 +10,16 @@
 #include <Dns.h>
 #include <FlexCAN_T4.h>
 
+// SSSF::SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate):
+//     SensorNode(),
+//     HTTPClient(_attachedDevice, serverAddress),
+//     timeClient(ntpSock),
+//     can0BaudRate(_can0Baudrate)
+//     {}
+
 SSSF::SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate):
     SensorNode(),
-    HTTPClient(_attachedDevice, serverAddress),
+    HTTPClient(_attachedDevice, IPAddress(192,168,1,61)),
     timeClient(ntpSock),
     can0BaudRate(_can0Baudrate)
     {}
@@ -29,9 +36,11 @@ bool SSSF::setup()
 {
     if (init() && connect())
     {
-        Log.noticeln("Setting up the Teensys Real Time Clock.");
+        Log.noticeln("Setting up the Teensy\'s Real Time Clock.");
         setupClock();
+        Log.noticeln("Setting up CAN Channel(s).");
         setupCANChannels();
+        Log.noticeln("Ready.");
         return true;
     }
     return false;
@@ -45,6 +54,9 @@ void SSSF::forwardingLoop()
     {
         struct COMMBlock msg = {0};
         struct CAN_message_t canFrame;
+        canFrame = {0};  // For testing
+        delay(100);
+        write(&canFrame);
         if (can0BaudRate && can0.read(canFrame)) write(&canFrame);
         if (can1BaudRate && can1.read(canFrame)) write(&canFrame);
         int packetSize = CANNode::read(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
@@ -116,7 +128,7 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
 void SSSF::setupClock()
 {
     timeClient.begin();
-    setSyncProvider(getExternalTime(Teensy3Clock.get()));
+    setSyncProvider((getExternalTime)Teensy3Clock.get);
     setSyncInterval(1);
 }
 
@@ -147,7 +159,7 @@ void SSSF::pollClock()
 void SSSF::pollServer()
 {
     struct Request request;
-    if(HTTPClient::read(&request))
+    if(HTTPClient::read(&request, false))
     {
         if (request.method.equalsIgnoreCase("POST"))
         {

@@ -34,7 +34,7 @@ void NetworkStats::reset()
 {
     for (size_t i = 0; i < size; i++)
     {
-        Basics[i].count = 0;
+        Basics[i].lastSequenceNumber = 0; //Not sure if this is right...
         Basics[i].lastMessageTime = millis();
         HealthReport[i] = {0};
     }
