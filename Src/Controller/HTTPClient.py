@@ -34,13 +34,13 @@ class Schema:
         return path.join(base_dir, "Schemas")
 
 class HTTPClient(CANNode, BaseHTTPRequestHandler):
-    def __init__(self, _server_ip = gethostname()) -> None:
+    def __init__(self, *, _server_ip = gethostname(), **kwargs) -> None:
         self.__server_ip = _server_ip
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
-        self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
+        self.request_schema, _ = Schema.compile_schema("RequestDevices.json")
         self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
-        super(HTTPClient, self).__init__()
+        super().__init__()
 
     # Overrides for the parent functions
 

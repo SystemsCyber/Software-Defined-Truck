@@ -16,11 +16,14 @@ from pandas import DataFrame
 
 class Controller(SensorNode, HTTPClient):
     def __init__(self, _max_retrans = 3, _max_frame_rate = 60, _server_ip = gethostname()) -> None:
-        SensorNode.__init__(_max_retrans, _max_frame_rate)
-        HTTPClient.__init__(_server_ip)
+        super().__init__(
+            _max_retrans = _max_retrans,
+            _max_frame_rate = _max_frame_rate,
+            _server_ip = _server_ip
+            )
         atexit.register(self.shutdown)
         
-        self.read_length = len(COMMBlock)
+        self.read_length = sizeof(COMMBlock)
         self.l_thread = Thread(target=self.__listen, args=(self.timeout_additive,))
         self.l_thread.setDaemon(True)
         self.listen = True

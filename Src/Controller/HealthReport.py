@@ -1,7 +1,7 @@
 from time import time
 from typing import NamedTuple
 from pandas import DataFrame
-from Controller import COMMBlock
+from SensorNode import COMMBlock
 
 
 class HealthReport:

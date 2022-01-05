@@ -109,7 +109,7 @@ class Broker(BaseHTTPRequestHandler):
     def listen(self):
         lsock = socket(AF_INET, SOCK_STREAM)
         lsock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        device_address = gethostbyname_ex(gethostname())[2][0]
+        device_address = gethostbyname_ex(gethostname())[2][1]
         lsock.bind((device_address, 80))
         # lsock.bind(("127.0.0.1", 80))
         lsock.listen()

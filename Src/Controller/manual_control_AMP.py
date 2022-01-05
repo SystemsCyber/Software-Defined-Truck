@@ -89,7 +89,7 @@ import math
 import random
 import re
 import weakref
-from SSS3 import SSS3
+from Controller import Controller
 
 try:
     import pygame
@@ -1079,7 +1079,7 @@ class CameraManager(object):
 
 
 def game_loop(args):
-    ecu = SSS3(10, args.server_host)
+    ecu = Controller()
     ecu.setup()
     pygame.init()
     pygame.font.init()

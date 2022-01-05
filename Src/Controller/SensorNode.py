@@ -1,8 +1,7 @@
 import logging
 from CANNode import CANNode, WCANBlock
 from ctypes import *
-from types import List
-from HealthReport import NetworkStats
+from typing import List
 from selectors import *
 from ipaddress import IPv4Address
 from time import time
@@ -52,10 +51,10 @@ class Member_Node():
         self.health_report = None
 
 class SensorNode(CANNode):
-    def __init__(self, _max_retrans = 3, _max_frame_rate = 60) -> None:
-        super(SensorNode, self).__init__()
+    def __init__(self, *, _max_retrans = 3, _max_frame_rate = 60, **kwargs) -> None:
+        super().__init__()
         self.id = -1
-        self.members: list[Member_Node] = [] # ID of member is index in array
+        self.members: List[Member_Node] = [] # ID of member is index in array
 
         self.max_retransmissions = _max_retrans
         self.max_retrans_notified = False
