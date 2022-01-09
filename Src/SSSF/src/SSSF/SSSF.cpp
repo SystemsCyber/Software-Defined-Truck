@@ -54,27 +54,35 @@ void SSSF::forwardingLoop()
     {
         struct COMMBlock msg = {0};
         struct CAN_message_t canFrame;
-        canFrame = {0};  // For testing
+        // For testing
+        canFrame = {0};
         delay(100);
         write(&canFrame);
+        // -----------
         if (can0BaudRate && can0.read(canFrame)) write(&canFrame);
         if (can1BaudRate && can1.read(canFrame)) write(&canFrame);
-        int packetSize = CANNode::read(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
+        int packetSize = readCOMMBlock(&msg);
         if (packetSize)
         {
+            printCOMMBlock(msg);
             if (msg.type == 1)
             {
                 //adding 28 for UDP header
-                networkHealth->update(msg.id, packetSize + 28, msg.timestamp, msg.canFrame.sequenceNumber);
+                networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.canFrame.sequenceNumber);
                 can0.write(msg.canFrame.frame.can);
                 if (can1BaudRate) can1.write(msg.canFrame.frame.can);
             }
             else if (msg.type == 2)
             {
-                networkHealth->update(msg.id, packetSize + 28, msg.timestamp, msg.frameNumber);
+                networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
             }
             else if (msg.type == 3) write(networkHealth->HealthReport);
+        }
+        if (numSignals > 0)
+        {
+            delete[] signals;
+            numSignals = 0;
         }
     }
 }
@@ -82,7 +90,7 @@ void SSSF::forwardingLoop()
 void SSSF::write(struct CAN_message_t *canFrame)
 {
     struct COMMBlock msg = {0};
-    msg.id = id;
+    msg.index = index;
     msg.frameNumber = frameNumber;
     msg.timestamp = millis();
     msg.type = 1;
@@ -97,7 +105,7 @@ void SSSF::write(struct CAN_message_t *canFrame)
 void SSSF::write(struct CANFD_message_t *canFrame)
 {
     struct COMMBlock msg = {0};
-    msg.id = id;
+    msg.index = index;
     msg.frameNumber = frameNumber;
     msg.timestamp = millis();
     msg.type = 1;
@@ -112,7 +120,7 @@ void SSSF::write(struct CANFD_message_t *canFrame)
 void SSSF::write(NetworkStats::NodeReport *healthReport)
 {
     struct COMMBlock msg = {0};
-    msg.id = id;
+    msg.index = index;
     msg.frameNumber = frameNumber;
     msg.timestamp = millis();
     msg.type = 4;
@@ -123,6 +131,39 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
     memcpy(healthReport, report + baseCOMMBlockSize, networkHealth->size);
     CANNode::write(report, baseCOMMBlockSize + networkHealth->size);
     CANNode::endPacket(false);
+}
+
+int SSSF::readCOMMBlock(struct COMMBlock *buffer)
+{
+    if (comBlockSize == 0)
+    {
+        comBlockSize = sizeof(COMMBlock);
+        comHeadSize = comBlockSize - sizeof(WCANBlock);
+    }
+    uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
+    CANNode::parsePacket();
+    int recvdHeaders = CANNode::read(buf, comHeadSize);
+    if (recvdHeaders > 0)
+    {
+        int recvdData = 0;
+        if (buffer->type == 1)
+        {
+            recvdData = CANNode::read(reinterpret_cast<WCANBlock*>(buffer + comHeadSize));
+        }
+        else if (buffer->type == 2)
+        {
+            recvdData = SensorNode::read(reinterpret_cast<WSensorBlock*>(buffer + comHeadSize));
+        }
+        else if (buffer->type == 3)
+        {
+            return recvdHeaders;
+        }
+        if (recvdData > 0)
+        {
+            return recvdHeaders + recvdData;
+        }
+    }
+    return -1;
 }
 
 void SSSF::setupClock()
@@ -159,7 +200,7 @@ void SSSF::pollClock()
 void SSSF::pollServer()
 {
     struct Request request;
-    if(HTTPClient::read(&request, false))
+    if(HTTPClient::read(&request))
     {
         if (request.method.equalsIgnoreCase("POST"))
         {
@@ -168,6 +209,7 @@ void SSSF::pollServer()
         else if (request.method.equalsIgnoreCase("DELETE"))
         {
             id = 0;
+            index = 0;
             frameNumber = 0;
             stop();
         }
@@ -182,25 +224,37 @@ void SSSF::pollServer()
 void SSSF::start(struct Request *request)
 {
     id = request->json["ID"];
-    size_t membersSize = request->json["MEMBERS"].size();
-    members = new uint16_t [membersSize];
-    for (size_t i = 0; i < membersSize; i++)
-    {
-        members[i] = request->json["MEMBERS"][i].as<uint16_t>();
-    }
+    index = request->json["Index"];
+    size_t membersSize = request->json["Devices"].size();
     frameNumber = 0;
-    networkHealth = new NetworkStats(id, members, membersSize);
+    networkHealth = new NetworkStats(index, membersSize);
     String ip = request->json["IP"];
-    if (CANNode::startSession(ip, request->json["PORT"]))
+    if (CANNode::startSession(ip, request->json["Port"]))
     {
-        Log.noticeln("\tID: %d", id);
+        Log.noticeln("\tID: %d\tIndex: %d", id, index);
     }
 }
 
 void SSSF::stop()
 {
     id = 0;
-    delete &members;
-    delete &networkHealth;
+    index = 0;
+    delete networkHealth;
     CANNode::stopSession();
+}
+
+void SSSF::printCOMMBlock(struct COMMBlock &commBlock)
+{
+    Serial.printf("Index: %d\n", commBlock.index);
+    Serial.printf("Frame Number: %d\n", commBlock.frameNumber);
+    Serial.printf("Timestamp: %d\n", commBlock.timestamp);
+    Serial.printf("Type: %d\n", commBlock.type);
+    if (commBlock.type == 1)
+    {
+        printCANBlock(commBlock.canFrame);
+    }
+    else if (commBlock.type == 2)
+    {
+        printSensorBlock(commBlock.sensorFrame);
+    }
 }

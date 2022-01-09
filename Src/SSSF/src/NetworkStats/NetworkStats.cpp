@@ -3,39 +3,37 @@
 #include <NetworkStats/NetworkStats.h>
 #include <FlexCAN_T4.h>
 
-NetworkStats::NetworkStats(uint16_t _id, uint16_t *_members, size_t _size):
-    id(_id), members(_members), size(_size),
+NetworkStats::NetworkStats(uint16_t _index, size_t _size):
+    index(_index), size(_size),
     Basics(new HealthBasics [_size]),
     HealthReport(new NodeReport [_size])
 {}
 
 NetworkStats::~NetworkStats()
 {
-    delete &HealthReport;
-    delete &Basics;
+    delete[] HealthReport;
+    delete[] Basics;
 }
 
-void NetworkStats::update(uint16_t _id, int packetSize, uint32_t timestamp, uint32_t sequenceNumber)
+void NetworkStats::update(uint16_t _index, int packetSize, uint32_t timestamp, uint32_t sequenceNumber)
 {
     float now = float(millis());
-    uint32_t seqNumOffset = sequenceNumber - Basics[_id].lastSequenceNumber;
-    float ellapsedSeconds = (now - Basics[_id].lastMessageTime) / 1000;
+    uint32_t seqNumOffset = sequenceNumber - Basics[_index].lastSequenceNumber;
+    float ellapsedSeconds = (now - Basics[_index].lastMessageTime) / 1000;
 
-    calculate(HealthReport[_id].latency, now - timestamp);
-    calculate(HealthReport[_id].jitter, HealthReport[_id].latency.variance);
-    HealthReport[_id].packetLoss = seqNumOffset - HealthReport[_id].latency.count;
-    calculate(HealthReport[_id].goodput, (packetSize * 8) / ellapsedSeconds);
+    calculate(HealthReport[_index].latency, now - timestamp);
+    calculate(HealthReport[_index].jitter, HealthReport[_index].latency.variance);
+    HealthReport[_index].packetLoss = seqNumOffset - HealthReport[_index].latency.count;
+    calculate(HealthReport[_index].goodput, (packetSize * 8) / ellapsedSeconds);
     
-    Basics[_id].lastMessageTime = now;
-    Basics[_id].lastSequenceNumber = sequenceNumber;
+    Basics[_index].lastMessageTime = now;
+    Basics[_index].lastSequenceNumber = sequenceNumber;
 }
 
 void NetworkStats::reset()
 {
     for (size_t i = 0; i < size; i++)
     {
-        Basics[i].lastSequenceNumber = 0; //Not sure if this is right...
-        Basics[i].lastMessageTime = millis();
         HealthReport[i] = {0};
     }
 }

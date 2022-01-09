@@ -7,48 +7,20 @@
 class SensorNode: public virtual CANNode
 {
 public:
-    struct CARLA_UDP: public Printable // CARLA frame information struct
-    {
-        uint32_t frameNumber;
-        float throttle, steer, brake;
-        bool handBrake, reverse, manualGearShift;
-        uint8_t gear;
+    uint8_t numSignals = 0;
+    float *signals;
 
-        size_t printTo(Print &p) const
-        {
-            size_t s = 0;
-            s += p.printf("Frame: %d\n", frameNumber);
-            s += p.printf("Throttle: %5f", throttle);
-            s += p.printf("  Steer: %5f", steer);
-            s += p.printf("  Brake: %5f\n", brake);
-            s += p.printf("Reverse: %d", reverse);
-            s += p.printf("  E-Brake: %d", handBrake);
-            s += p.printf("  Manual: %d", manualGearShift);
-            s += p.printf("  Gear: %d\n\n", gear);
-            return s;
-        };
-    } _frame;
-
-    struct WSensorBlock: public Printable
+    struct WSensorBlock
     {
         uint8_t numSignals;
-        float signals[19];
-
-        size_t printTo(Print &p) const
-        {
-            size_t s = 0;
-            for(uint8_t i = 0; i < numSignals; i++)
-            {
-                s += p.printf("%d: %3f ", i, (signals + i));
-            }
-            s += p.print("\n");
-            return s;
-        }
+        float *signals;
     };
 
     SensorNode(): CANNode() {};
-    virtual int read(struct WSensorBlock *sensorFrame);
+    virtual int read(struct WSensorBlock *buffer);
     virtual int write(struct WSensorBlock *sensorFrame);
+
+    void printSensorBlock(struct WSensorBlock &senseBlock);
 };
 
 #endif /* SensorNode_h_ */

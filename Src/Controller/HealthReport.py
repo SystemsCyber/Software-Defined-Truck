@@ -17,7 +17,6 @@ class HealthReport:
         self.throughput = DataFrame(
             zero_matrix, columns=_members, index=_members)
 
-    
 
 
 class HealthBasics(NamedTuple):
@@ -43,25 +42,22 @@ class NodeReport(NamedTuple):
 
 
 class NetworkStats:
-    def __init__(self, _id: int, _num_members: int) -> None:
-        self.id = _id
-        self.basics = [HealthBasics()] * len(_num_members)
-        self.health_report = [NodeReport()] * len(_num_members)
+    def __init__(self, _num_members: int) -> None:
+        self.basics = [HealthBasics()] * _num_members
+        self.health_report = [NodeReport()] * _num_members
 
-    def update(self, msg: COMMBlock, packet_size: int):
-        index = self.members.index(msg.id)
-        node = self.health_report[index]
-        basics = self.basics[index]
-        now = time()
-        basics.count += 1
-        self.calculate(node.latency, basics.count, now - msg.timestamp)
-        self.calculate(node.jitter, basics.count, node.latency.variance)
-        node.packetLoss = (
-            (msg.sequence_number - basics.count) / msg.sequence_number) * 100
-        ellapsedSeconds = (now - basics.last_message_time) / 1000
-        self.calculate(node.throughput, basics.count,
-                       (packet_size * 8) / ellapsedSeconds)
-        basics.last_message_time = now
+    def update(self, msg: COMMBlock):
+        node = self.health_report[msg.index]
+        basics = self.basics[msg.index]
+        # now = time()
+        # self.calculate(node.latency, basics.count, now - msg.timestamp)
+        # self.calculate(node.jitter, basics.count, node.latency.variance)
+        # node.packetLoss = (
+        #     (msg.sequence_number - basics.count) / msg.sequence_number) * 100
+        # ellapsedSeconds = (now - basics.last_message_time) / 1000
+        # self.calculate(node.throughput, basics.count,
+        #                (len(msg) * 8) / ellapsedSeconds)
+        # basics.last_message_time = now
 
     def calculate(edge: HealthCore, count: int, n: float):
         # From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm

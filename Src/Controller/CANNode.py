@@ -64,7 +64,7 @@ class CANFD_message_t(Structure):
 
     def __repr__(self) -> str:
         return (
-            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.id_hit}\n'
+            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.idhit}\n'
             f'\tbrs: {self.brs} esi: {self.esi} edl: {self.edl}\n'
             f'{self.flags}'
             f'\tlen: {self.len} buf: {self.buf}\n'
@@ -122,7 +122,7 @@ class WCANBlock(Structure):
 
     def __repr__(self) -> str:
         s = (
-            f'Sequence Number: {self.sequence_number} Timestamp: {self.timestamp}\n'
+            f'Sequence Number: {self.sequence_number}\n'
             f'Need Response: {self.need_response} FD: {self.fd}\n'
         )
         if self.fd:
@@ -162,9 +162,9 @@ class CANNode:
         return path.join(log_path, log_name)
     
     def __init_logging(self) -> None:
-        filename = self.__findpath("sss3_log")
+        filename = self.__findpath("controller_log")
         logging.basicConfig(
-            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
+            format='%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s',
             level=logging.DEBUG,
             handlers=[
                 TimedRotatingFileHandler(
@@ -177,8 +177,6 @@ class CANNode:
                 ColoredConsoleHandler()
                 ]
             )
-        # self.logger = logging.getLogger(__name__)
-        # self.logger.setLevel(logging.DEBUG)
     
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
@@ -191,7 +189,7 @@ class CANNode:
         self.__can_sock.bind(('', can_port))
     
     def __create_group_info(self, ip: IPv4Address) -> bytes:
-        device_address = gethostbyname_ex(gethostname())[2][3]
+        device_address = gethostbyname_ex(gethostname())[2][0]  # TODO Pick this automagically
         logging.info(device_address + " was chosen as the interface to subscribe to for multicast messages.")
         iface = inet_aton(device_address)
         group = inet_aton(str(ip))
@@ -203,14 +201,14 @@ class CANNode:
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
         self.__init_socket(self.__can_port, self.__mreq, self.__iface)
-        can_data = SimpleNamespace(callback = self.read(), message = None)
+        can_data = SimpleNamespace(callback = self.read, message = None)
         with self.sel_lock:
             self.can_key = self.sel.register(self.__can_sock, EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
-    def read(self, size: int) -> bytes:
+    def read(self) -> bytes:
         try:
-            return self.__can_sock.recv(size)
+            return self.__can_sock.recv(1024)
         except OSError as oe:
             logging.error(oe)
 
@@ -235,6 +233,7 @@ class CANNode:
         return message
 
     def write(self, message: bytes) -> int:
+        print(type(message))
         try:
             return self.__can_sock.sendto(
                 message,
@@ -246,10 +245,11 @@ class CANNode:
     def stop_session(self) -> None:
         self.__can_ip = IPv4Address
         self.__can_port = 0
-        logging.info("Shutting down CAN socket.")
-        with self.sel_lock:
-            self.sel.unregister(self.__can_sock)
-        self.__can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
-        self.__can_sock.shutdown(SHUT_RDWR)
-        self.__can_sock.close()
-        self.session_status = self.SessionStatus.Inactive
+        if self.session_status == self.SessionStatus.Active:
+            logging.info("Shutting down CAN socket.")
+            with self.sel_lock:
+                self.sel.unregister(self.__can_sock)
+            self.__can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
+            self.__can_sock.shutdown(SHUT_RDWR)
+            self.__can_sock.close()
+            self.session_status = self.SessionStatus.Inactive

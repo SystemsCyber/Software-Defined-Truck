@@ -45,10 +45,10 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     # Overrides for the parent functions
 
     def log_error(self, format, *args):
-        logging.error("%s - - %s\n" % ("SERVER", format%args))
+        logging.error("%s - %s\n" % ("SERVER", format%args))
 
     def log_message(self, format, *args):
-        logging.info("%s - - %s\n" % ("SERVER", format%args))
+        logging.info("%s - %s\n" % ("SERVER", format%args))
     
     # ----------------------------------
     
@@ -99,7 +99,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def __submit_registration(self, retry = True) -> bool:
         registration = json.dumps({"MAC": self.mac})
         try:
-            uri = "/client/register"
+            uri = "/controller/register"
             headers = {"Content-Type": "application/json"}
             self.ctrl.request("POST", uri, registration, headers)
         except HTTPException as httpe:
@@ -146,7 +146,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         msg = "request available devices from the server"
         try:
             logging.info(f"Requesting {msg[7:]}.")
-            self.ctrl.request("GET", "/sss3")
+            self.ctrl.request("GET", "/sssf")
         except HTTPException as httpe:
             logging.error(f"Failed to {msg}.")
             logging.error(httpe)
@@ -154,13 +154,13 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             if self.__getresponse() and self.__successful(msg, 400):
                 return self.__deserialize_device_list(self.response_data)
 
-    def request_devices(self, _devices: list) -> bool:
+    def request_devices(self, _req: list, _devices: list) -> bool:
         msg = "request desired devices from the server"
         logging.info(f"Requesting {msg[7:]}")
-        req = [i for i in self.devices if i["ID"] in _devices]
-        requestJSON = json.dumps({"MAC": self.mac, "ECUs": req})
+        req = [i for i in _devices if i["ID"] in _req]
+        requestJSON = json.dumps({"MAC": self.mac, "Devices": req})
         try:
-            uri = "/client/session"
+            uri = "/controller/session"
             headers = {"Content-Type": "application/json"}
             self.ctrl.request("POST", uri, requestJSON, headers)
         except HTTPException as httpe:
@@ -185,7 +185,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             request_data = json.load(self.rfile)
             self.session_schema.validate(request_data)
             ip = IPv4Address(request_data["IP"])
-            port = request_data["PORT"]
+            port = request_data["Port"]
             return ip, port, request_data
         except (ValidationError,
                 JSONDecodeError,
@@ -208,12 +208,13 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             self.__getresponse()
     
     def do_DELETE(self):
-        self.__send_delete("/client/session")
+        self.__send_delete("/controller/session")
 
     def shutdown(self, notify_server = True):
         logging.debug("Shutting down server connection.")
         if notify_server:
-            self.__send_delete("/client/register")
-        self.sel.unregister(self.ctrl.sock)
+            self.__send_delete("/controller/register")
+        with self.sel_lock:
+            self.sel.unregister(self.ctrl.sock)
         self.ctrl.sock.shutdown(SHUT_RDWR)
         self.ctrl.sock.close()

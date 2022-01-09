@@ -90,6 +90,8 @@ import random
 import re
 import weakref
 from Controller import Controller
+from CANNode import ColoredConsoleHandler
+from logging.handlers import TimedRotatingFileHandler
 
 try:
     import pygame
@@ -1107,7 +1109,15 @@ def game_loop(args):
             # p = world.player.get_physics_control()
             # t = world.player.get_transform()
             # v = world.player.get_velocity()
-            ecu.send_control_frame(c)
+            ecu.write(
+                c.throttle,
+                c.steer,
+                c.brake,
+                float(c.hand_brake),
+                float(c.reverse),
+                float(c.manual_gear_shift),
+                float(c.gear)
+            )
             if controller.parse_events(client, world, clock):
                 return
             world.tick(clock)
@@ -1149,7 +1159,7 @@ def main():
         '--server_host',
         metavar='S',
         default='127.0.0.1',
-        help='IP of the server to set up communication between the client and SSS3 (default: 127.0.0.1)')
+        help='IP of the server to set up communication between the controller and SSSF (default: 127.0.0.1)')
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
@@ -1185,7 +1195,29 @@ def main():
     args.width, args.height = [int(x) for x in args.res.split('x')]
 
     log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+
+    filename = ""
+    log_name = "controller_log"
+    base_dir = os.path.abspath(os.getcwd())
+    for root, dirs, files in os.walk(base_dir):
+        for name in dirs:
+            if name == "Logs":
+                log_path = os.path.join(root, name)
+                filename = os.path.join(log_path, log_name)
+    logging.basicConfig(
+        format='%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s',
+        level=logging.DEBUG,
+        handlers=[
+            TimedRotatingFileHandler(
+                filename=filename,
+                when="midnight",
+                interval=1,
+                backupCount=7,
+                encoding='utf-8'
+                ),
+            ColoredConsoleHandler()
+            ]
+        )
 
     logging.info('listening to server %s:%s', args.host, args.port)
 

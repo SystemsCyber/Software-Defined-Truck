@@ -12,14 +12,19 @@
             }
         ]
     ],
-    "maxItems": 10,
+    "maxItems": 20,
     "minItems": 1,
-    "uniqueItems": true,
     "type": "array",
     "items": {
         "anyOf": [
             {
                 "$ref":"ECU.json"
+            },
+            {
+                "title": "Controller",
+                "description": "Placeholder for a Controller.",
+                "type": "string",
+                "const": "Controller"
             }
         ]
     }

@@ -16,10 +16,21 @@ void setup() {
         }
     }
     config.init();
-    sssf = new SSSF(config.config["attachedDevices"], 250000);
+    sssf = new SSSF(config.config["AttachedDevices"], 250000);
     sssf->setup();
 }
 
 void loop() {
     sssf->forwardingLoop();
+    // unsigned long lastAttempt = millis();
+    // const unsigned long retryInterval = 1000;
+    // while (true)
+    // {
+    //     if (millis() - lastAttempt > retryInterval)
+    //     {
+    //         lastAttempt = millis();
+    //         Serial.print("Time: ");
+    //         Serial.println(millis());
+    //     }
+    // }
 }

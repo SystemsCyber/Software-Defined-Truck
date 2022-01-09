@@ -1,9 +1,10 @@
 import atexit
 import logging
+from io import BytesIO
 from HealthReport import NetworkStats
 from SensorNode import SensorNode, Member_Node, COMMBlock
 from HTTPClient import HTTPClient
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Type
 from types import SimpleNamespace
 from time import time, sleep
 from pprint import pprint
@@ -104,45 +105,51 @@ class Controller(SensorNode, HTTPClient):
     def setup(self):
         if self.connect() and self.register():
             self.__provision_devices()
+            with BytesIO(self.response_data) as self.rfile:
+                self.do_POST()
 
     def do_POST(self):  # Equivalent of start
-        ip, port, request_data = super().do_POST()
-        if ip:
-            tw.write("Received session information.", tw.magenta)
-            self.start_session(ip, port, request_data)
-            self.network_stats = NetworkStats(self.id, len(self.members))
-            tw.write("Starting the session!", tw.yellow)
-            if self.l_thread.is_alive():
-                self.listen = False
-                self.l_thread.join(1)
-            self.listen = True
-            self.l_thread.start()
-        else:
-            tw.write("Did not receive session information.", tw.magenta)
-            tw.write("Exiting...", tw.red)
+        try:
+            ip, port, request_data = super().do_POST()
+            if ip:
+                tw.write("Received session information:", tw.magenta)
+                pprint(request_data)
+                self.start_session(ip, port, request_data)
+                self.network_stats = NetworkStats(len(self.members))
+                tw.write("Starting the session!", tw.yellow)
+                if self.l_thread.is_alive():
+                    self.listen = False
+                    self.l_thread.join(1)
+                self.listen = True
+                self.l_thread.start()
+            else:
+                tw.write("Did not receive session information.", tw.magenta)
+                tw.write("Exiting...", tw.red)
+        except TypeError as te:
+            logging.error(te)
 
     def do_DELETE(self):  # Equivalent of stop
         tw.write("Stopping session.", tw.red)
         super().do_DELETE()
         self.stop_session()
 
-    def write(self, key) -> None:
-        if isinstance(key, SelectorKey):
-            super().write(key.data.message)
-            key.data.callback = self.read
-            self.sel.modify(key.fileobj, EVENT_READ, key.data)
-        else:
+    def write(self, *key) -> None:
+        if isinstance(key[0], SelectorKey):
+            super().write(key[0].data.message)
+            key[0].data.callback = self.read
+            self.sel.modify(key[0].fileobj, EVENT_READ, key[0].data)
+        elif self.session_status == self.SessionStatus.Active:
             self.can_key.data.callback = self.write
-            self.can_key.data.message = self.packSensorData(key)
+            self.can_key.data.message = self.packSensorData(*key)
             with self.sel_lock:
                 self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
 
     def read(self, key: SelectorKey) -> None:
-        # TODO: Read length for health messages will be longer than current COMMBlock size.
-        msg = super().read(self.read_length)
+        msg, buffer = super().read()
         if msg:
+            print(msg)
             if msg.type == 1:
-                self.network_stats.update(msg, self.read_length)
+                self.network_stats.update(msg)
             elif msg.type == 4:
                 pass
                 # for row in self.health_report.columns()
@@ -150,8 +157,9 @@ class Controller(SensorNode, HTTPClient):
     def shutdown(self, notify_server = True):
         self.do_DELETE()
         super().shutdown(notify_server)
-        self.listen = False
-        self.l_thread.join(1)
+        if self.l_thread.is_alive():
+            self.listen = False
+            self.l_thread.join(1)
     
     def __update_health_view(self):
         pass

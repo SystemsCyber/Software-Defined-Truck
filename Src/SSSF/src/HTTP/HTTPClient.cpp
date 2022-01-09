@@ -38,6 +38,8 @@ bool HTTPClient::connect()
     unsigned long lastAttempt = millis();
     const unsigned long retryInterval = 60 * 1000;
     client.connectionKeepAlive();
+    client.setHttpResponseTimeout(3000);
+    if (registration.length() == 0) createRegistration();
     connectionStatus = attemptConnection();
     while (connectionStatus != Connected)
     {
@@ -64,8 +66,11 @@ bool HTTPClient::read(struct Request *request, bool respondOnError)
         request->raw = clientSock.readString((size_t) 4096);
         if (parseRequest(request))
         {
-            Log.noticeln("New command from: %p", clientSock.remoteIP());
-            Log.noticeln(request->raw.c_str());
+            Log.noticeln(
+                "New command from: %p\n%s",
+                clientSock.remoteIP(),
+                request->raw.c_str()
+                );
             return true;
         }
         else if (respondOnError)
@@ -86,7 +91,7 @@ bool HTTPClient::write(struct Response *res)
 {
     if (clientSock.connected())
     {
-        String msg = res->code + " " + res->reason + " HTTP/1.1\r\n";
+        String msg = String(res->code) + " " + res->reason + " HTTP/1.1\r\n";
         msg += "Connection: keep-alive\r\n";
         clientSock.write(msg.c_str());
         clientSock.flush();
@@ -145,6 +150,18 @@ int HTTPClient::write(struct Request *req, struct Response *res)
     return false;
 }
 
+void HTTPClient::createRegistration()
+{
+    DynamicJsonDocument reg(1024);
+    reg["MAC"] = teensyMAC();
+    reg["AttachedDevices"] = attachedDevices;
+    serializeJson(reg, registration);
+    
+    String pretty_reg;
+    serializeJsonPretty(reg, pretty_reg);
+    Log.noticeln("Creating registration:\n%s", pretty_reg.c_str());
+}
+
 int HTTPClient::attemptConnection(bool retry)
 {
     if (serverAddress)
@@ -155,17 +172,11 @@ int HTTPClient::attemptConnection(bool retry)
     {
         Log.noticeln("Connecting to and registering with %p.", serverIP);
     }
-    String body;
-    DynamicJsonDocument registration(1024);
-    registration["MAC"] = teensyMAC();
-    registration["attachedDevices"] = attachedDevices;
-    serializeJson(registration, body);
-    Serial.println(body);
-    int code = client.post("/sss3/register", "application/json", body);
+    int code = client.post("/sssf/register", "application/json", registration);
     int statusCode = client.responseStatusCode();
-    String response = client.responseBody();  //Must be called after responseStatusCode
     if (code == 0)
     {
+        String response = client.responseBody();  //Must be called after responseStatusCode
         return connectionSuccessful(statusCode, retry);
     }
     else
@@ -215,7 +226,7 @@ bool HTTPClient::parseRequest(struct Request *req)
         if (endOfHeaders == -1 || endOfHeaders == 0)
             return false;
     }
-    if (parseHeaders(endOfHeaders, req) && parseData(endOfHeaders+1, req))
+    if (parseHeaders(endOfHeaders, req) && parseData(endOfHeaders+4, req))
     {
         return validateRequestData(req);
     }
@@ -231,8 +242,8 @@ bool HTTPClient::parseHeaders(int endOfHeaders, struct Request *req)
     String params[3];
     if (tokenizeRequestLine(headers, params) && params[2] == "HTTP/1.1")
     {
-        req->method == params[0];
-        req->uri == params[1];
+        req->method = params[0];
+        req->uri = params[1];
         return true;
     }
     else
@@ -261,11 +272,13 @@ bool HTTPClient::parseData(int startOfData, struct Request *req)
 bool HTTPClient::validateRequestData(struct Request *req)
 {
     bool id = req->json.containsKey("ID");
+    bool index = req->json.containsKey("Index");
     bool ip = req->json.containsKey("IP");
-    bool port = req->json.containsKey("PORT");
+    bool port = req->json.containsKey("Port");
+    bool devices = req->json.containsKey("Devices");
     if (req->method.equalsIgnoreCase("POST"))
     {
-        if (!ip || !port || !id)
+        if (!ip || !port || !id || !index || !devices)
         {
             Log.errorln("Request JSON is missing 1+ required keys.");
             return false;
@@ -276,7 +289,7 @@ bool HTTPClient::validateRequestData(struct Request *req)
             Log.errorln("Error in the provided multicast IP.");
             return false;
         }
-        else if (req->json["PORT"] < 1025 || req->json["PORT"] > 65535)
+        else if (req->json["Port"] < 1025 || req->json["Port"] > 65535)
         {
             Log.errorln("CAN port in request is out of range.");
             return false;

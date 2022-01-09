@@ -15,8 +15,8 @@ class SSSF: private SensorNode, private HTTPClient
 {
 private:
     const char *serverAddress = "ETS00853";
-    uint16_t id;
-    uint16_t *members;
+    uint32_t id;
+    uint32_t index;
     uint32_t frameNumber;
     EthernetUDP ntpSock;
     NTPClient timeClient;
@@ -28,10 +28,13 @@ private:
 
     NetworkStats *networkHealth;
 
+    int comBlockSize = 0;
+    int comHeadSize = 0;
+
 public:
     struct COMMBlock
     {
-        uint32_t id;
+        uint32_t index;
         uint32_t frameNumber;
         uint32_t timestamp;
         uint8_t type;
@@ -39,6 +42,7 @@ public:
         {
             struct WSensorBlock sensorFrame;
             struct WCANBlock canFrame;
+            NetworkStats::NodeReport *healthReport;
         };
     };
 
@@ -53,6 +57,8 @@ private:
     void write(struct CANFD_message_t *canFrame);
     void write(NetworkStats::NodeReport *healthReport);
 
+    int readCOMMBlock(struct COMMBlock *buffer);
+
     void setupClock();
     void setupCANChannels();
 
@@ -62,6 +68,8 @@ private:
 
     void start(struct Request *request);
     void stop();
+
+    void printCOMMBlock(struct COMMBlock &commBlock);
 };
 
 #endif /* SSSF_H_ */

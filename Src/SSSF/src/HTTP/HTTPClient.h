@@ -30,6 +30,8 @@ private:
 
     volatile int connectionStatus;
 
+    String registration;
+
 public:
     struct Request
     {
@@ -58,6 +60,7 @@ public:
     virtual int write(struct Request *request, struct Response *response);
 
 private:
+    void createRegistration();
     int attemptConnection(bool retry = true);
     int connectionSuccessful(int statusCode, bool retry = true);
     int connectionFailed(int code, bool retry = true);

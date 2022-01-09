@@ -1,24 +1,14 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
-    "title": "Client POST Schema",
-    "description": "POST Schema for Client devices.",
+    "title": "Controller POST Schema",
+    "description": "POST Schema for Controllers.",
     "type": "object",
     "examples": [
         {
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/0"
-            }
-        },
-        {
-            "MAC": {
-                "$ref": "VMMAC.json/#/examples/1"
-            }
-        },
-        {
-            "MAC": {
-                "$ref": "VMMAC.json/#/examples/0"
             },
-            "devices": {
+            "Devices": {
                 "$ref": "RequestDevices.json/#/examples/0"
             }
         },
@@ -26,20 +16,20 @@
             "MAC": {
                 "$ref": "VMMAC.json/#/examples/1"
             },
-            "devices": {
+            "Devices": {
                 "$ref": "RequestDevices.json/#/examples/1"
             }
         }
     ],
     "required": [
         "MAC",
-        "devices"
+        "Devices"
     ],
     "properties": {
         "MAC": {
             "$ref": "VMMAC.json"
         },
-        "devices": {
+        "Devices": {
             "$ref": "RequestDevices.json"
         }
     }

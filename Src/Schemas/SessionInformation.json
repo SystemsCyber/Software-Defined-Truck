@@ -4,13 +4,24 @@
     "description": "The session information will contain the multicast addresses for Carla and Can traffic.",
     "type": "object",
     "required": [
+        "ID",
+        "Index",
         "IP",
-        "CARLA_PORT",
-        "CAN_PORT"
+        "Port",
+        "Devices"
     ],
     "properties": {
-        "GROUP_ID": {
-            "$ref": "SessionGroupID.json"
+        "Group_ID": {
+            "title": "SessionGroupID",
+            "description": "The Group ID of the session.",
+            "type": "string",
+            "examples": [
+                "1A2B3C4D",
+                "D4C3B2A1"
+            ],
+            "maxLength": 30,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_]+$"
         },
         "ID": {
             "type":"integer",
@@ -21,18 +32,38 @@
             "minimum": 4,
             "maximum": 65535
         },
+        "Index": {
+            "type":"integer",
+            "examples": [
+                1,
+                4
+            ],
+            "minimum": 0,
+            "maximum": 20
+        },
         "IP": {
-            "$ref": "MulticastIP.json"
+            "title": "Multicast IP",
+            "description": "A multicast IP in the local organization use range of 239.255/16",
+            "type": "string",
+            "examples": [
+                "239.255.255.255",
+                "239.255.128.128",
+                "239.255.64.64",
+                "239.255.0.1"
+            ],
+            "maxLength": 15,
+            "minLength": 11,
+            "pattern": "^239.255(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d?|0)){2}$"
         },
-        "CAN_PORT": {
+        "Port": {
             "type": "number",
             "maximum": 65535,
             "minimum": 1025
         },
-        "CARLA_PORT": {
-            "type": "number",
-            "maximum": 65535,
-            "minimum": 1025
+        "Devices": {
+            "title": "Requested Devices",
+            "description": "The requested device(s) associated with the requested ID.",
+            "$ref": "RequestDevices.json"
         }
     }
 }

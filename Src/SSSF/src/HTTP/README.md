@@ -23,3 +23,7 @@ if (timedout) {
 
 ## Logical Not Parentheses
 Add the required parentheses.
+
+```c++
+if ((!iClient->connect(iServerName, iServerPort)) > 0)
+```
