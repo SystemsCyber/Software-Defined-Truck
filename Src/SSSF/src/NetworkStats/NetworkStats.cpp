@@ -3,8 +3,8 @@
 #include <NetworkStats/NetworkStats.h>
 #include <FlexCAN_T4.h>
 
-NetworkStats::NetworkStats(uint16_t _index, size_t _size):
-    index(_index), size(_size),
+NetworkStats::NetworkStats(size_t _size):
+    size(_size),
     Basics(new HealthBasics [_size]),
     HealthReport(new NodeReport [_size])
 {}
@@ -15,27 +15,25 @@ NetworkStats::~NetworkStats()
     delete[] Basics;
 }
 
-void NetworkStats::update(uint16_t _index, int packetSize, uint32_t timestamp, uint32_t sequenceNumber)
+void NetworkStats::update(uint16_t i, int packetSize, uint32_t timestamp, uint32_t sequenceNumber)
 {
     float now = float(millis());
-    uint32_t seqNumOffset = sequenceNumber - Basics[_index].lastSequenceNumber;
-    float ellapsedSeconds = (now - Basics[_index].lastMessageTime) / 1000;
+    uint32_t seqNumOffset = sequenceNumber - Basics[i].lastSequenceNumber;
+    float ellapsedSeconds = (now - Basics[i].lastMessageTime) / 1000;
 
-    calculate(HealthReport[_index].latency, now - timestamp);
-    calculate(HealthReport[_index].jitter, HealthReport[_index].latency.variance);
-    HealthReport[_index].packetLoss = seqNumOffset - HealthReport[_index].latency.count;
-    calculate(HealthReport[_index].goodput, (packetSize * 8) / ellapsedSeconds);
+    calculate(HealthReport[i].latency, now - timestamp);
+    calculate(HealthReport[i].jitter, HealthReport[i].latency.variance);
+    HealthReport[i].packetLoss = seqNumOffset - HealthReport[i].latency.count;
+    calculate(HealthReport[i].goodput, (packetSize * 8) / ellapsedSeconds);
     
-    Basics[_index].lastMessageTime = now;
-    Basics[_index].lastSequenceNumber = sequenceNumber;
+    Basics[i].lastMessageTime = now;
+    Basics[i].lastSequenceNumber = sequenceNumber;
 }
 
 void NetworkStats::reset()
 {
-    for (size_t i = 0; i < size; i++)
-    {
-        HealthReport[i] = {0};
-    }
+    delete[] HealthReport;
+    HealthReport = new NodeReport[size];
 }
 
 void NetworkStats::calculate(struct HealthCore &edge, float n)

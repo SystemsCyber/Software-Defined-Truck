@@ -22,15 +22,4 @@ void setup() {
 
 void loop() {
     sssf->forwardingLoop();
-    // unsigned long lastAttempt = millis();
-    // const unsigned long retryInterval = 1000;
-    // while (true)
-    // {
-    //     if (millis() - lastAttempt > retryInterval)
-    //     {
-    //         lastAttempt = millis();
-    //         Serial.print("Time: ");
-    //         Serial.println(millis());
-    //     }
-    // }
 }

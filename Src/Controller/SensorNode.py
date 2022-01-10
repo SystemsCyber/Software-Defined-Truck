@@ -1,4 +1,5 @@
 import logging
+import struct
 from CANNode import CANNode, WCANBlock
 from ctypes import *
 from typing import List, Tuple
@@ -6,17 +7,20 @@ from selectors import *
 from ipaddress import IPv4Address
 from time import time
 
+from CANNode import WCANFrame, WCANBlock
+
 
 class WSenseBlock(Structure):
+    _pack_ = 4
     _fields_ = [
         ("num_signals", c_uint8),
-        ("signals", POINTER(c_float))
+        ("signals", POINTER(c_float))  # Remember this machine is 64-bit and teensy is 32-bit
     ]
 
     def __repr__(self) -> str:
         s = f'num_signals: {self.num_signals} signals:\n'
         for i in range(self.num_signals):
-            s += f'{self.signals[i]}\n'
+            s += f'{self.signals[i]} '
         return s
 
 class WCOMMFrame(Union):
@@ -26,6 +30,8 @@ class WCOMMFrame(Union):
     ]
 
 class COMMBlock(Structure):
+    _anonymous_ = ("frame",)
+    _pack_ = 4
     _fields_ = [
         ("index", c_uint32),
         ("frame_number", c_uint32),
@@ -63,8 +69,10 @@ class SensorNode(CANNode):
         self.max_retrans_notified = False
         self.attempts = 0
         self.timeout = None
-        self.timeout_additive = (1/_max_frame_rate) * (_max_retrans)   
+        self.timeout_additive = (1/_max_frame_rate) * (_max_retrans)
+        logging.debug(f"Timeout additive: {self.timeout_additive}")
         self.frame_number = 1
+        self.offset = sizeof(COMMBlock) - sizeof(WCOMMFrame) + 4
 
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
         super().start_session(ip, port)
@@ -81,32 +89,31 @@ class SensorNode(CANNode):
         super().stop_session()
 
     def packSensorData(self, *sensors: float) -> bytes:
+        l = len(sensors)
         self.attempts = 0
         self.max_retrans_notified = False
-        signalArray = c_float * len(sensors)
+        signalArray = c_float * l
         signals = signalArray(*sensors)
         msg = COMMBlock(
             self.index,
             self.frame_number,
             int(time() * 1000),
             2,
-            WCOMMFrame(WCANBlock(), WSenseBlock(
-                len(sensors), signals
-                ))
+            WCOMMFrame(WCANBlock(), WSenseBlock(l, signals))
         )
-        msg = bytes(msg)[:-4] + bytes(signals)
         self.frame_number += 1
-        return msg
+        return bytes(msg)[:self.offset] + struct.pack(f"<{l}f", *signals)
 
     def write(self, *msg: COMMBlock) -> int:
         if self.attempts <= self.max_retransmissions:
             self.attempts += 1
             self.timeout = time() + self.timeout_additive
             return super().write(*msg)
-        elif not self.max_retrans_notified:
+        elif not self.max_retrans_notified and isinstance(msg[0], COMMBlock):
+            index = msg[0].index
             logging.error(
                 f"Have not received frame #{self.frame_number} "
-                f"from device with index number {id} after "
+                f"from device with index number {index} after "
                 f"{self.max_retransmissions} attempts."
                 )
             self.max_retrans_notified = True
@@ -114,13 +121,12 @@ class SensorNode(CANNode):
     def read(self) -> Tuple[COMMBlock, bytes]:
         try:
             buffer = super().read()
-            buffer = buffer + b'0000'
             if buffer:
                 msg = COMMBlock.from_buffer_copy(buffer[:sizeof(COMMBlock)])
                 self.members[msg.index].last_received_frame = msg.frame_number
                 return msg, buffer
             else:
-                return None
+                return (None, None)
         except (AttributeError, ValueError) as ae:
             logging.error("Received data from an out of band device.")
             logging.error(ae)
@@ -130,6 +136,7 @@ class SensorNode(CANNode):
         not_recvd = member.last_received_frame != self.frame_number
         timedout = current_time >= self.timeout
         if not_recvd and timedout:
+            self.can_key.data.callback = self.write
             with self.sel_lock:
                 self.sel.modify(
                     self.can_key.fileobj,

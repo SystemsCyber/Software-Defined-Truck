@@ -9,8 +9,6 @@
 class NetworkStats
 {
 private:
-    uint16_t index;
-
     float delta = 0;
     float delta2 = 0;
 
@@ -43,7 +41,7 @@ public:
     struct HealthBasics *Basics;
     struct NodeReport *HealthReport;
 
-    NetworkStats(uint16_t _index, size_t _size);
+    NetworkStats(size_t _size);
     ~NetworkStats();
     void update(uint16_t _index, int packetSize, uint32_t timestamp, uint32_t sequenceNumber);
     void reset();

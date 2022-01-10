@@ -1,7 +1,7 @@
 import atexit
 import logging
 from io import BytesIO
-from HealthReport import NetworkStats
+from HealthReport import NetworkStats, HealthReport
 from SensorNode import SensorNode, Member_Node, COMMBlock
 from HTTPClient import HTTPClient
 from typing import List, NamedTuple, Type
@@ -23,8 +23,6 @@ class Controller(SensorNode, HTTPClient):
             _server_ip = _server_ip
             )
         atexit.register(self.shutdown)
-        
-        self.read_length = sizeof(COMMBlock)
         self.l_thread = Thread(target=self.__listen, args=(self.timeout_additive,))
         self.l_thread.setDaemon(True)
         self.listen = True
@@ -34,9 +32,10 @@ class Controller(SensorNode, HTTPClient):
             try:
                 with self.sel_lock:
                     connection_events = self.sel.select(timeout=_timeout)
-                    for key, mask in connection_events:
-                        callback = key.data.callback
-                        callback(key)
+                if not self.listen: return
+                for key, mask in connection_events:
+                    callback = key.data.callback
+                    callback(key)
                 self.check_members()
             except TimeoutError:
                 self.check_members()
@@ -116,6 +115,7 @@ class Controller(SensorNode, HTTPClient):
                 pprint(request_data)
                 self.start_session(ip, port, request_data)
                 self.network_stats = NetworkStats(len(self.members))
+                self.health_report = HealthReport()
                 tw.write("Starting the session!", tw.yellow)
                 if self.l_thread.is_alive():
                     self.listen = False
@@ -149,7 +149,12 @@ class Controller(SensorNode, HTTPClient):
         if msg:
             print(msg)
             if msg.type == 1:
-                self.network_stats.update(msg)
+                self.network_stats.update(
+                    msg.index,
+                    len(buffer),
+                    msg.timestamp,
+                    msg.frame.sequence_number
+                    )
             elif msg.type == 4:
                 pass
                 # for row in self.health_report.columns()

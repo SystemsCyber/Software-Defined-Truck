@@ -55,7 +55,8 @@ class Broker(Wrap_HTTPRequestHandler):
 
     def __init__(self) -> None:
         self.client_address = None
-        self.keepalive_interval = 300
+        # self.keepalive_interval = 300
+        self.keepalive_interval = 2
         self.protocol_version = "HTTP/1.1"
         atexit.register(self.__exit)
         self.__setup_logging()

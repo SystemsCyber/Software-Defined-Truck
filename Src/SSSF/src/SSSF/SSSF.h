@@ -69,7 +69,7 @@ private:
     void start(struct Request *request);
     void stop();
 
-    void printCOMMBlock(struct COMMBlock &commBlock);
+    String dumpCOMMBlock(struct COMMBlock &commBlock);
 };
 
 #endif /* SSSF_H_ */

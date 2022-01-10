@@ -1,3 +1,5 @@
+import ipaddress
+import netifaces
 import logging
 import copy
 from os import path, walk, getcwd
@@ -35,6 +37,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
 # ------------------------------------------------------------
 
 class FLAGS_FD(Structure):
+    _pack_ = 4
     _fields_ = [
         ("extended", c_bool),
         ("overrun", c_bool),
@@ -47,6 +50,7 @@ class FLAGS_FD(Structure):
         )
 
 class CANFD_message_t(Structure):
+    _pack_ = 4
     _fields_ = [
         ("can_id", c_uint32),
         ("can_timestamp", c_uint16),
@@ -72,6 +76,7 @@ class CANFD_message_t(Structure):
             )
 
 class FLAGS(Structure):
+    _pack_ = 4
     _fields_ = [
         ("extended", c_bool),
         ("remote", c_bool),
@@ -85,6 +90,7 @@ class FLAGS(Structure):
         )
 
 class CAN_message_t(Structure):
+    _pack_ = 4
     _fields_ = [
         ("can_id", c_uint32),
         ("can_timestamp", c_uint16),
@@ -106,6 +112,7 @@ class CAN_message_t(Structure):
             )
 
 class WCANFrame(Union):
+    _pack_ = 4
     _fields_ = [
         ("can", CAN_message_t),
         ("can_FD", CANFD_message_t)
@@ -113,6 +120,7 @@ class WCANFrame(Union):
 
 class WCANBlock(Structure):
     _anonymous_ = ("frame",)
+    _pack_ = 4
     _fields_ = [
         ("sequence_number", c_uint32),
         ("need_response", c_bool),
@@ -182,6 +190,7 @@ class CANNode:
         logging.info("Creating CANNode socket.")
         self.__can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         self.__can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_LOOP, False)
         self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
         self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
         self.__can_sock.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
@@ -189,9 +198,22 @@ class CANNode:
         self.__can_sock.bind(('', can_port))
     
     def __create_group_info(self, ip: IPv4Address) -> bytes:
-        device_address = gethostbyname_ex(gethostname())[2][0]  # TODO Pick this automagically
-        logging.info(device_address + " was chosen as the interface to subscribe to for multicast messages.")
-        iface = inet_aton(device_address)
+        default_gw = netifaces.gateways()["default"][netifaces.AF_INET]
+        gw = IPv4Address(default_gw[0])
+        logging.info(f"Default IPv4 Gateway: {gw}")
+        device_addresses = gethostbyname_ex(gethostname())[2]
+        logging.info(f"Device interface addresses: {device_addresses}")
+        closest_ip = str
+        smallest_diff = 9999999999
+        for i in netifaces.ifaddresses(default_gw[1])[netifaces.AF_INET]:
+            _ip = IPv4Address(i["addr"])
+            diff = abs(int(gw) - int(_ip))
+            if (diff < smallest_diff) and (str(_ip) in device_addresses):
+                smallest_diff = diff
+                closest_ip = str(_ip)
+        logging.info(f"Closest IP found to default gateway: {closest_ip}")
+        logging.info("Multicast interface chosen: " + closest_ip)
+        iface = inet_aton(closest_ip)
         group = inet_aton(str(ip))
         mreq = group + iface
         return iface, mreq
@@ -210,6 +232,7 @@ class CANNode:
         try:
             return self.__can_sock.recv(1024)
         except OSError as oe:
+            logging.debug("Occured in read")
             logging.error(oe)
 
     def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
@@ -233,7 +256,6 @@ class CANNode:
         return message
 
     def write(self, message: bytes) -> int:
-        print(type(message))
         try:
             return self.__can_sock.sendto(
                 message,

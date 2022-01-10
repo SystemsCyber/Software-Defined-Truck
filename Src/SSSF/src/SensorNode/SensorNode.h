@@ -20,7 +20,7 @@ public:
     virtual int read(struct WSensorBlock *buffer);
     virtual int write(struct WSensorBlock *sensorFrame);
 
-    void printSensorBlock(struct WSensorBlock &senseBlock);
+    String dumpSensorBlock(struct WSensorBlock &senseBlock);
 };
 
 #endif /* SensorNode_h_ */

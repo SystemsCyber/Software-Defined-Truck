@@ -31,19 +31,16 @@ protected:
     volatile boolean sessionStatus;
 
 public:
-
-    union WCANFrame
-    {
-        struct CAN_message_t can;
-        struct CANFD_message_t canFD;
-    };
-
     struct WCANBlock
     {
         uint32_t sequenceNumber;
         bool needResponse;
         bool fd;
-        union WCANFrame frame;
+        union
+        {
+            struct CAN_message_t can;
+            struct CANFD_message_t canFD;
+        };
     };
     
     CANNode();
@@ -59,7 +56,7 @@ public:
     virtual int write(struct WCANBlock *canFrame);
     virtual int endPacket(bool incrementSequenceNumber = true);
     virtual void stopSession();
-    void printCANBlock(struct WCANBlock &canBlock);
+    String dumpCANBlock(struct WCANBlock &canBlock);
 
 private:
     static void checkHardware();

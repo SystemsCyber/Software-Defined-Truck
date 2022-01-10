@@ -1,70 +1,107 @@
+from ctypes import *
+from collections import namedtuple
 from time import time
-from typing import NamedTuple
 from pandas import DataFrame
 from SensorNode import COMMBlock
 
 
-class HealthReport:
-    def __init__(self, _members: list) -> None:
-        self.members = _members
-        zero_matrix = [[0] * len(_members)] * len(_members)
-        self.packet_loss = DataFrame(
-            zero_matrix, columns=_members, index=_members),
-        self.latency = DataFrame(
-            zero_matrix, columns=_members, index=_members),
-        self.jitter = DataFrame(
-            zero_matrix, columns=_members, index=_members),
-        self.throughput = DataFrame(
-            zero_matrix, columns=_members, index=_members)
-
-
-
-class HealthBasics(NamedTuple):
+class HealthBasics(namedtuple):
     last_message_time = time()
     last_sequence_number = 0
-    M2 = 0.0
+
+class HealthCore(Structure):
+    _pack_ = 4
+    _fields_ = [
+        ("count", c_uint32),
+        ("min", c_float),
+        ("max", c_float),
+        ("mean", c_float),
+        ("variance", c_float),
+        ("sumofSquaredDifferences", c_float)
+    ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\tCount: {self.count} Min: {self.min} Max: {self.max}\n'
+            f'\tMean: {self.mean} Variance: {self.variance}\n'
+            f'\tSumofSquaredDifferences: {self.sumofSquaredDifferences}\n'
+            )
+    # min = float('inf')
+    # max = -float('inf')
 
 
-class HealthCore(NamedTuple):
-    count = 0
-    min = float('inf')
-    max = -float('inf')
-    mean = 0.0
-    variance = 0.0
-    M2 = 0.0
-
-
-class NodeReport(NamedTuple):
-    packetLoss = 0.0
-    latency = HealthCore()
-    jitter = HealthCore()
-    throughput = HealthCore()
+class NodeReport(Structure):
+    _pack_ = 4
+    _fields = [
+        ("packetLoss", c_float),
+        ("latency", HealthCore),
+        ("jitter", HealthCore),
+        ("goodput", HealthCore)
+    ]
+    def __repr__(self) -> str:
+        return (
+            f'PacketLoss: {self.packetLoss}\n'
+            f'Latency: \n{self.latency}\n'
+            f'Jitter: \n{self.jitter}\n'
+            f'Goodput: \n{self.goodput}\n'
+            )
 
 
 class NetworkStats:
     def __init__(self, _num_members: int) -> None:
+        self.size = _num_members
         self.basics = [HealthBasics()] * _num_members
-        self.health_report = [NodeReport()] * _num_members
+        self.health_report = [NodeReport(
+            0.0,
+            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+            )] * _num_members
 
-    def update(self, msg: COMMBlock):
-        node = self.health_report[msg.index]
-        basics = self.basics[msg.index]
-        # now = time()
-        # self.calculate(node.latency, basics.count, now - msg.timestamp)
-        # self.calculate(node.jitter, basics.count, node.latency.variance)
-        # node.packetLoss = (
-        #     (msg.sequence_number - basics.count) / msg.sequence_number) * 100
-        # ellapsedSeconds = (now - basics.last_message_time) / 1000
-        # self.calculate(node.throughput, basics.count,
-        #                (len(msg) * 8) / ellapsedSeconds)
-        # basics.last_message_time = now
+    def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
+        now = time()
+        sequence_offset = sequence_number - self.basics[i].last_sequence_number
+        ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000
 
-    def calculate(edge: HealthCore, count: int, n: float):
+        self.calculate(self.health_report[i].latency, now - timestamp)
+        self.calculate(self.health_report.jitter, self.health_report[i].variance)
+        self.health_report[i].packetLoss = sequence_offset - self.health_report[i].latency.count
+        self.calculate(self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
+
+        self.basics[i].last_message_time = now
+        self.basics[i].last_sequence_number = sequence_number
+
+    def reset(self):
+        for i in range(self.size):
+            self.health_report[i] = NodeReport(
+                0.0,
+                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
+            )
+
+    def calculate(edge: HealthCore, n: float):
         # From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
         edge.min = min(edge.min, n)
         edge.max = max(edge.max, n)
+        edge.count += 1
         delta = n - edge.mean
-        edge.mean += delta / count
+        edge.mean += delta / edge.count
         delta2 = n - edge.mean
-        edge.M2 += delta * delta2
-        edge.variance = edge.M2 / count
+        edge.sumOfSquaredDifferences += delta * delta2
+        edge.variance = edge.sumOfSquaredDifferences / edge.count
+
+
+
+class HealthReport:
+    def __init__(self, _num_members: int) -> None:
+        self.members = range(_num_members)
+        zero_matrix = [[0] * _num_members] * _num_members
+        self.packet_loss = DataFrame(
+            zero_matrix, columns=self.members, index=self.members)
+        self.latency = DataFrame(
+            zero_matrix, columns=self.members, index=self.members)
+        self.jitter = DataFrame(
+            zero_matrix, columns=self.members, index=self.members)
+        self.throughput = DataFrame(
+            zero_matrix, columns=self.members, index=self.members)

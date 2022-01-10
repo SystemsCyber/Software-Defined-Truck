@@ -40,6 +40,9 @@ bool SSSF::setup()
         setupClock();
         Log.noticeln("Setting up CAN Channel(s).");
         setupCANChannels();
+        Log.noticeln("Setting up message sizes.");
+        comBlockSize = sizeof(COMMBlock);
+        comHeadSize = comBlockSize - sizeof(WCANBlock);
         Log.noticeln("Ready.");
         return true;
     }
@@ -62,15 +65,15 @@ void SSSF::forwardingLoop()
         if (can0BaudRate && can0.read(canFrame)) write(&canFrame);
         if (can1BaudRate && can1.read(canFrame)) write(&canFrame);
         int packetSize = readCOMMBlock(&msg);
-        if (packetSize)
+        if (packetSize > 0)
         {
-            printCOMMBlock(msg);
+            Serial.println(dumpCOMMBlock(msg));
             if (msg.type == 1)
             {
                 //adding 28 for UDP header
                 networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.canFrame.sequenceNumber);
-                can0.write(msg.canFrame.frame.can);
-                if (can1BaudRate) can1.write(msg.canFrame.frame.can);
+                can0.write(msg.canFrame.can);
+                if (can1BaudRate) can1.write(msg.canFrame.can);
             }
             else if (msg.type == 2)
             {
@@ -97,7 +100,7 @@ void SSSF::write(struct CAN_message_t *canFrame)
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = false;
     msg.canFrame.needResponse = false;
-    memcpy(&msg.canFrame.frame, canFrame, sizeof(CAN_message_t));
+    memcpy(&msg.canFrame.can, canFrame, sizeof(CAN_message_t));
     CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
     CANNode::endPacket();
 }
@@ -112,7 +115,7 @@ void SSSF::write(struct CANFD_message_t *canFrame)
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = true;
     msg.canFrame.needResponse = false;
-    memcpy(&msg.canFrame.frame, canFrame, sizeof(CANFD_message_t));
+    memcpy(&msg.canFrame.canFD, canFrame, sizeof(CANFD_message_t));
     CANNode::write(reinterpret_cast<uint8_t*>(&msg), sizeof(struct COMMBlock));
     CANNode::endPacket();
 }
@@ -135,32 +138,30 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
 
 int SSSF::readCOMMBlock(struct COMMBlock *buffer)
 {
-    if (comBlockSize == 0)
+    int remaining = CANNode::parsePacket();
+    if (remaining)
     {
-        comBlockSize = sizeof(COMMBlock);
-        comHeadSize = comBlockSize - sizeof(WCANBlock);
-    }
-    uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
-    CANNode::parsePacket();
-    int recvdHeaders = CANNode::read(buf, comHeadSize);
-    if (recvdHeaders > 0)
-    {
-        int recvdData = 0;
-        if (buffer->type == 1)
+        uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
+        int recvdHeaders = CANNode::read(buf, comHeadSize);
+        if (recvdHeaders > 0)
         {
-            recvdData = CANNode::read(reinterpret_cast<WCANBlock*>(buffer + comHeadSize));
-        }
-        else if (buffer->type == 2)
-        {
-            recvdData = SensorNode::read(reinterpret_cast<WSensorBlock*>(buffer + comHeadSize));
-        }
-        else if (buffer->type == 3)
-        {
-            return recvdHeaders;
-        }
-        if (recvdData > 0)
-        {
-            return recvdHeaders + recvdData;
+            int recvdData = 0;
+            if (buffer->type == 1)
+            {
+                recvdData = CANNode::read(&buffer->canFrame);
+            }
+            else if (buffer->type == 2)
+            {
+                recvdData = SensorNode::read(&buffer->sensorFrame);
+            }
+            else if (buffer->type == 3)
+            {
+                return recvdHeaders;
+            }
+            if (recvdData > 0)
+            {
+                return recvdHeaders + recvdData;
+            }
         }
     }
     return -1;
@@ -243,18 +244,19 @@ void SSSF::stop()
     CANNode::stopSession();
 }
 
-void SSSF::printCOMMBlock(struct COMMBlock &commBlock)
+String SSSF::dumpCOMMBlock(struct COMMBlock &commBlock)
 {
-    Serial.printf("Index: %d\n", commBlock.index);
-    Serial.printf("Frame Number: %d\n", commBlock.frameNumber);
-    Serial.printf("Timestamp: %d\n", commBlock.timestamp);
-    Serial.printf("Type: %d\n", commBlock.type);
+    String msg = "Index: " + String(commBlock.index) + "\n";
+    msg += "Frame Number: " + String(commBlock.frameNumber) + "\n";
+    msg += "Timestamp: " + String(commBlock.timestamp) + "\n";
+    msg += "Type: " + String(commBlock.type) + "\n";
     if (commBlock.type == 1)
     {
-        printCANBlock(commBlock.canFrame);
+        msg += dumpCANBlock(commBlock.canFrame);
     }
     else if (commBlock.type == 2)
     {
-        printSensorBlock(commBlock.sensorFrame);
+        msg += dumpSensorBlock(commBlock.sensorFrame);
     }
+    return msg;
 }

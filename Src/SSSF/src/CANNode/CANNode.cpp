@@ -17,6 +17,11 @@ CANNode::CANNode(): mac{0}, sessionStatus(Inactive)
 
 int CANNode::init()
 {
+    Log.noticeln("Setting up CAN message sizes.");
+    canBlockSize = sizeof(WCANBlock);
+    canSize = sizeof(CAN_message_t);
+    canFDSize = sizeof(CANFD_message_t);
+    canHeadSize = canBlockSize - canFDSize;
     Log.noticeln("Setting up Ethernet:");
     Log.noticeln("\t-> Initializing the Ethernet shield to use the provided MAC address");
     Log.noticeln("\t   and retreving network configuration parameters through DHCP.");
@@ -88,19 +93,21 @@ int CANNode::read(uint8_t *buffer, size_t size)
 
 int CANNode::read(struct WCANBlock *buffer)
 {
-    if (canBlockSize == 0)
-    {
-        canBlockSize = sizeof(WCANBlock);
-        canSize = sizeof(CAN_message_t);
-        canFDSize = sizeof(CANFD_message_t);
-        canHeadSize = canBlockSize - canFDSize;
-    }
     uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
     int recvdHeaders = read(buf, canHeadSize);
     if (recvdHeaders > 0)
     {
-        int readSize = (buffer->fd) ? canFDSize : canSize;
-        int recvdData = read(buf + canHeadSize, readSize);
+        int recvdData = 0;
+        if (buffer->fd)
+        {
+            buf = reinterpret_cast<uint8_t*>(&buffer->canFD);
+            recvdData = read(buf, canFDSize);
+        }
+        else
+        {
+            buf = reinterpret_cast<uint8_t*>(&buffer->can);
+            recvdData = read(buf, canSize);
+        }
         if (recvdData > 0)
         {
             return recvdHeaders + recvdData;
@@ -147,23 +154,34 @@ void CANNode::stopSession()
     Log.noticeln("Waiting for next session.");
 }
 
-void CANNode::printCANBlock(struct WCANBlock &canBlock)
+String CANNode::dumpCANBlock(struct WCANBlock &canBlock)
 {
-    Serial.printf("Sequence Number: %d Need Response: %d\n", canBlock.sequenceNumber,  canBlock.needResponse);
+    String msg = "Sequence Number: " + String(canBlock.sequenceNumber);
+    msg += "Need Response: " + String(canBlock.needResponse) + "\n";
     if (canBlock.fd)
     {
-        struct CANFD_message_t f = canBlock.frame.canFD;
-        Serial.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-        Serial.printf("Length: %d Data: ", f.len);
-        Serial.write(f.buf, size_t(f.len));
+        struct CANFD_message_t f = canBlock.canFD;
+        msg += "CAN ID: " + String(f.id); 
+        msg += " CAN Timestamp: " + String(f.timestamp) + "\n";
+        msg += "Length: " + String(f.len) + " Data: ";
+        for (int i = 0; i < f.len; i++)
+        {
+            msg += String(f.buf[i]);
+        }
     }
     else
     {
-        struct CAN_message_t f = canBlock.frame.can;
-        Serial.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-        Serial.printf("Length: %d Data: ", f.len);
-        Serial.write(f.buf, size_t(f.len));
+        struct CAN_message_t f = canBlock.can;
+        msg += "CAN ID: " + String(f.id); 
+        msg += " CAN Timestamp: " + String(f.timestamp) + "\n";
+        msg += "Length: " + String(f.len) + " Data: ";
+        for (int i = 0; i < f.len; i++)
+        {
+            msg += String(f.buf[i]);
+        }
     }
+    msg += "\n";
+    return msg;
 }
 
 void CANNode::checkHardware()
