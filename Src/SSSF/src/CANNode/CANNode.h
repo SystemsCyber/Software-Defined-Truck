@@ -20,52 +20,42 @@ private:
     IPAddress canIP;
     uint16_t canPort;
 
+    int canBlockSize = 0;
+    int canHeadSize = 0;
+    
 protected:
-    uint8_t mac[6];  //MAC address of WIZnet Device. Hostname is "WIZnet" + last three bytes of the MAC.
+    int canSize = 0;
+    int canFDSize = 0;
+
+    uint32_t can0BaudRate;
+    uint32_t can1BaudRate;
+    FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
+    FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
+
+    uint8_t mac[6];  // Hostname is "WIZnet" + last three bytes of the MAC.
     uint32_t sequenceNumber = 1;
     volatile boolean sessionStatus;
 
 public:
-
-    union WCANFrame
-    {
-        struct CAN_message_t can;
-        struct CANFD_message_t canFD;
-    };
-
-    struct WCANBlock: public Printable
+    struct WCANBlock
     {
         uint32_t sequenceNumber;
         bool needResponse;
         bool fd;
-        union WCANFrame frame;
-
-        size_t printTo(Print &p) const
+        union
         {
-            size_t s = 0;
-            s += p.printf("Sequence Number: %d Need Response: %d\n", sequenceNumber,  needResponse);
-            if (fd)
-            {
-                struct CANFD_message_t f = frame.canFD;
-                s += p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-                s += p.printf("Length: %d Data: ", f.len);
-                s += p.write(f.buf, size_t(f.len));
-            }
-            else
-            {
-                struct CAN_message_t f = frame.can;
-                s += p.printf("CAN ID: %d CAN Timestamp: %d\n", f.id, f.timestamp);
-                s += p.printf("Length: %d Data: ", f.len);
-                s += p.write(f.buf, size_t(f.len));
-            }
-            return s;
+            struct CAN_message_t can;
+            struct CANFD_message_t canFD;
         };
     };
     
     CANNode();
+    CANNode(uint32_t _can0Baudrate);
+    CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate);
     virtual int init();
     virtual bool startSession(IPAddress _ip, uint16_t _port);
     virtual bool startSession(String _ip, uint16_t _port);
+    virtual int parsePacket();
     virtual int read(uint8_t *buffer, size_t size);
     virtual int read(struct WCANBlock *buffer);
     virtual int beginPacket();
@@ -74,8 +64,11 @@ public:
     virtual int write(struct WCANBlock *canFrame);
     virtual int endPacket(bool incrementSequenceNumber = true);
     virtual void stopSession();
+    String dumpCANBlock(struct WCANBlock &canBlock);
 
 private:
+    void setupLogging();
+    void setupCANChannels();
     static void checkHardware();
     static void checkLink();
 

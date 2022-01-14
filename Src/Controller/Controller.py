@@ -1,68 +1,62 @@
-import atexit
 import logging
-from NetworkStats import NetworkStats
-from CANNode import WCANBlock
-from SensorNode import SensorNode, WSenseBlock
+from io import BytesIO
+from HealthReport import NetworkStats, HealthReport
+from SensorNode import SensorNode, COMMBlock, WCOMMFrame
 from HTTPClient import HTTPClient
-from typing import List
+from typing import List, NamedTuple, Type
 from types import SimpleNamespace
 from time import time, sleep
 from pprint import pprint
 from socket import *
 from selectors import *
-from threading import Thread
+from threading import Thread, Event
 from TypeWriter import TypeWriter as tw
 from ctypes import *
-
-
-class WCOMMFrame(Union):
-    _fields_ = [
-        ("can", WCANBlock),
-        ("signals", WSenseBlock)
-    ]
-
-class COMMBlock(Structure):
-    _fields_ = [
-        ("id", c_uint32),
-        ("frame_number", c_uint32),
-        ("timestamp", c_uint32),
-        ("type", c_uint8),
-        ("frame", WCOMMFrame)
-    ]
-
-    def __repr__(self) -> str:
-        s =  (
-            f'Device: {self.id} Frame Number: {self.frame_number}\n'
-            f'Timestamp: {self.timestamp} Type: {self.type}\n'
-        )
-        if self.type == 1:
-            s += f'Frame:\n{self.frame.can}\n'
-        elif self.type == 2:
-            s += f'Frame:\n{self.frame.signals}\n'
-        return s
+from pandas import DataFrame
 
 class Controller(SensorNode, HTTPClient):
-    def __init__(self, _max_retrans: int, _server_ip = gethostname()) -> None:
-        SensorNode.__init__(_max_retrans)
-        HTTPClient.__init__(_server_ip)
-        atexit.register(self.shutdown)
-        self.id = None
-        self.members = None
-        self.l_thread = Thread(target=self.__listen, args=(0,))
-        self.l_thread.setDaemon(True)
-        self.listen = True
+    def __init__(self, _max_retrans = 3, _max_frame_rate = 60, _server_ip = gethostname()) -> None:
+        super().__init__(
+            _max_retrans = _max_retrans,
+            _max_frame_rate = _max_frame_rate,
+            _server_ip = _server_ip
+            )
 
-    def __listen(self, _timeout=None) -> None:
-        while self.listen:
+    def __request_health(self, _listen: Event) -> None:
+        while _listen.is_set():
+            sleep(1)
+            msg = COMMBlock(
+                self.index,
+                self.frame_number,
+                int(time() * 1000),
+                3,
+                WCOMMFrame()
+            )
+            self.can_key.data.callback = self.write
+            self.can_key.data.message = bytes(msg)
+            with self.sel_lock:
+                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+
+    def __check_members(self, _listen: Event) -> None:
+        while _listen.is_set():
+            sleep(self.timeout_additive)
+            super().check_members()
+
+    def __write_signals(self, conn: SocketType) -> None:
+        while True:
+            try:
+                self.write(conn.recv())
+            except EOFError:
+                return
+
+    def __listen(self, _listen: Event) -> None:
+        while _listen.is_set():
             try:
                 with self.sel_lock:
-                    connection_events = self.sel.select(timeout=_timeout)
-                    for key, mask in connection_events:
-                        callback = key.data.callback
-                        callback(key)
-                    # self.__check_connection()
-            except TimeoutError:
-                continue
+                    connection_events = self.sel.select(timeout=1)
+                for key, mask in connection_events:
+                    callback = key.data.callback
+                    callback(key)
             except KeyboardInterrupt:
                 return
 
@@ -125,106 +119,89 @@ class Controller(SensorNode, HTTPClient):
         else:
             tw.write("Exiting", tw.red)
 
-    def setup(self):
+    def start(self, conn: SocketType, listen: Event) -> None:
         if self.connect() and self.register():
             self.__provision_devices()
+            with BytesIO(self.response_data) as self.rfile:
+                self.do_POST()
+            signal_thd = Thread(target=self.__write_signals, args=(conn,))
+            report_thd = Thread(target=self.__request_health, args=(listen,))
+            check_thd = Thread(target=self.__check_members, args=(listen,))
+            signal_thd.start()
+            report_thd.start()
+            check_thd.start()
+            self.__listen(listen)
+            signal_thd.join(1)
+            report_thd.join(1)
+            check_thd.join(1)
+            self.stop()
 
-    def do_POST(self):
-        super().do_POST()
-        self.id = self.request_data["ID"]
-        self.members = self.request_data["MEMBERS"]
-        self.network_stats = NetworkStats(self.id, self.members)
-        tw.write((
-            "Received session setup information "
-            "from the server."
-        ), tw.magenta)
-        tw.write("Starting the session!", tw.yellow)
-        if self.l_thread.is_alive():
-            self.listen = False
-            self.l_thread.join(1)
-            self.listen = True
-            self.l_thread.start()
-        else:
-            self.listen = True
-            self.l_thread.start()
-            # control = SimpleNamespace(throttle = 1.0, steer = 1.0, brake = 1.0, hand_brake = 1, reverse = 1,manual_gear_shift = 1, gear = 1)
-            # try:
-            #     while True:
-            #         self.write(control)
-            #         sleep(1)
-            # except KeyboardInterrupt:
-            #     pass
 
-    def do_DELETE(self):
+    def do_POST(self):  # Equivalent of start
+        try:
+            ip, port, request_data = super().do_POST()
+            if ip:
+                tw.write("Received session information:", tw.magenta)
+                pprint(request_data)
+                self.start_session(ip, port, request_data)
+                self.network_stats = NetworkStats(len(self.members))
+                self.health_report = HealthReport(len(self.members))
+                tw.write("Starting the session!", tw.yellow)
+            else:
+                tw.write("Did not receive session information.", tw.magenta)
+                tw.write("Exiting...", tw.red)
+        except TypeError as te:
+            logging.error(te)
+
+    def do_DELETE(self):  # Equivalent of stop
         tw.write("Stopping session.", tw.red)
-        self.listen = False
-        self.id = None
-        self.members = list
-        return super().do_DELETE()
+        super().do_DELETE()
+        self.stop_session()
 
-    def write(self, key) -> None:
-        if isinstance(key, SelectorKey):
-            try:
-                super().write(key.data.outgoing_message)
-                current_time = time()
-                # timepassed = current_time - self.last_frame_sent_time
-                # new_rate = 1 / timepassed
-                # new_rate -= self.avg_sending_rate
-                # self.avg_sending_rate += ((new_rate) / self.frame.last_frame)
-                # self.retrans_timeout = 1 / (self.max_retrans * self.avg_sending_rate)
-                self.last_transmission_time = current_time
-                key.data.callback = self.read
-                key.data.outgoing_message = None
-                self.sel.modify(key.fileobj, EVENT_READ, key.data)
-            except InterruptedError:
-                logging.error("Message was interrupted while sending.")
-            except BlockingIOError:
-                logging.error("Socket is currently blocked and cannot send messages.")
-        else:
+    def write(self, *key) -> None:
+        if isinstance(key[0], SelectorKey):
+            super().write(key[0].data.message)
+            key[0].data.callback = self.read
+            self.sel.modify(key[0].fileobj, EVENT_READ, key[0].data)
+        elif self.session_status == self.SessionStatus.Active:
+            self.can_key.data.callback = self.write
+            self.can_key.data.message = self.packSensorData(*key)
             with self.sel_lock:
-                key = self.sel.get_key(self.can_sock)
-                key.data.callback = self.write
-                key.data.outgoing_message = key
-                self.sel.modify(key.fileobj, EVENT_WRITE, key.data)
+                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
 
     def read(self, key: SelectorKey) -> None:
-        try:
-            data = COMMBlock.from_buffer_copy(super().read(len(COMMBlock)))
-        except timeout:
-            logging.warning(f'Socket timed out.')
-        except OSError as oe:
-            logging.error(oe)
-        else:
-            if data.id in self.members:
-                if data.type == 1:
-                    self.network_stats.update(
-                        data.id,
-                        len(COMMBlock),
-                        data.timestamp,
-                        data.sequence_number
-                        )
-                elif data.type == 4:
-                    pass
-            else:
-                logging.error("Received data from an out of band device.")
-
-    def shutdown(self, notify_server = True):
+        msg, buffer = super().read()
+        if msg:
+            print(msg)
+            if msg.type == 1:
+                self.network_stats.update(
+                    msg.index,
+                    len(buffer),
+                    msg.timestamp,
+                    msg.frame.canFrame.sequence_number
+                    )
+            elif msg.type == 4:
+                report = self.health_report.report.from_buffer_copy(
+                    buffer, self.comm_head_size
+                    )
+                # for i in range(len(self.members)):
+                #     print(report[i])
+                self.health_report.update(msg.index, report)
+                # print(self.health_report.packet_loss)
+                # print(self.health_report.latency)
+                # print(self.health_report.jitter)
+                # print(self.health_report.goodput)
+            
+    def stop(self, notify_server = True):
+        print("Times socket blocked: ", self.socket_blocked)
+        print("Times messages recvd: ", self.messages_recvd)
         self.do_DELETE()
         super().shutdown(notify_server)
-        self.l_thread.join(1)
-    
-    # def __check_connection(self):
-    #     for device in self.devices:
-    #         if device.last_frame_number < self.frame.last_frame:
-    #             self.__retransmit_if_needed()
-    #         if time() - device.last_can_message_time() > 1:
-    #             logging.warning(f'[{device.id}] hasnt sent can messages in at least 1 second!')
-            
-    # def __retransmit_if_needed(self):
-    #     if (time() - self.last_frame_sent_time) > self.retrans_timeout:
-    #         self.send_control_frame(self.last_control_frame)
+
+    def __update_health_view(self):
+        pass
 
 
 if __name__ == '__main__':
-    controller = Controller(10)
-    controller.setup()
+    controller = Controller()
+    controller.start()

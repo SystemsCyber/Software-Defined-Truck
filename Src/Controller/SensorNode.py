@@ -1,24 +1,155 @@
-from CANNode import CANNode
+import logging
+import struct
+from CANNode import CANNode, WCANBlock
 from ctypes import *
+from typing import List, Tuple
+from selectors import *
+from ipaddress import IPv4Address
+from time import time
+
+from CANNode import WCANFrame, WCANBlock
 
 
 class WSenseBlock(Structure):
+    _pack_ = 4
     _fields_ = [
         ("num_signals", c_uint8),
-        ("signals", c_float * 19)
+        ("signals", POINTER(c_float))  # Remember this machine is 64-bit and teensy is 32-bit
     ]
 
     def __repr__(self) -> str:
         s = f'num_signals: {self.num_signals} signals:\n'
         for i in range(self.num_signals):
-            s += f'{self.signals[i]}\n'
+            s += f'{self.signals[i]} '
         return s
 
+class WCOMMFrame(Union):
+    _fields_ = [
+        ("canFrame", WCANBlock),
+        ("sensorFrame", WSenseBlock)
+    ]
+
+class COMMBlock(Structure):
+    _anonymous_ = ("frame",)
+    _pack_ = 4
+    _fields_ = [
+        ("index", c_uint32),
+        ("frame_number", c_uint32),
+        ("timestamp", c_uint32),
+        ("type", c_uint8),
+        ("frame", WCOMMFrame)
+    ]
+
+    def __repr__(self) -> str:
+        s =  (
+            f'Index: {self.index} Frame Number: {self.frame_number}\n'
+            f'Timestamp: {self.timestamp} Type: {self.type}\n'
+        )
+        if self.type == 1:
+            s += f'Frame:\n{self.frame.canFrame}\n'
+        elif self.type == 2:
+            s += f'Frame:\n{self.frame.sensorFrame}\n'
+        return s
+
+class Member_Node():
+    def __init__(self, _id = -1, _devices = None) -> None:
+        self.id = _id
+        self.devices = _devices
+        self.last_received_frame = -1
+        self.health_report = None
+
 class SensorNode(CANNode):
-    def __init__(self) -> None:
-        super(SensorNode, self).__init__()
+    def __init__(self, *, _max_retrans = 3, _max_frame_rate = 60, **kwargs) -> None:
+        super().__init__()
+        self._id = -1
+        self.index = 0
+        self.members: List[Member_Node] = [] # ID of member is index in array
 
-    def packSignals(self, *sensors: float) -> WSenseBlock:
-        return WSenseBlock(len(sensors), sensors)
+        self._max_retransmissions = _max_retrans
+        self._max_retrans_notified = False
+        self._attempts = 0
+        self._timeout = None
+        self.timeout_additive = (1/_max_frame_rate) * (_max_retrans)
+        logging.debug(f"Timeout additive: {self.timeout_additive}")
+        self.frame_number = 1
+        self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
+        self._signal_offset = self.comm_head_size + 4
 
-    
+    def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
+        super().start_session(ip, port)
+        self._id = request_data["ID"]
+        self.members = [Member_Node] * len(request_data["Devices"])
+        for member in request_data["Devices"]:
+            self.members[member["Index"]] = Member_Node(
+                member["ID"], member["Devices"]
+                )
+
+    def stop_session(self) -> None:
+        self._id = -1
+        self.members.clear()
+        super().stop_session()
+
+    def packSensorData(self, *sensors: float) -> bytes:
+        l = len(sensors)
+        self._attempts = 0
+        self._max_retrans_notified = False
+        signalArray = c_float * l
+        signals = signalArray(*sensors)
+        msg = COMMBlock(
+            self.index,
+            self.frame_number,
+            int(time() * 1000),
+            2,
+            WCOMMFrame(WCANBlock(), WSenseBlock(l, signals))
+        )
+        self.frame_number += 1
+        return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
+
+    def write(self, *msg: COMMBlock) -> int:
+        if self._attempts <= self._max_retransmissions:
+            self._attempts += 1
+            self._timeout = time() + self.timeout_additive
+            return super().write(*msg)
+        elif not self._max_retrans_notified and isinstance(msg[0], COMMBlock):
+            index = msg[0].index
+            logging.error(
+                f"Have not received frame #{self.frame_number} "
+                f"from device with index number {index} after "
+                f"{self._max_retransmissions} attempts."
+                )
+            self._max_retrans_notified = True
+
+    def read(self) -> Tuple[COMMBlock, bytes]:
+        try:
+            buffer = super().read()
+            if buffer and len(buffer) >= sizeof(COMMBlock):
+                msg = COMMBlock.from_buffer_copy(buffer)
+                self.members[msg.index].last_received_frame = msg.frame_number
+                return msg, buffer
+            else:
+                return (None, None)
+        except (AttributeError, ValueError) as ae:
+            logging.error("Received data from an out of band device.")
+            logging.error(ae)
+            return (None, None)
+
+    def __recvd_frame(self, member: Member_Node, current_time: float) -> bool:
+        not_recvd = member.last_received_frame != self.frame_number
+        timedout = current_time >= self._timeout
+        if not_recvd and timedout:
+            self.can_key.data.callback = self.write
+            with self.sel_lock:
+                self.sel.modify(
+                    self.can_key.fileobj,
+                    EVENT_WRITE,
+                    self.can_key.data
+                    )
+            return False
+
+    def check_members(self) -> None:
+        if not self._timeout:
+            return
+        current_time = time()
+        for member in self.members:
+            if self.__recvd_frame(member, current_time):
+                break

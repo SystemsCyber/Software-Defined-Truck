@@ -1,0 +1,57 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "Requested Devices",
+    "description": "The device(s) and their IDs being requested by the controller.",
+    "type": "array",
+    "examples": [
+        {
+            "ID": 1234,
+            "Devices": {
+                "$ref": "DeviceCollection.json/#/examples/0"
+            }
+        },
+        {
+            "ID": 4321,
+            "Devices": {
+                "$ref": "DeviceCollection.json/#/examples/1"
+            }
+        }
+    ],
+    "maxItems": 20,
+    "minItems": 1,
+    "uniqueItems": true,
+    "items": {
+        "type":"object",
+        "required": [
+            "ID",
+            "Devices"
+        ],
+        "properties": {
+            "ID": {
+                "title": "ID",
+                "description": "The ID of the device(s) being requested.",
+                "type":"integer",
+                "examples": [
+                    1234,
+                    4321
+                ],
+                "minimum": 4,
+                "maximum": 65535
+            },
+            "Index": {
+                "type":"integer",
+                "examples": [
+                    1,
+                    4
+                ],
+                "minimum": 0,
+                "maximum": 20
+            },
+            "Devices": {
+                "title": "Requested Devices",
+                "description": "The requested device(s) associated with the requested ID.",
+                "$ref": "DeviceCollection.json"
+            }
+        }
+    }
+}

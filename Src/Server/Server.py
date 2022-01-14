@@ -1,20 +1,24 @@
-from http import HTTPStatus
-from argparse import ArgumentParser
+import atexit
+import logging
+import asyncio
+import http.client
 import queue
+import os
+import Routes
+from typing import List, Dict
+from logging.handlers import TimedRotatingFileHandler
+from http import HTTPStatus
+from copy import copy
 from socket import *
-from time import time, sleep
+from time import time
 from selectors import *
-from ipaddress import ip_network
-from http.server import BaseHTTPRequestHandler
+from ipaddress import IPv4Address, ip_network
+from Wrap_HTTPRequestHandler import Wrap_HTTPRequestHandler
 from types import SimpleNamespace
 from io import BytesIO
-from Node import Node
+from Device import Device
 from CANNodes import CANNodes
 from SensorNodes import SensorNodes
-import logging
-from logging.handlers import TimedRotatingFileHandler
-from HelperMethods import ColoredConsoleHandler, LogFolder
-import http.client
 
 """TODO Notes:
     - When recving or sending timeout should be calculated dynamically.
@@ -24,33 +28,60 @@ import http.client
               calculate timeout and when to retransmit.
 """
 
-class Broker(BaseHTTPRequestHandler):
+# COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
+class ColoredConsoleHandler(logging.StreamHandler):
+    def emit(self, record):
+        # Need to make a actual copy of the record
+        # to prevent altering the message for other loggers
+        myrecord = copy(record)
+        levelno = myrecord.levelno
+        if(levelno >= 50):  # CRITICAL / FATAL
+            color = '\x1b[31m'  # red
+        elif(levelno >= 40):  # ERROR
+            color = '\x1b[31m'  # red
+        elif(levelno >= 30):  # WARNING
+            color = '\x1b[33m'  # yellow
+        elif(levelno >= 20):  # INFO
+            color = '\x1b[32m'  # green
+        elif(levelno >= 10):  # DEBUG
+            color = '\x1b[35m'  # pink
+        else:  # NOTSET and anything else
+            color = '\x1b[0m'  # normal
+        myrecord.levelname = color + str(myrecord.levelname) + '\x1b[0m'  # normal
+        logging.StreamHandler.emit(self, myrecord)
+# ------------------------------------------------------------
 
-    # ==================== Initialization ====================
+class Broker(Wrap_HTTPRequestHandler):
 
-    def __init__(self, _keepalive_interval = 300, _localhost = False) -> None:
+    def __init__(self) -> None:
         self.client_address = None
-        self.keepalive_interval = _keepalive_interval
-        self.localhost = _localhost
+        # self.keepalive_interval = 300
+        self.keepalive_interval = 2
+        self.protocol_version = "HTTP/1.1"
+        atexit.register(self.__exit)
         self.__setup_logging()
         self.log_message("Broker Initializing.")
-        self.protocol_version = "HTTP/1.1"
         self.sel = DefaultSelector()
-        self.multicast_IPs = []
-        for ip in ip_network('239.255.0.0/16'):
-            self.multicast_IPs.append({
-                "ip": ip,
-                "available": True,
-                "sockets": []
-            })
-        self.blacklist_ips = []
-        self.SSS3s = CANNodes(self.sel, self.multicast_IPs)
-        self.CLIENTs = SensorNodes(self.sel, self.multicast_IPs)
+        self.multicast_ips: List[Dict] = self.__init_multicast_ips()
+        self.blacklist_ips: List[IPv4Address] = []
+        self.SSSFs = CANNodes(self.sel, self.multicast_ips)
+        self.CONTROLLERs = SensorNodes(self.sel, self.multicast_ips)
+        self.__setup()
 
-    def __setup_logging(self):
-        filename = LogFolder.findpath("broker_log")
+    def __findpath(self, log_name: str) -> str:
+        base_dir = os.path.abspath(os.getcwd())
+        for root, dirs, files in os.walk(base_dir):
+            for name in dirs:
+                if name == "Logs":
+                    log_path = os.path.join(root, name)
+                    return os.path.join(log_path, log_name)
+        log_path = os.path.join(base_dir, "Logs")
+        return os.path.join(log_path, log_name)
+
+    def __setup_logging(self) -> None:
+        filename = self.__findpath("broker_log")
         logging.basicConfig(
-            format='%(asctime)s - %(filename)s - %(levelname)s - %(message)s',
+            format='%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s',
             level=logging.DEBUG,
             handlers=[
                 TimedRotatingFileHandler(
@@ -63,89 +94,57 @@ class Broker(BaseHTTPRequestHandler):
                 ColoredConsoleHandler()
                 ]
             )
-        # self.logger = logging.getLogger(__name__)
-        # self.logger.setLevel(logging.DEBUG)
 
-    # ===== Overrides for parent class functions =====
+    def __init_multicast_ips(self) -> List[Dict]:
+        ips = []
+        for ip in ip_network('239.255.0.0/16'):
+            ips.append({
+                "ip": ip,
+                "available": True,
+                "sockets": []
+            })
+        return ips
 
-    def log_error(self, format, *args):
-        address_string = "SERVER"
-        if self.client_address:
-            address_string = self.client_address[0]
-        logging.error("%s - - %s\n" %
-                         (address_string, format%args))
-
-    def log_message(self, format, *args):
-        address_string = "SERVER"
-        if self.client_address:
-            address_string = self.client_address[0]
-        logging.info("%s - - %s\n" %
-                         (address_string, format%args))
-
-    def end_headers(self):
-        """Send the blank line ending the MIME headers."""
-        self.wfile.seek(0)
-        message_body = self.wfile.read()
-        self.wfile.seek(0)
-        message_body_len = len(message_body)
-        self.send_header("Content-Length", str(message_body_len))
-        if message_body_len > 0:
-            self.send_header("Content-Type", "application/json")
-        if not self.close_connection:
-                self.send_header("Connection", "keep-alive")
-        if self.request_version != 'HTTP/0.9':
-            self._headers_buffer.append(b"\r\n")
-            self.flush_headers(message_body)
-
-    def flush_headers(self, message_body=b""):
-        if hasattr(self, '_headers_buffer'):
-            headers = b"".join(self._headers_buffer)
-            self.wfile.write(headers)
-            self.wfile.write(message_body)
-            self._headers_buffer = []
-
-    # ==================== Main Server Functions ====================
-
-    def listen(self):
-        lsock = socket(AF_INET, SOCK_STREAM)
-        lsock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        device_address = gethostbyname_ex(gethostname())[2][3]
-        lsock.bind((device_address, 80))
-        # lsock.bind(("127.0.0.1", 80))
-        lsock.listen()
-        lsock.setblocking(False)
+    def __setup(self):
+        self.lsock = socket(AF_INET, SOCK_STREAM)
+        self.lsock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.lsock.setblocking(False)
         data = SimpleNamespace(callback=self.__accept)
-        self.sel.register(lsock, EVENT_READ, data=data)
-        self.log_message(f'Listening on: {device_address}:80')
-        self.__handle_connection()
+        self.sel.register(self.lsock, EVENT_READ, data=data)
 
-    def __handle_connection(self) -> None:
+    def listen(self) -> None:
+        device_address = gethostbyname_ex(gethostname())[2]
+        self.lsock.bind(('', 80))
+        self.lsock.listen()
+        self.log_message(
+            f'Listening on these interfaces: {device_address}:80'
+            )
+        asyncio.run(self.__listening_loop())
+
+    async def __listening_loop(self) -> None:
         while True:
             try:
-                connection_events = self.sel.select(timeout=1)
+                events = self.sel.select(timeout=1)
             except TimeoutError:
                 continue
             except KeyboardInterrupt:
                 return
             else:
-                for key, mask in connection_events:
-                    self.__handle_mask_events(key, mask)
+                cors = [self.__events(key, mask) for key, mask in events]
+                await asyncio.gather(*cors)
                 self.__prune_connections()
 
-    def __handle_mask_events(self, key: SelectorKey, mask):
-        if mask == EVENT_READ:
-            if key.data.callback == self.__accept:
-                callback = key.data.callback
-                callback(key)
-            elif not key.data.rate_limit(self.log_error):
-                sleep(0.001)  # Small hack to let the rest of the message
-                                    # make it in to the socket before reading it.
+    async def __events(self, key: SelectorKey, mask):
+        if mask == EVENT_READ and key.data.callback != self.__accept:
+            if not key.data.rate_limit(self.log_error):
+                await asyncio.sleep(0.2)
                 self.__call_callback(key)
         else:
             self.__call_callback(key)
 
     def __call_callback(self, key: SelectorKey):
-        self.client_address = key.data.addr
+        if hasattr(key.data, "addr"):
+            self.client_address = key.data.addr
         callback = key.data.callback
         callback(key)
         self.client_address = None
@@ -175,7 +174,7 @@ class Broker(BaseHTTPRequestHandler):
         else:
             self.log_message(f'New connection from: {addr[0]}:{str(addr[1])}')
             self.__set_keepalive(conn)
-            data = Node(self.__read, self.__write, addr)
+            data = Device(self.__read, self.__write, addr)
             self.sel.register(conn, EVENT_READ, data=data)
 
     def __set_keepalive(self, conn: SocketType) -> None:
@@ -199,7 +198,7 @@ class Broker(BaseHTTPRequestHandler):
     
     def __handle_request(self, key: SelectorKey, message: bytes) -> None:
         with BytesIO() as self.wfile, BytesIO(message) as self.rfile:
-            self._key = key
+            self.key = key
             self.handle_one_request()
             self.end_headers()
             self.wfile.seek(0)
@@ -210,7 +209,6 @@ class Broker(BaseHTTPRequestHandler):
                 key.data.close_connection = self.close_connection
                 self.sel.modify(key.fileobj, EVENT_WRITE, key.data)
             else:
-                logging.info(f'{key.data.addr[0]} - - Closed the connection.')
                 self.__shutdown_connection(key)
 
     def __handle_response(self, key: SelectorKey):
@@ -218,70 +216,63 @@ class Broker(BaseHTTPRequestHandler):
         try:
             key.data.response.begin()
             key.data.expecting_response = False
-        except http.client.HTTPException as he:
-            self.log_error(f'{he}')
+        except (
+            http.client.HTTPException,
+            http.client.BadStatusLine,
+            OSError
+            ) as ose:
+            self.log_error(f'{ose}')
             key.data.close_connection = True
             self.__shutdown_connection(key)
-        except OSError as ose:
-                self.log_error(f'{ose}')
-                key.data.close_connection = True
-                self.__shutdown_connection(key)
 
     def do_GET(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_HEAD(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_POST(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_PUT(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_DELETE(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_OPTIONS(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_CONNECT(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
     def do_TRACE(self):
-        self.__method_poxy()
+        self.__method_proxy()
 
-    def __method_poxy(self):
-        list_name, method_name = self.__parse_path()
-        try:
-            device_list = getattr(self, list_name)
-        except AttributeError as ae:
-            logging.debug(f'{ae}')
-            self.log_error("Requested a non-existent device type.")
-            self.send_error(HTTPStatus.NOT_FOUND)
-            return
-        try:
-            method_handle = getattr(device_list, method_name)
-            response = method_handle(self._key, self.rfile, self.wfile)
-            if response == HTTPStatus.FORBIDDEN:
-                self.blacklist_ips.append(self._key.addr[0])
-                self._key.data.close_connection = True
-            self.send_response(response)
-        except AttributeError as ae:
-            logging.debug(f'{ae}')
-            self.log_error("Requested a method that is not implemented.")
-            self.send_error(HTTPStatus.NOT_IMPLEMENTED)
-
-    def __parse_path(self):
+    def __parse_path(self) -> str:
         second_slash = self.path.find('/', 1)
         if second_slash == -1:
             list_name = self.path[1:].upper() + "s"
-            method_name = 'do_' + self.command.upper()
         else:
             list_name = self.path[1:second_slash].upper() + "s"
-            verb_name = '_' + self.path[(second_slash + 1):].lower()
-            method_name = 'do_' + self.command.upper() + verb_name 
-        return list_name, method_name
+        return list_name
+
+    def __method_proxy(self):
+        try:
+            device_list = getattr(self, self.__parse_path())
+            func = Routes.routes[self.path.upper() + self.command.upper()]
+            response = func(device_list, self.key, self.rfile, self.wfile)
+            if response == HTTPStatus.FORBIDDEN:
+                self.blacklist_ips.append(self.key.addr[0])
+                self.key.data.close_connection = True
+            self.send_response(response)
+        except (KeyError, AttributeError) as ae:
+            logging.warning(ae)
+            self.log_error(
+                "Requested a URI+Command combination "
+                "that was not found."
+                )
+            self.send_error(HTTPStatus.NOT_FOUND)
 
     def __write(self, key: SelectorKey):
         try:
@@ -295,38 +286,32 @@ class Broker(BaseHTTPRequestHandler):
             self.log_error(f'{ose}')
             key.data.close_connection = True
         finally:
-            if key.data.close_connection:
-                self.log_message(f'Closed the connection.')
-                self.__shutdown_connection(key)
+            if key.data.close_connection: self.__shutdown_connection(key)
 
-    def __shutdown_connection(self, key: SelectorKey):
-        logging.info(f'{key.data.addr[0]} - - Closing connection.')
-        if getattr(key.data, "type"):
-            list_name = getattr(self, key.data.type + "s")
-            del_method = getattr(list_name, "do_DELETE_register")
-            del_method(key)
+    def __shutdown_connection(self, key: SelectorKey) -> None:
+        logging.info(f'{key.data.addr[0]} - Closing connection.')
+        try:
+            valid_type = hasattr(key.data, "type") and key.data.type != "unknown"
+            in_use = hasattr(key.data, "in_use") and key.data.in_use
+            if valid_type and in_use:
+                del_method = "/" + key.data.type.upper() + "/REGISTERDELETE"
+                del_method = Routes.routes[del_method]
+                with BytesIO() as self.wfile, BytesIO() as self.rfile:
+                    del_method(
+                        getattr(self, key.data.type + "s"), key,
+                        self.wfile, self.rfile
+                        )
+        except (KeyError, AttributeError) as ae:
+            logging.error(ae)
         self.sel.unregister(key.fileobj)
         key.fileobj.shutdown(SHUT_RDWR)
         key.fileobj.close()
 
+    def __exit(self) -> None:
+        self.sel.close()
+
 def main():
-    argparser = ArgumentParser(
-        description="DARPA AMP CARLA Broker"
-        )
-    argparser.add_argument(
-        '-k', '--keep_alive_interval',
-        default=300,
-        type=int,
-        help='Keep alive probe interval for sockets.'
-        )
-    argparser.add_argument(
-        '-l', '--localhost',
-        action='store_true',
-        default=False,
-        help='Use localhost interface for listening socket.'
-    )
-    args = argparser.parse_args()
-    broker = Broker(args.keep_alive_interval, args.localhost)
+    broker = Broker()
     broker.listen()
 
 if __name__ == "__main__":

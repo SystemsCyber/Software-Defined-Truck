@@ -34,22 +34,21 @@ class Schema:
         return path.join(base_dir, "Schemas")
 
 class HTTPClient(CANNode, BaseHTTPRequestHandler):
-    def __init__(self, _server_ip = gethostname()) -> None:
+    def __init__(self, *, _server_ip = gethostname(), **kwargs) -> None:
         self.__server_ip = _server_ip
-        self.__server_port = 80
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
-        self.request_schema, _ = Schema.compile_schema("RequestECUs.json")
+        self.request_schema, _ = Schema.compile_schema("RequestDevices.json")
         self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
-        super(HTTPClient, self).__init__()
+        super().__init__()
 
     # Overrides for the parent functions
 
     def log_error(self, format, *args):
-        logging.error("%s - - %s\n" % ("SERVER", format%args))
+        logging.error("%s - %s\n" % ("SERVER", format%args))
 
     def log_message(self, format, *args):
-        logging.info("%s - - %s\n" % ("SERVER", format%args))
+        logging.info("%s - %s\n" % ("SERVER", format%args))
     
     # ----------------------------------
     
@@ -100,7 +99,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def __submit_registration(self, retry = True) -> bool:
         registration = json.dumps({"MAC": self.mac})
         try:
-            uri = "/client/register"
+            uri = "/controller/register"
             headers = {"Content-Type": "application/json"}
             self.ctrl.request("POST", uri, registration, headers)
         except HTTPException as httpe:
@@ -147,7 +146,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         msg = "request available devices from the server"
         try:
             logging.info(f"Requesting {msg[7:]}.")
-            self.ctrl.request("GET", "/sss3")
+            self.ctrl.request("GET", "/sssf")
         except HTTPException as httpe:
             logging.error(f"Failed to {msg}.")
             logging.error(httpe)
@@ -155,13 +154,13 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             if self.__getresponse() and self.__successful(msg, 400):
                 return self.__deserialize_device_list(self.response_data)
 
-    def request_devices(self, _devices: list) -> bool:
+    def request_devices(self, _req: list, _devices: list) -> bool:
         msg = "request desired devices from the server"
         logging.info(f"Requesting {msg[7:]}")
-        req = [i for i in self.devices if i["ID"] in _devices]
-        requestJSON = json.dumps({"MAC": self.mac, "ECUs": req})
+        req = [i for i in _devices if i["ID"] in _req]
+        requestJSON = json.dumps({"MAC": self.mac, "Devices": req})
         try:
-            uri = "/client/session"
+            uri = "/controller/session"
             headers = {"Content-Type": "application/json"}
             self.ctrl.request("POST", uri, requestJSON, headers)
         except HTTPException as httpe:
@@ -183,17 +182,17 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         
     def do_POST(self):
         try:
-            self.request_data = json.load(self.rfile)
-            self.session_schema.validate(self.request_data)
-            self.start_session(
-                IPv4Address(self.request_data["IP"]),
-                self.request_data["PORT"]
-                )
+            request_data = json.load(self.rfile)
+            self.session_schema.validate(request_data)
+            ip = IPv4Address(request_data["IP"])
+            port = request_data["Port"]
+            return ip, port, request_data
         except (ValidationError,
                 JSONDecodeError,
                 AddressValueError) as ve:
             logging.error(ve)
             self.close_connection = True
+            return None
 
     def __send_delete(self, path: str):
         logging.info(f'Sending DELETE.')
@@ -209,13 +208,13 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             self.__getresponse()
     
     def do_DELETE(self):
-        self.__send_delete("/client/session")
-        self.stop_session()
+        self.__send_delete("/controller/session")
 
     def shutdown(self, notify_server = True):
         logging.debug("Shutting down server connection.")
         if notify_server:
-            self.__send_delete("/client/register")
-        self.sel.unregister(self.ctrl.sock)
+            self.__send_delete("/controller/register")
+        with self.sel_lock:
+            self.sel.unregister(self.ctrl.sock)
         self.ctrl.sock.shutdown(SHUT_RDWR)
         self.ctrl.sock.close()

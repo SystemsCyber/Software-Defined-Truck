@@ -23,12 +23,14 @@ private:
     EthernetClient clientSock;
     HttpClient client;
 
-    DynamicJsonDocument attachedDevice;
-    const char *serverAddress;
+    DynamicJsonDocument attachedDevices;
+    const char* serverAddress;
     IPAddress serverIP;
     uint16_t serverPort;
 
     volatile int connectionStatus;
+
+    String registration;
 
 public:
     struct Request
@@ -48,9 +50,9 @@ public:
         String error;
     };
 
-    HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort = 80);
-    HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddress, uint16_t _serverPort = 80);
-    HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, const char* _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, String& _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, IPAddress& _serverIP, uint16_t _serverPort = 80);
     
     virtual bool connect();
     virtual bool read(struct Request *request, bool respondOnError = true);
@@ -58,8 +60,9 @@ public:
     virtual int write(struct Request *request, struct Response *response);
 
 private:
+    void createRegistration();
     int attemptConnection(bool retry = true);
-    int connectionSuccessful(bool retry = true);
+    int connectionSuccessful(int statusCode, bool retry = true);
     int connectionFailed(int code, bool retry = true);
 
     bool parseRequest(struct Request *req);

@@ -6,37 +6,30 @@
 #include <array>
 
 Load::Load():
-    exConfigWithIP(512),
-    exConfigWithFQDN(512),
+    exConfig(512),
     exECU1(256),
     exECU2(256),
     config(1024)                   
 {
-    exECU1["sn"] = "1a2b3c4d";
-    exECU1["make"] = "Cummins";
-    exECU1["model"] = "theModel";
-    exECU1["year"] = 1999;
-    JsonArray ecuType1 = exECU1.createNestedArray("type");
+    exECU1["SN"] = "1a2b3c4d";
+    exECU1["Make"] = "Cummins";
+    exECU1["Model"] = "theModel";
+    exECU1["Year"] = 1999;
+    JsonArray ecuType1 = exECU1.createNestedArray("Type");
     ecuType1.add("ECU");
     ecuType1.add("Electronic Control Unit");
 
-    exECU2["sn"] = "a1b2c3d4";
-    exECU2["make"] = "Detroit Desiel";
-    exECU2["model"] = "theModel";
-    exECU2["year"] = 2000;
-    JsonArray ecuType2 = exECU2.createNestedArray("type");
+    exECU2["SN"] = "a1b2c3d4";
+    exECU2["Make"] = "Detroit Desiel";
+    exECU2["Model"] = "theModel";
+    exECU2["Year"] = 2000;
+    JsonArray ecuType2 = exECU2.createNestedArray("Type");
     ecuType2.add("ECM");
     ecuType2.add("Engine Control Module");
 
-    exConfigWithIP["serverAddress"] = "123.456.789.101";
-    JsonArray ecus1 = exConfigWithIP.createNestedArray("ECUs");
+    JsonArray ecus1 = exConfig.createNestedArray("AttachedDevices");
     ecus1.add(exECU1);
     ecus1.add(exECU2);
-
-    exConfigWithFQDN["serverAddress"] = "aHostName";
-    JsonArray ecus2 = exConfigWithFQDN.createNestedArray("ECUs");
-    ecus2.add(exECU1);
-    ecus2.add(exECU2);
 };
 
 void Load::init()
@@ -62,7 +55,7 @@ File Load::initializeSD(const char *filename)
 
 File Load::fileExists(const char *filename)
 {
-    Serial.print("The SSS3 configuration file \"");
+    Serial.print("The SSSF configuration file \"");
     Serial.print(filename);
     if (!SD.exists(filename))
     {
@@ -102,7 +95,7 @@ void Load::deserializeConfiguration(File file)
         Serial.print(F("Deserializing the configuration file failed with code "));
         Serial.println(error.f_str());
         Serial.println();
-        Serial.println("The default format for the SSS3 SD card is:");
+        Serial.println("The default format for the SSSF SD card is:");
         serializeJsonPretty(config, Serial);
     }
     else
@@ -110,5 +103,6 @@ void Load::deserializeConfiguration(File file)
         Serial.println("Done.");
         Serial.println("Configuration read from SD card:");
         serializeJsonPretty(config, Serial);
+        Serial.println("\n");
     }
 }

@@ -1,11 +1,11 @@
 import queue
 import time
-import selectors
+from selectors import *
+from types import FunctionType
 from typing import Tuple, Dict, List
 
-SEL = selectors.SelectorKey
 
-class Node:
+class Device:
     def __init__(self, read, write, addr: Tuple[str, int]) -> None:
         self.read = read
         self.write = write
@@ -55,43 +55,43 @@ class Node:
             return True
 
     @staticmethod
-    def is_registered(key: SEL) -> bool:
+    def is_registered(key: SelectorKey) -> bool:
         if hasattr(key.data, "MAC") and key.data.MAC:
             return True
         return False
 
     @staticmethod
-    def is_not_listening_socket(key: SEL) -> bool:
+    def is_not_listening_socket(key: SelectorKey) -> bool:
         return hasattr(key.data, "MAC")
 
     @staticmethod
-    def is_client(key: SEL) -> bool:
-        if Node.is_registered(key):
-            return hasattr(key.data, "type") and key.data.type == "CLIENT"
+    def is_controller(key: SelectorKey) -> bool:
+        if Device.is_registered(key):
+            return hasattr(key.data, "type") and key.data.type == "CONTROLLER"
         else:
             return False
     
     @staticmethod
-    def is_SSS3(key: SEL) -> bool:
+    def is_SSSF(key: SelectorKey) -> bool:
         if hasattr(key.data, "MAC") and key.data.MAC:
-            return hasattr(key.data, "type") and key.data.type == "SSS3"
+            return hasattr(key.data, "type") and key.data.type == "SSSF"
         else:
             return False
 
     @staticmethod
-    def is_available(key: SEL) -> bool:
-        if Node.is_not_listening_socket(key):
-            return Node.is_SSS3(key) and not key.data.in_use
+    def is_available(key: SelectorKey, is_type: FunctionType) -> bool:
+        if Device.is_not_listening_socket(key):
+            return is_type(key) and not key.data.in_use
 
     @staticmethod
-    def get_available_ECUs(sel: selectors.DefaultSelector) -> List:
+    def get_available_devices(sel: DefaultSelector, is_type: FunctionType) -> List:
         available = []
         sel_map = sel.get_map()
         for fd in sel_map:
             key = sel_map[fd]
-            if Node.is_available(key):
+            if Device.is_available(key, is_type):
                 available.append({
                     "ID": fd, 
-                    "ECUs": key.data.ECUs
+                    "Devices": key.data.devices
                 })
         return available
