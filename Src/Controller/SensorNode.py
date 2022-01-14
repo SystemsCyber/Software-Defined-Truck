@@ -61,22 +61,23 @@ class Member_Node():
 class SensorNode(CANNode):
     def __init__(self, *, _max_retrans = 3, _max_frame_rate = 60, **kwargs) -> None:
         super().__init__()
-        self.id = -1
+        self._id = -1
         self.index = 0
         self.members: List[Member_Node] = [] # ID of member is index in array
 
-        self.max_retransmissions = _max_retrans
-        self.max_retrans_notified = False
-        self.attempts = 0
-        self.timeout = None
+        self._max_retransmissions = _max_retrans
+        self._max_retrans_notified = False
+        self._attempts = 0
+        self._timeout = None
         self.timeout_additive = (1/_max_frame_rate) * (_max_retrans)
         logging.debug(f"Timeout additive: {self.timeout_additive}")
         self.frame_number = 1
-        self.offset = sizeof(COMMBlock) - sizeof(WCOMMFrame) + 4
+        self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
+        self._signal_offset = self.comm_head_size + 4
 
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
         super().start_session(ip, port)
-        self.id = request_data["ID"]
+        self._id = request_data["ID"]
         self.members = [Member_Node] * len(request_data["Devices"])
         for member in request_data["Devices"]:
             self.members[member["Index"]] = Member_Node(
@@ -84,14 +85,14 @@ class SensorNode(CANNode):
                 )
 
     def stop_session(self) -> None:
-        self.id = -1
+        self._id = -1
         self.members.clear()
         super().stop_session()
 
     def packSensorData(self, *sensors: float) -> bytes:
         l = len(sensors)
-        self.attempts = 0
-        self.max_retrans_notified = False
+        self._attempts = 0
+        self._max_retrans_notified = False
         signalArray = c_float * l
         signals = signalArray(*sensors)
         msg = COMMBlock(
@@ -102,27 +103,27 @@ class SensorNode(CANNode):
             WCOMMFrame(WCANBlock(), WSenseBlock(l, signals))
         )
         self.frame_number += 1
-        return bytes(msg)[:self.offset] + struct.pack(f"<{l}f", *signals)
+        return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
 
     def write(self, *msg: COMMBlock) -> int:
-        if self.attempts <= self.max_retransmissions:
-            self.attempts += 1
-            self.timeout = time() + self.timeout_additive
+        if self._attempts <= self._max_retransmissions:
+            self._attempts += 1
+            self._timeout = time() + self.timeout_additive
             return super().write(*msg)
-        elif not self.max_retrans_notified and isinstance(msg[0], COMMBlock):
+        elif not self._max_retrans_notified and isinstance(msg[0], COMMBlock):
             index = msg[0].index
             logging.error(
                 f"Have not received frame #{self.frame_number} "
                 f"from device with index number {index} after "
-                f"{self.max_retransmissions} attempts."
+                f"{self._max_retransmissions} attempts."
                 )
-            self.max_retrans_notified = True
+            self._max_retrans_notified = True
 
     def read(self) -> Tuple[COMMBlock, bytes]:
         try:
             buffer = super().read()
-            if buffer:
-                msg = COMMBlock.from_buffer_copy(buffer[:sizeof(COMMBlock)])
+            if buffer and len(buffer) >= sizeof(COMMBlock):
+                msg = COMMBlock.from_buffer_copy(buffer)
                 self.members[msg.index].last_received_frame = msg.frame_number
                 return msg, buffer
             else:
@@ -130,11 +131,11 @@ class SensorNode(CANNode):
         except (AttributeError, ValueError) as ae:
             logging.error("Received data from an out of band device.")
             logging.error(ae)
-            return None
+            return (None, None)
 
     def __recvd_frame(self, member: Member_Node, current_time: float) -> bool:
         not_recvd = member.last_received_frame != self.frame_number
-        timedout = current_time >= self.timeout
+        timedout = current_time >= self._timeout
         if not_recvd and timedout:
             self.can_key.data.callback = self.write
             with self.sel_lock:
@@ -146,7 +147,7 @@ class SensorNode(CANNode):
             return False
 
     def check_members(self) -> None:
-        if not self.timeout:
+        if not self._timeout:
             return
         current_time = time()
         for member in self.members:

@@ -24,7 +24,7 @@ private:
     HttpClient client;
 
     DynamicJsonDocument attachedDevices;
-    const char *serverAddress;
+    const char* serverAddress;
     IPAddress serverIP;
     uint16_t serverPort;
 
@@ -50,9 +50,9 @@ public:
         String error;
     };
 
-    HTTPClient(DynamicJsonDocument _attachedDevices, const char* _serverAddress, uint16_t _serverPort = 80);
-    HTTPClient(DynamicJsonDocument _attachedDevices, String _serverAddress, uint16_t _serverPort = 80);
-    HTTPClient(DynamicJsonDocument _attachedDevices, IPAddress _serverIP, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, const char* _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, String& _serverAddress, uint16_t _serverPort = 80);
+    HTTPClient(DynamicJsonDocument& _attachedDevices, IPAddress& _serverIP, uint16_t _serverPort = 80);
     
     virtual bool connect();
     virtual bool read(struct Request *request, bool respondOnError = true);

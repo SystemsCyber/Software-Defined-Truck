@@ -22,10 +22,16 @@ private:
 
     int canBlockSize = 0;
     int canHeadSize = 0;
+    
+protected:
     int canSize = 0;
     int canFDSize = 0;
 
-protected:
+    uint32_t can0BaudRate;
+    uint32_t can1BaudRate;
+    FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
+    FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
+
     uint8_t mac[6];  // Hostname is "WIZnet" + last three bytes of the MAC.
     uint32_t sequenceNumber = 1;
     volatile boolean sessionStatus;
@@ -44,6 +50,8 @@ public:
     };
     
     CANNode();
+    CANNode(uint32_t _can0Baudrate);
+    CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate);
     virtual int init();
     virtual bool startSession(IPAddress _ip, uint16_t _port);
     virtual bool startSession(String _ip, uint16_t _port);
@@ -59,6 +67,8 @@ public:
     String dumpCANBlock(struct WCANBlock &canBlock);
 
 private:
+    void setupLogging();
+    void setupCANChannels();
     static void checkHardware();
     static void checkLink();
 

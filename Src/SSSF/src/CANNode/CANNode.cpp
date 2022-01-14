@@ -6,12 +6,30 @@
 #include <FlexCAN_T4.h>
 #include <Dns.h>
 
-CANNode::CANNode(): mac{0}, sessionStatus(Inactive)
+CANNode::CANNode():
+    mac{0},
+    sessionStatus(Inactive)
 {
-    Log.setPrefix(printPrefix);
-    Log.setSuffix(printSuffix);
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.setShowLevel(false);
+    setupLogging();
+    teensyMAC(mac);
+}
+
+CANNode::CANNode(uint32_t _can0Baudrate):
+    can0BaudRate(_can0Baudrate),
+    mac{0},
+    sessionStatus(Inactive)
+{
+    setupLogging();
+    teensyMAC(mac);
+}
+
+CANNode::CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+    can0BaudRate(_can0Baudrate),
+    can1BaudRate(_can1Baudrate),
+    mac{0},
+    sessionStatus(Inactive)
+{
+    setupLogging();
     teensyMAC(mac);
 }
 
@@ -22,6 +40,8 @@ int CANNode::init()
     canSize = sizeof(CAN_message_t);
     canFDSize = sizeof(CANFD_message_t);
     canHeadSize = canBlockSize - canFDSize;
+    Log.noticeln("Setting up CAN Channel(s).");
+    setupCANChannels();
     Log.noticeln("Setting up Ethernet:");
     Log.noticeln("\t-> Initializing the Ethernet shield to use the provided MAC address");
     Log.noticeln("\t   and retreving network configuration parameters through DHCP.");
@@ -157,31 +177,57 @@ void CANNode::stopSession()
 String CANNode::dumpCANBlock(struct WCANBlock &canBlock)
 {
     String msg = "Sequence Number: " + String(canBlock.sequenceNumber);
-    msg += "Need Response: " + String(canBlock.needResponse) + "\n";
+    msg += " Need Response: " + String(canBlock.needResponse);
+    msg += " FD: " + String(canBlock.fd) + "\n" + "Frame:\n";
     if (canBlock.fd)
     {
         struct CANFD_message_t f = canBlock.canFD;
-        msg += "CAN ID: " + String(f.id); 
-        msg += " CAN Timestamp: " + String(f.timestamp) + "\n";
-        msg += "Length: " + String(f.len) + " Data: ";
+        msg += "\tCAN ID: " + String(f.id) + " CAN Timestamp: " + String(f.timestamp) + " IDHit: " + String(f.idhit) + "\n";
+        msg += "\tbrs: " + String(f.brs) + " esi: " + String(f.esi) + " bus: " + String(f.bus) + "\n";
+        msg += "\tExtended: " + String(f.flags.extended) + " Overrun: " + String(f.flags.overrun);
+        msg += " Reserved: " + String(f.flags.reserved) + "\n";
+        msg += "\tLength: " + String(f.len) + " Data: ";
         for (int i = 0; i < f.len; i++)
         {
             msg += String(f.buf[i]);
         }
+        msg += "\n\tmb: " + String(f.mb) + " bus: " + String(f.bus) + " seq: " + String(f.seq) + "\n";
     }
     else
     {
         struct CAN_message_t f = canBlock.can;
-        msg += "CAN ID: " + String(f.id); 
-        msg += " CAN Timestamp: " + String(f.timestamp) + "\n";
-        msg += "Length: " + String(f.len) + " Data: ";
+        msg += "\tCAN ID: " + String(f.id) + " CAN Timestamp: " + String(f.timestamp) + " IDHit: " + String(f.idhit) + "\n";
+        msg += "\tExtended: " + String(f.flags.extended) + " Remote: " + String(f.flags.remote);
+        msg += " Overrun: " + String(f.flags.overrun) + " Reserved: " + String(f.flags.reserved) + "\n";
+        msg += "\tLength: " + String(f.len) + " Data: ";
         for (int i = 0; i < f.len; i++)
         {
             msg += String(f.buf[i]);
         }
+        msg += "\n\tmb: " + String(f.mb) + " bus: " + String(f.bus) + " seq: " + String(f.seq) + "\n";
     }
-    msg += "\n";
     return msg;
+}
+
+void CANNode::setupLogging()
+{
+    Log.setPrefix(printPrefix);
+    Log.setSuffix(printSuffix);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    Log.setShowLevel(false);
+}
+
+void CANNode::setupCANChannels()
+{
+    Log.noticeln("Setting up can0 with a bitrate of %d", can0BaudRate);
+    can0.begin();
+    can0.setBaudRate(can0BaudRate);
+    if (can1BaudRate)
+    {
+        Log.noticeln("Setting up can1 with a bitrate of %d", can1BaudRate);
+        can1.begin();
+        can1.setBaudRate(can1BaudRate);
+    }
 }
 
 void CANNode::checkHardware()
@@ -222,27 +268,26 @@ void CANNode::printPrefix(Print* _logOutput, int logLevel)
 
 void CANNode::printTimestamp(Print* _logOutput)
 {
+    // Division constants
+    const unsigned int MSECS_PER_SEC       = 1000;
+    const unsigned int SECS_PER_MIN        = 60;
+    const unsigned int SECS_PER_HOUR       = 3600;
+    const unsigned int SECS_PER_DAY        = 86400;
 
-  // Division constants
-  const unsigned int MSECS_PER_SEC       = 1000;
-  const unsigned int SECS_PER_MIN        = 60;
-  const unsigned int SECS_PER_HOUR       = 3600;
-  const unsigned int SECS_PER_DAY        = 86400;
+    // Total time
+    const unsigned int msecs               =  millis() ;
+    const unsigned int secs                =  msecs / MSECS_PER_SEC;
 
-  // Total time
-  const unsigned int msecs               =  millis() ;
-  const unsigned int secs                =  msecs / MSECS_PER_SEC;
+    // Time in components
+    const unsigned int MiliSeconds         =  msecs % MSECS_PER_SEC;
+    const unsigned int Seconds             =  secs  % SECS_PER_MIN ;
+    const unsigned int Minutes             = (secs  / SECS_PER_MIN) % SECS_PER_MIN;
+    const unsigned int Hours               = (secs  % SECS_PER_DAY) / SECS_PER_HOUR;
 
-  // Time in components
-  const unsigned int MiliSeconds         =  msecs % MSECS_PER_SEC;
-  const unsigned int Seconds             =  secs  % SECS_PER_MIN ;
-  const unsigned int Minutes             = (secs  / SECS_PER_MIN) % SECS_PER_MIN;
-  const unsigned int Hours               = (secs  % SECS_PER_DAY) / SECS_PER_HOUR;
-
-  // Time as string
-  char timestamp[20];
-  sprintf(timestamp, "%02u:%02u:%02u.%03u ", Hours, Minutes, Seconds, MiliSeconds);
-  _logOutput->print(timestamp);
+    // Time as string
+    char timestamp[20];
+    sprintf(timestamp, "%02u:%02u:%02u.%03u ", Hours, Minutes, Seconds, MiliSeconds);
+    _logOutput->print(timestamp);
 }
 
 

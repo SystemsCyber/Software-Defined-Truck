@@ -1,8 +1,7 @@
-import atexit
 import logging
 from io import BytesIO
 from HealthReport import NetworkStats, HealthReport
-from SensorNode import SensorNode, Member_Node, COMMBlock
+from SensorNode import SensorNode, COMMBlock, WCOMMFrame
 from HTTPClient import HTTPClient
 from typing import List, NamedTuple, Type
 from types import SimpleNamespace
@@ -10,7 +9,7 @@ from time import time, sleep
 from pprint import pprint
 from socket import *
 from selectors import *
-from threading import Thread
+from threading import Thread, Event
 from TypeWriter import TypeWriter as tw
 from ctypes import *
 from pandas import DataFrame
@@ -22,23 +21,42 @@ class Controller(SensorNode, HTTPClient):
             _max_frame_rate = _max_frame_rate,
             _server_ip = _server_ip
             )
-        atexit.register(self.shutdown)
-        self.l_thread = Thread(target=self.__listen, args=(self.timeout_additive,))
-        self.l_thread.setDaemon(True)
-        self.listen = True
 
-    def __listen(self, _timeout=None) -> None:
-        while self.listen:
+    def __request_health(self, _listen: Event) -> None:
+        while _listen.is_set():
+            sleep(1)
+            msg = COMMBlock(
+                self.index,
+                self.frame_number,
+                int(time() * 1000),
+                3,
+                WCOMMFrame()
+            )
+            self.can_key.data.callback = self.write
+            self.can_key.data.message = bytes(msg)
+            with self.sel_lock:
+                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+
+    def __check_members(self, _listen: Event) -> None:
+        while _listen.is_set():
+            sleep(self.timeout_additive)
+            super().check_members()
+
+    def __write_signals(self, conn: SocketType) -> None:
+        while True:
+            try:
+                self.write(conn.recv())
+            except EOFError:
+                return
+
+    def __listen(self, _listen: Event) -> None:
+        while _listen.is_set():
             try:
                 with self.sel_lock:
-                    connection_events = self.sel.select(timeout=_timeout)
-                if not self.listen: return
+                    connection_events = self.sel.select(timeout=1)
                 for key, mask in connection_events:
                     callback = key.data.callback
                     callback(key)
-                self.check_members()
-            except TimeoutError:
-                self.check_members()
             except KeyboardInterrupt:
                 return
 
@@ -101,11 +119,23 @@ class Controller(SensorNode, HTTPClient):
         else:
             tw.write("Exiting", tw.red)
 
-    def setup(self):
+    def start(self, conn: SocketType, listen: Event) -> None:
         if self.connect() and self.register():
             self.__provision_devices()
             with BytesIO(self.response_data) as self.rfile:
                 self.do_POST()
+            signal_thd = Thread(target=self.__write_signals, args=(conn,))
+            report_thd = Thread(target=self.__request_health, args=(listen,))
+            check_thd = Thread(target=self.__check_members, args=(listen,))
+            signal_thd.start()
+            report_thd.start()
+            check_thd.start()
+            self.__listen(listen)
+            signal_thd.join(1)
+            report_thd.join(1)
+            check_thd.join(1)
+            self.stop()
+
 
     def do_POST(self):  # Equivalent of start
         try:
@@ -115,13 +145,8 @@ class Controller(SensorNode, HTTPClient):
                 pprint(request_data)
                 self.start_session(ip, port, request_data)
                 self.network_stats = NetworkStats(len(self.members))
-                self.health_report = HealthReport()
+                self.health_report = HealthReport(len(self.members))
                 tw.write("Starting the session!", tw.yellow)
-                if self.l_thread.is_alive():
-                    self.listen = False
-                    self.l_thread.join(1)
-                self.listen = True
-                self.l_thread.start()
             else:
                 tw.write("Did not receive session information.", tw.magenta)
                 tw.write("Exiting...", tw.red)
@@ -153,24 +178,30 @@ class Controller(SensorNode, HTTPClient):
                     msg.index,
                     len(buffer),
                     msg.timestamp,
-                    msg.frame.sequence_number
+                    msg.frame.canFrame.sequence_number
                     )
             elif msg.type == 4:
-                pass
-                # for row in self.health_report.columns()
+                report = self.health_report.report.from_buffer_copy(
+                    buffer, self.comm_head_size
+                    )
+                # for i in range(len(self.members)):
+                #     print(report[i])
+                self.health_report.update(msg.index, report)
+                # print(self.health_report.packet_loss)
+                # print(self.health_report.latency)
+                # print(self.health_report.jitter)
+                # print(self.health_report.goodput)
             
-    def shutdown(self, notify_server = True):
+    def stop(self, notify_server = True):
+        print("Times socket blocked: ", self.socket_blocked)
+        print("Times messages recvd: ", self.messages_recvd)
         self.do_DELETE()
         super().shutdown(notify_server)
-        if self.l_thread.is_alive():
-            self.listen = False
-            self.l_thread.join(1)
-    
+
     def __update_health_view(self):
         pass
 
 
-
 if __name__ == '__main__':
-    controller = Controller(10)
-    controller.setup()
+    controller = Controller()
+    controller.start()

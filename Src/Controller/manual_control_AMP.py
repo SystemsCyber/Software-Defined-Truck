@@ -81,6 +81,7 @@ import carla
 
 from carla import ColorConverter as cc
 
+import signal
 import argparse
 import collections
 import datetime
@@ -1080,9 +1081,7 @@ class CameraManager(object):
 # ==============================================================================
 
 
-def game_loop(args):
-    ecu = Controller()
-    ecu.setup()
+def game_loop(ecu, args):
     pygame.init()
     pygame.font.init()
     world = None
@@ -1223,12 +1222,16 @@ def main():
 
     print(__doc__)
 
+    ecu = Controller()
+    ecu.setup()
+    signal.signal(signal.SIGTERM, ecu.shutdown)
     try:
 
-        game_loop(args)
+        game_loop(ecu, args)
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
+        ecu.shutdown()
 
 
 if __name__ == '__main__':

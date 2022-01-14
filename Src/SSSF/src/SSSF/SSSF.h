@@ -5,26 +5,19 @@
 #include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
 #include <NetworkStats/NetworkStats.h>
+#include <W_NTPClient/W_NTPClient.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
-#include <NTPClient.h>
 #include <FlexCAN_T4.h>
 
 class SSSF: private SensorNode, private HTTPClient
 {
 private:
-    const char *serverAddress = "ETS00853";
     uint32_t id;
     uint32_t index;
     uint32_t frameNumber;
-    EthernetUDP ntpSock;
-    NTPClient timeClient;
-
-    FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
-    FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
-    uint32_t can0BaudRate;
-    uint32_t can1BaudRate;
+    W_NTPClient timeClient;
 
     NetworkStats *networkHealth;
 
@@ -46,25 +39,26 @@ public:
         };
     };
 
-    SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate);
-    SSSF(DynamicJsonDocument _attachedDevice, uint32_t _can0Baudrate, uint32_t can1Baudrate);
+    SSSF(const char* serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate);
+    SSSF(String& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate);
+    SSSF(IPAddress& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate);
+
+    SSSF(const char* serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t can1Baudrate);
+    SSSF(String& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t can1Baudrate);
+    SSSF(IPAddress& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t can1Baudrate);
 
     virtual bool setup();
-    virtual void forwardingLoop();
+    virtual void forwardingLoop(bool print = false);
 
 private:
-    void write(struct CAN_message_t *canFrame);
-    void write(struct CANFD_message_t *canFrame);
+    void write(struct CAN_message_t &canFrame);
+    void write(struct CANFD_message_t &canFrame);
     void write(NetworkStats::NodeReport *healthReport);
 
     int readCOMMBlock(struct COMMBlock *buffer);
 
-    void setupClock();
-    void setupCANChannels();
-
-    void pollClock();
     void pollServer();
-    void pollCANNetwork();
+    void pollCANNetwork(struct CAN_message_t &canFrame);
 
     void start(struct Request *request);
     void stop();

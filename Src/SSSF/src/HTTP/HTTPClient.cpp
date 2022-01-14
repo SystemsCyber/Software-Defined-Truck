@@ -9,7 +9,7 @@
 #include <ArduinoHttpClient.h>
 #include <TeensyID.h>
 
-HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverAddress, uint16_t _serverPort):
+HTTPClient::HTTPClient(DynamicJsonDocument& _attachedDevice, const char* _serverAddress, uint16_t _serverPort):
     CANNode(),
     client(clientSock, _serverAddress, _serverPort),
     attachedDevices(_attachedDevice),
@@ -19,11 +19,11 @@ HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, const char* _serverA
     connectionStatus(Disconnected)
     {};
 
-HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, String _serverAddress, uint16_t _serverPort):
+HTTPClient::HTTPClient(DynamicJsonDocument& _attachedDevice, String& _serverAddress, uint16_t _serverPort):
     HTTPClient(_attachedDevice, _serverAddress.c_str(), _serverPort)
     {};
 
-HTTPClient::HTTPClient(DynamicJsonDocument _attachedDevice, IPAddress _serverIP, uint16_t _serverPort):
+HTTPClient::HTTPClient(DynamicJsonDocument& _attachedDevice, IPAddress& _serverIP, uint16_t _serverPort):
     CANNode(),
     client(clientSock, _serverIP, _serverPort),
     attachedDevices(_attachedDevice),
@@ -154,7 +154,7 @@ void HTTPClient::createRegistration()
 {
     DynamicJsonDocument reg(1024);
     reg["MAC"] = teensyMAC();
-    reg["AttachedDevices"] = attachedDevices;
+    reg["AttachedDevices"] = attachedDevices["AttachedDevices"];
     serializeJson(reg, registration);
     
     String pretty_reg;
@@ -189,6 +189,14 @@ int HTTPClient::connectionSuccessful(int statusCode, bool retry)
 {
     if ((statusCode >= 200) && (statusCode < 400))
     {
+        if (serverAddress)
+        {
+            Log.noticeln("Successfully registered with %s.\n", serverAddress);
+        }
+        else
+        {
+            Log.noticeln("Successfully registered with %p.\n", serverIP);
+        }
         return Connected;
     }
     else

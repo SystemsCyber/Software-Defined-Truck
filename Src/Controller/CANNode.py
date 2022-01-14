@@ -1,4 +1,3 @@
-import ipaddress
 import netifaces
 import logging
 import copy
@@ -12,6 +11,7 @@ from types import SimpleNamespace
 from socket import *
 from selectors import *
 from ctypes import *
+import traceback
 
 # COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
 class ColoredConsoleHandler(logging.StreamHandler):
@@ -105,7 +105,7 @@ class CAN_message_t(Structure):
 
     def __repr__(self) -> str:
         return (
-            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.id_hit}\n'
+            f'\tcan_id: {self.can_id} can_timestamp: {self.can_timestamp} idhit: {self.idhit}\n'
             f'{self.flags}'
             f'\tlen: {self.len} buf: {self.buf}\n'
             f'\tmb: {self.mb} bus: {self.bus} seq: {self.seq}\n'
@@ -130,13 +130,13 @@ class WCANBlock(Structure):
 
     def __repr__(self) -> str:
         s = (
-            f'Sequence Number: {self.sequence_number}\n'
+            f'\tSequence Number: {self.sequence_number} '
             f'Need Response: {self.need_response} FD: {self.fd}\n'
         )
         if self.fd:
-            s += f'Frame:\n{self.frame.can}\n'
+            s += f'\tFrame:\n{self.frame.can_FD}\n'
         else:
-            s += f'Frame:\n{self.frame.can_FD}\n'
+            s += f'\tFrame:\n{self.frame.can}\n'
         return s
 
 class CANNode:
@@ -153,11 +153,14 @@ class CANNode:
         self.sel_lock = Lock()
 
         self.mac = gma()
-        self.sequence_number = 1
+        self._sequence_number = 1
         self.session_status = self.SessionStatus.Inactive
 
         self.mac = "00:0C:29:DE:AD:BE"  # For testing purposes
         logging.debug(f"The testing MAC address is: {self.mac}")
+
+        self.socket_blocked = 0
+        self.messages_recvd = 0
 
     def __findpath(self, log_name):
         base_dir = path.abspath(getcwd())
@@ -230,29 +233,32 @@ class CANNode:
 
     def read(self) -> bytes:
         try:
-            return self.__can_sock.recv(1024)
+            buffer = self.__can_sock.recv(1024)
+            self.messages_recvd += 1
+            return buffer
         except OSError as oe:
+            self.socket_blocked += 1
             logging.debug("Occured in read")
             logging.error(oe)
 
     def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
         message = WCANBlock(
-            self.sequence_number,
+            self._sequence_number,
             False,
             False,
             WCANFrame(can_frame)
             )
-        self.sequence_number += 1
+        self._sequence_number += 1
         return message
 
     def packCANFD(self, can_frame: CANFD_message_t) -> WCANBlock:
         message = WCANBlock(
-            self.sequence_number,
+            self._sequence_number,
             False,
             True,
             WCANFrame(can_frame)
             )
-        self.sequence_number += 1
+        self._sequence_number += 1
         return message
 
     def write(self, message: bytes) -> int:
