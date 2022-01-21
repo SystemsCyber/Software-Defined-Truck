@@ -1,17 +1,18 @@
-import Routes
-from selectors import *
-from DeviceCollection import DeviceCollection
-from jsonschema.protocols import Validator
+import selectors as sel
 from http import HTTPStatus
 from io import BytesIO
 
+from jsonschema.protocols import Validator
+
+import Routes
+from DeviceCollection import DeviceCollection
+
+SELECTOR = sel.DefaultSelector
+KEY = sel.SelectorKey
+
 
 class CANNodes(DeviceCollection):
-    def __init__(
-        self,
-        _sel: DefaultSelector,
-        _multicast_ips: list
-        ) -> None:
+    def __init__(self, _sel: SELECTOR, _multicast_ips: list) -> None:
         super().__init__(_sel, _multicast_ips)
         self.reg_schema, _ = self.compile_schema("SSSFRegistration.json")
         self.session_schema, _ = self.compile_schema("SessionInformation.json")
@@ -39,23 +40,23 @@ class CANNodes(DeviceCollection):
 
     @Routes.add("/SSSF", "GET")
     @DeviceCollection.type_required("CONTROLLER")
-    def get_devices(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_devices(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().get_devices(key, rfile, wfile)
 
     @Routes.add("/SSSF/REGISTER", "GET")
-    def get_registration_schema(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_registration_schema(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().get_registration_schema(key, rfile, wfile)
 
     @Routes.add("/SSSF/REGISTER", "POST")
-    def register(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def register(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().register(key, rfile, wfile)
-    
+
     @Routes.add("/SSSF/REGISTER", "PUT")
     @DeviceCollection.type_required("SSSF")
-    def modify_registration(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def modify_registration(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().modify_registration(key, rfile, wfile)
 
     @Routes.add("/SSSF/REGISTER", "DELETE")
     @DeviceCollection.type_required("SSSF")
-    def unregister(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def unregister(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().unregister(key, rfile, wfile)

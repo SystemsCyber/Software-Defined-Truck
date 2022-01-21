@@ -1,33 +1,34 @@
-import json
-import jsonschema
-import os
-import logging
 import abc
-from io import BytesIO
-from http import HTTPStatus
-from selectors import *
-from jsonschema.protocols import Validator
-from json.decoder import JSONDecodeError
-from jsonschema import ValidationError
-from ipaddress import IPv4Address
-from typing import List, Tuple
-from types import FunctionType
+import json
+import logging
+import os
+import selectors as sel
 from functools import wraps
+from http import HTTPStatus
+from io import BytesIO
+from ipaddress import IPv4Address
+from json.decoder import JSONDecodeError
+from types import FunctionType
+from typing import List, Tuple
+
+import jsonschema
+from jsonschema import ValidationError
+from jsonschema.protocols import Validator
+
 from Device import Device
+
+SELECTOR = sel.DefaultSelector
+KEY = sel.SelectorKey
 
 
 class DeviceCollection:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(
-        self,
-        _sel: DefaultSelector,
-        _multicast_ips: List
-        ) -> None:
+    def __init__(self, _sel: SELECTOR, _multicast_ips: List) -> None:
         self.sel = _sel
         self.multicast_ips = _multicast_ips
         self.schema_dir = self.__find_schema_folder()
-        self.key = SelectorKey
+        self.key = KEY
         self.can_port = 41665
 
     def __find_schema_folder(self) -> str:
@@ -43,19 +44,20 @@ class DeviceCollection:
         schema_path = os.path.join(self.schema_dir, schema_name)
         with open(schema_path, 'rb') as schema_file:
             schema = json.load(schema_file)
-        resolver = jsonschema.RefResolver('file:///' + self.schema_dir.replace("\\", "/") + '/', schema)
+        resolver = jsonschema.RefResolver(
+            'file:///' + self.schema_dir.replace("\\", "/") + '/', schema)
         return jsonschema.Draft7Validator(schema, resolver=resolver), schema
 
     def set_key(func: FunctionType) -> FunctionType:
         @wraps(func)
-        def wrapper(self, key: SelectorKey, *args):
+        def wrapper(self, key: KEY, *args):
             self.key = key
             return func(self, key, *args)
         return wrapper
 
     def registration_required(func: FunctionType) -> FunctionType:
         @wraps(func)
-        def wrapper(self, key: SelectorKey, *args):
+        def wrapper(self, key: KEY, *args):
             if hasattr(key.data, "MAC") and key.data.MAC:
                 return func(self, key, *args)
             else:
@@ -65,7 +67,7 @@ class DeviceCollection:
     def type_required(type: str) -> FunctionType:
         def decorator_wrapper(func: FunctionType) -> FunctionType:
             @wraps(func)
-            def wrapper(self, key: SelectorKey, *args):
+            def wrapper(self, key: KEY, *args):
                 if hasattr(key.data, "type") and key.data.type == type:
                     return func(self, key, *args)
                 else:
@@ -75,10 +77,10 @@ class DeviceCollection:
 
     def debug(self, message: str) -> None:
         logging.debug(f'{self.key.data.addr[0]} - {message}')
-    
+
     def info(self, message: str) -> None:
         logging.info(f'{self.key.data.addr[0]} - {message}')
-    
+
     def warning(self, message: str) -> None:
         logging.warning(f'{self.key.data.addr[0]} - {message}')
 
@@ -101,7 +103,7 @@ class DeviceCollection:
 
     @set_key
     @registration_required
-    def get_devices(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_devices(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info(f"Requested available {__name__}.")
         is_type = getattr(Device, "is_" + self.device_type)
         devices = json.dumps(Device.get_available_devices(self.sel, is_type))
@@ -109,18 +111,18 @@ class DeviceCollection:
         return HTTPStatus.FOUND
 
     @set_key
-    def get_registration_schema(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_registration_schema(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info("Requested Reqistration schema.")
         wfile.write(self.registration_schema)
         return HTTPStatus.FOUND
 
-    def __check_number_duplicates(self, duplicates: List[SelectorKey]) -> HTTPStatus:
+    def __check_number_duplicates(self, duplicates: List[KEY]) -> HTTPStatus:
         if len(duplicates) > 5:
             return HTTPStatus.CONFLICT
         else:
             return HTTPStatus.ACCEPTED
 
-    def __check_duplicates(self, old_key: SelectorKey) -> HTTPStatus:
+    def __check_duplicates(self, old_key: KEY) -> HTTPStatus:
         if old_key.data.MAC == self.key.data.MAC:
             if self.device_type == "SSSF":
                 # Without a way to determine which connection is a real SSSF we don't
@@ -135,11 +137,11 @@ class DeviceCollection:
                 self.error("Tried to change MAC. Banning device.")
                 return HTTPStatus.FORBIDDEN
         else:
-        # If its a different connection and different MAC we assume its a
-        # different device.
+            # If its a different connection and different MAC we assume its a
+            # different device.
             return HTTPStatus.ACCEPTED
 
-    def __check_already_registered(self, old_key: SelectorKey) -> HTTPStatus:
+    def __check_already_registered(self, old_key: KEY) -> HTTPStatus:
         if old_key.fd == self.key.fd:
             # Trying to change MAC address is not allowed and connection will be
             # dropped and device will be banned.
@@ -159,7 +161,7 @@ class DeviceCollection:
         for fd in sel_map:
             if Device.is_not_listening_socket(sel_map[fd]):
                 return self.__check_already_registered(sel_map[fd])
-    
+
     def __register(self, data: Device) -> HTTPStatus:
         self.key.data.MAC = data["MAC"]
         self.key.data.type = self.device_type
@@ -171,7 +173,7 @@ class DeviceCollection:
         return registration_check
 
     @set_key
-    def register(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def register(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info("Submitted registration information.")
         try:
             data = json.load(rfile)
@@ -184,7 +186,7 @@ class DeviceCollection:
 
     @set_key
     @registration_required
-    def modify_registration(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def modify_registration(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info("Submitted a change in registration.")
         return self.register(key, rfile, wfile)
 
@@ -192,14 +194,14 @@ class DeviceCollection:
         session_information = json.dumps({
             "ID": members[index]["ID"],
             "Index": members[index]["Index"],
-            "IP" : str(ip),
+            "IP": str(ip),
             "Port": self.can_port,
             "Devices": members
         })
         session_information = bytes(session_information, "UTF-8")
         return session_information
 
-    def notify_session_members(self, members: List, message: bytes, IP = None):
+    def notify_session_members(self, members: List, message: bytes, IP=None):
         self.key.data.in_use = not self.key.data.in_use
         self.info(f'Notifying devices.')
         mapping = self.sel.get_map()
@@ -212,7 +214,7 @@ class DeviceCollection:
             key.data.outgoing_messages.put(msg)
             key.data.expecting_response = True
             key.data.in_use = not key.data.in_use
-            self.sel.modify(key.fileobj, EVENT_WRITE, key.data)
+            self.sel.modify(key.fileobj, sel.EVENT_WRITE, key.data)
             self.info(f'Successfully notified {key.data.addr[0]}.')
 
     def handle_end_session(self):
@@ -228,7 +230,7 @@ class DeviceCollection:
 
     @set_key
     @registration_required
-    def unregister(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def unregister(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info("Unregistered.")
         if key.data.in_use:
             self.handle_end_session()

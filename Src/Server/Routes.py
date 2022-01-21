@@ -1,7 +1,8 @@
-from typing import Dict
 from types import FunctionType
+from typing import Dict
 
 routes: Dict[str, FunctionType] = {}
+
 
 def add(path: str, method: str) -> FunctionType:
     def update(func: FunctionType) -> FunctionType:

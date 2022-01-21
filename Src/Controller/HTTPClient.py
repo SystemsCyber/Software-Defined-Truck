@@ -1,64 +1,53 @@
-import logging
 import json
-from io import BytesIO
-from CANNode import CANNode
-from types import SimpleNamespace
-from time import sleep
-from json.decoder import JSONDecodeError
+import logging
+import selectors as sel
+import socket as soc
 from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler
-from jsonschema import RefResolver, Draft7Validator, ValidationError
-from ipaddress import IPv4Address, AddressValueError
-from os import path, getcwd, walk
-from socket import *
-from selectors import *
+from io import BytesIO
+from ipaddress import AddressValueError, IPv4Address
+from json.decoder import JSONDecodeError
+from time import sleep
 
-class Schema:
-    @staticmethod
-    def compile_schema(schema_name) -> None:
-        dir = Schema.find_schema_folder()
-        schema_path = path.join(dir, schema_name)
-        with open(schema_path, 'rb') as schema_file:
-            schema = json.load(schema_file)
-        r = RefResolver('file:///' + dir.replace("\\", "/") + '/', schema)
-        return Draft7Validator(schema, resolver=r), schema
+from jsonschema import ValidationError, Validator
 
-    @staticmethod
-    def find_schema_folder():
-        base_dir = path.abspath(getcwd())
-        base_dir = base_dir.rpartition(path.sep)[0]
-        for root, dirs, files in walk(base_dir):
-            for name in dirs:
-                if name == "Schemas":
-                    return path.join(root, name)
-        return path.join(base_dir, "Schemas")
+from CANNode import CANNode
+from Environment import Schema
+
 
 class HTTPClient(CANNode, BaseHTTPRequestHandler):
-    def __init__(self, *, _server_ip = gethostname(), **kwargs) -> None:
-        self.__server_ip = _server_ip
+    def __init__(self, *args, _server_ip=soc.gethostname(), **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if _server_ip != "127.0.0.1":
+            self.__server_ip = _server_ip
+        else:
+            self.__server_ip = soc.gethostname()
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
-        self.request_schema, _ = Schema.compile_schema("RequestDevices.json")
-        self.session_schema, _ = Schema.compile_schema("SessionInformation.json")
-        super().__init__()
+
+        self.request_schema = Validator
+        self.sessions_schema = Validator
 
     # Overrides for the parent functions
 
     def log_error(self, format, *args):
-        logging.error("%s - %s\n" % ("SERVER", format%args))
+        logging.error("%s - %s\n" % ("SERVER", format % args))
 
     def log_message(self, format, *args):
-        logging.info("%s - %s\n" % ("SERVER", format%args))
-    
+        logging.info("%s - %s\n" % ("SERVER", format % args))
+
     # ----------------------------------
-    
-    def connect(self, retry = True) -> bool:
+
+    def connect(self, retry=True) -> bool:
+        # Cannot put these schema lines in init due to file sharing issues that
+        # occur between the jsonschema library and multiprocess library
+        self.request_schema = Schema.compile_schema("RequestDevices.json")
+        self.session_schema = Schema.compile_schema("SessionInformation.json")
         try:
             logging.info("Connecting to the server.")
             self.ctrl = HTTPConnection(self.__server_ip)
             self.ctrl.connect()
-            with self.sel_lock:
-                self.sel.register(self.ctrl.sock, EVENT_READ)
+            self.sel.register(self.ctrl.sock, sel.EVENT_READ)
         except HTTPException as httpe:
             logging.error("Failed to connect to server.")
             logging.error(httpe)
@@ -81,22 +70,21 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             logging.error(f'\tFailure Reason: {self.response.reason}')
             return False
 
-    def __getresponse(self, timeout=None) -> bool:
+    def __getresponse(self, timeout=5) -> bool:
         try:
-            with self.sel_lock:
-                self.sel.modify(self.ctrl.sock, EVENT_READ)
-                if self.sel.select(timeout=timeout):
-                    self.response = self.ctrl.getresponse()
-                    length = self.response.length
-                    self.response_data = self.response.read(length)
-                    return True
+            self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
+            if self.sel.select(timeout=timeout):
+                self.response = self.ctrl.getresponse()
+                length = self.response.length
+                self.response_data = self.response.read(length)
+                return True
         except TimeoutError:
             logging.error("Timed-out waiting for response.")
             return False
         except KeyboardInterrupt:
             return False
-    
-    def __submit_registration(self, retry = True) -> bool:
+
+    def __submit_registration(self, retry=True) -> bool:
         registration = json.dumps({"MAC": self.mac})
         try:
             uri = "/controller/register"
@@ -112,7 +100,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         else:
             return self.__getresponse()
 
-    def register(self, retry = True) -> bool:
+    def register(self, retry=True) -> bool:
         logging.info(f'MAC Address detected: {self.mac}.')
         logging.info(f'Registering with server.')
         if not self.__submit_registration():
@@ -141,7 +129,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         else:
             return devices
         return []
-    
+
     def get_devices(self) -> list:
         msg = "request available devices from the server"
         try:
@@ -170,7 +158,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         else:
             return self.__getresponse() and self.__successful(msg, 300)
 
-    def receive_SSE(self, key: SelectorKey):
+    def receive_SSE(self, key: sel.SelectorKey):
         logging.debug("Received an SSE.")
         sleep(0.1)
         message = self.ctrl.sock.recv(4096)
@@ -178,8 +166,8 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             self.handle_one_request()
         if self.close_connection:
             logging.error("Server closed the connection.")
-            self.shutdown(False)
-        
+            self.stop_session()
+
     def do_POST(self):
         try:
             request_data = json.load(self.rfile)
@@ -199,22 +187,26 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         try:
             headers = {"Connection": "keep-alive"}
             self.ctrl.request("DELETE", path, headers=headers)
-            with self.sel_lock:
-                self.sel.modify(self.ctrl.sock, EVENT_READ)
+            self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
         except HTTPException as httpe:
             logging.error("-> Delete request failed to send.")
             logging.error(httpe)
         else:
             self.__getresponse()
-    
+
     def do_DELETE(self):
         self.__send_delete("/controller/session")
 
-    def shutdown(self, notify_server = True):
+    def shutdown(self, notify_server=True):
         logging.debug("Shutting down server connection.")
         if notify_server:
-            self.__send_delete("/controller/register")
-        with self.sel_lock:
-            self.sel.unregister(self.ctrl.sock)
-        self.ctrl.sock.shutdown(SHUT_RDWR)
+            if not self.close_connection:
+                self.__send_delete("/controller/register")
+            else:
+                logging.warning(
+                    "Cannot unregister with server because "
+                    "server already closed the connection."
+                    )
+        self.sel.unregister(self.ctrl.sock)
+        self.ctrl.sock.shutdown(soc.SHUT_RDWR)
         self.ctrl.sock.close()

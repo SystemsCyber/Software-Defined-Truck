@@ -1,66 +1,61 @@
 import logging
+import selectors as sel
 from io import BytesIO
-from HealthReport import NetworkStats, HealthReport
-from SensorNode import SensorNode, COMMBlock, WCOMMFrame
-from HTTPClient import HTTPClient
-from typing import List, NamedTuple, Type
-from types import SimpleNamespace
-from time import time, sleep
+from multiprocessing import Event, current_process
+from multiprocessing.connection import Client, Connection
 from pprint import pprint
-from socket import *
-from selectors import *
-from threading import Thread, Event
-from TypeWriter import TypeWriter as tw
-from ctypes import *
-from pandas import DataFrame
+from time import time
+from types import SimpleNamespace
+from typing import List
+
+from HealthReport import HealthReport, NetworkStats
+from HTTPClient import HTTPClient
+from SensorNode import COMMBlock, SensorNode, WCOMMFrame
+from Text import TypeWriter as tw
+
 
 class Controller(SensorNode, HTTPClient):
-    def __init__(self, _max_retrans = 3, _max_frame_rate = 60, _server_ip = gethostname()) -> None:
-        super().__init__(
-            _max_retrans = _max_retrans,
-            _max_frame_rate = _max_frame_rate,
-            _server_ip = _server_ip
-            )
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._last_request = time()
 
-    def __request_health(self, _listen: Event) -> None:
-        while _listen.is_set():
-            sleep(1)
-            msg = COMMBlock(
-                self.index,
-                self.frame_number,
-                int(time() * 1000),
-                3,
-                WCOMMFrame()
-            )
+    def __request_health(self, now: float) -> None:
+        if (now - self._last_request) >= 1.0:
+            self._last_request = now
+            msg = COMMBlock(self.index, self.frame_number,
+                            int(now * 1000), 3, WCOMMFrame())
+            for i in range(len(self.members)):
+                    print(self.network_stats.health_report[i])
+            self.health_report.update(
+                self.index, self.network_stats.health_report)
+            self.network_stats.reset()
             self.can_key.data.callback = self.write
             self.can_key.data.message = bytes(msg)
-            with self.sel_lock:
-                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+            self.sel.modify(self.can_key.fileobj,
+                            sel.EVENT_WRITE, self.can_key.data)
 
-    def __check_members(self, _listen: Event) -> None:
-        while _listen.is_set():
-            sleep(self.timeout_additive)
-            super().check_members()
+    def __write_signals(self, key: sel.SelectorKey) -> None:
+        try:
+            signals = key.fileobj.recv()
+            if signals:
+                self.write(*signals)
+            else:
+                logging.debug("IPC sockets closed.")
+        except EOFError as ee:
+            logging.debug(ee)
+            logging.debug("IPC sockets closed.")
 
-    def __write_signals(self, conn: SocketType) -> None:
-        while True:
-            try:
-                self.write(conn.recv())
-            except EOFError:
-                return
+    def __listen(self, running: Event) -> None:
+        while running.is_set() and not self.close_connection:
+            connection_events = self.sel.select(timeout=self.timeout_additive)
+            for key, mask in connection_events:
+                callback = key.data.callback
+                callback(key)
+            now = time()
+            self.check_members(now)
+            self.__request_health(now)
 
-    def __listen(self, _listen: Event) -> None:
-        while _listen.is_set():
-            try:
-                with self.sel_lock:
-                    connection_events = self.sel.select(timeout=1)
-                for key, mask in connection_events:
-                    callback = key.data.callback
-                    callback(key)
-            except KeyboardInterrupt:
-                return
-
-    def __request_devices(self, req: list, devices: list) -> List[int]:
+    def __request_devices(self, req: list, devices: list, conn: Connection) -> List[int]:
         if self.request_devices(req, devices):
             tw.write((
                 "Requested devices were successfully allocated."
@@ -71,9 +66,9 @@ class Controller(SensorNode, HTTPClient):
                 "One or more of the requested devices are no "
                 "longer available. Please select new device(s)."
             ), tw.red)
-            return self.__request_available_devices()
+            return self.__request_available_devices(conn)
 
-    def __print_devices(self, available_devices: list) -> List[int]:
+    def __print_devices(self, available_devices: list, conn: Connection) -> List[int]:
         tw.bar()
         tw.write("Available ECUs: ", tw.magenta)
         pprint(available_devices)
@@ -81,14 +76,15 @@ class Controller(SensorNode, HTTPClient):
             "Enter the numbers corresponding to the ECUs you "
             "would like to use (comma separated): "
         ), tw.magenta, end=None)
-        input_list = input('').split(',')
+        conn.send("ask")
+        input_list = str(conn.recv()).split(',')
         return [int(i.strip()) for i in input_list]
 
-    def __request_user_input(self, available: list) -> List[int]:
+    def __request_user_input(self, available: list, conn: Connection) -> List[int]:
         available_device_ids = [device["ID"] for device in available]
-        requested = self.__print_devices(available)
+        requested = self.__print_devices(available, conn)
         if set(requested).issubset(available_device_ids):
-            return self.__request_devices(requested, available)
+            return self.__request_devices(requested, available, conn)
         else:
             tw.write((
                 "One or more numbers entered do not correspond"
@@ -96,10 +92,10 @@ class Controller(SensorNode, HTTPClient):
             ), tw.red)
             return self.__request_user_input(available)
 
-    def __request_available_devices(self) -> List[int]:
+    def __request_available_devices(self, conn: Connection) -> List[int]:
         available_devices = self.get_devices()
         if len(available_devices) > 0:
-            return self.__request_user_input(available_devices)
+            return self.__request_user_input(available_devices, conn)
         else:
             tw.bar()
             tw.write((
@@ -108,34 +104,27 @@ class Controller(SensorNode, HTTPClient):
             ), tw.red)
             return []
 
-    def __provision_devices(self):
-        requested = self.__request_available_devices()
+    def __provision_devices(self, conn: Connection, running: Event) -> None:
+        requested = self.__request_available_devices(conn)
+        conn.send("break")
         if requested:
             data = SimpleNamespace(
-                    callback = self.receive_SSE,
-                    outgoing_message = None
-                    )
-            self.sel.modify(self.ctrl.sock, EVENT_READ, data)
+                callback=self.receive_SSE, outgoing_message=None)
+            self.sel.modify(self.ctrl.sock, sel.EVENT_READ, data)
+            with BytesIO(self.response_data) as self.rfile:
+                self.do_POST()
+            self.__listen(running)
         else:
             tw.write("Exiting", tw.red)
 
-    def start(self, conn: SocketType, listen: Event) -> None:
+    def start(self, port: int, running: Event) -> None:
+        authkey = current_process().authkey
+        conn = Client(('localhost', port), authkey=authkey)
+        data = SimpleNamespace(callback=self.__write_signals)
+        self.sel.register(conn, sel.EVENT_READ, data)
         if self.connect() and self.register():
-            self.__provision_devices()
-            with BytesIO(self.response_data) as self.rfile:
-                self.do_POST()
-            signal_thd = Thread(target=self.__write_signals, args=(conn,))
-            report_thd = Thread(target=self.__request_health, args=(listen,))
-            check_thd = Thread(target=self.__check_members, args=(listen,))
-            signal_thd.start()
-            report_thd.start()
-            check_thd.start()
-            self.__listen(listen)
-            signal_thd.join(1)
-            report_thd.join(1)
-            check_thd.join(1)
-            self.stop()
-
+            self.__provision_devices(conn, running)
+            self.stop(ipc_conn=conn)
 
     def do_POST(self):  # Equivalent of start
         try:
@@ -146,6 +135,7 @@ class Controller(SensorNode, HTTPClient):
                 self.start_session(ip, port, request_data)
                 self.network_stats = NetworkStats(len(self.members))
                 self.health_report = HealthReport(len(self.members))
+                self._last_request = time() + 5  # Give it a few secs for carla to start
                 tw.write("Starting the session!", tw.yellow)
             else:
                 tw.write("Did not receive session information.", tw.magenta)
@@ -159,49 +149,37 @@ class Controller(SensorNode, HTTPClient):
         self.stop_session()
 
     def write(self, *key) -> None:
-        if isinstance(key[0], SelectorKey):
+        if isinstance(key[0], sel.SelectorKey):
             super().write(key[0].data.message)
             key[0].data.callback = self.read
-            self.sel.modify(key[0].fileobj, EVENT_READ, key[0].data)
+            self.sel.modify(key[0].fileobj, sel.EVENT_READ, key[0].data)
         elif self.session_status == self.SessionStatus.Active:
             self.can_key.data.callback = self.write
             self.can_key.data.message = self.packSensorData(*key)
-            with self.sel_lock:
-                self.sel.modify(self.can_key.fileobj, EVENT_WRITE, self.can_key.data)
+            self.sel.modify(self.can_key.fileobj,
+                            sel.EVENT_WRITE, self.can_key.data)
 
-    def read(self, key: SelectorKey) -> None:
+    def read(self, key: sel.SelectorKey) -> None:
         msg, buffer = super().read()
         if msg:
-            print(msg)
             if msg.type == 1:
                 self.network_stats.update(
                     msg.index,
                     len(buffer),
                     msg.timestamp,
                     msg.frame.canFrame.sequence_number
-                    )
+                )
             elif msg.type == 4:
                 report = self.health_report.report.from_buffer_copy(
                     buffer, self.comm_head_size
-                    )
-                # for i in range(len(self.members)):
-                #     print(report[i])
+                )
+                for i in range(len(self.members)):
+                    print(report[i])
                 self.health_report.update(msg.index, report)
-                # print(self.health_report.packet_loss)
-                # print(self.health_report.latency)
-                # print(self.health_report.jitter)
-                # print(self.health_report.goodput)
-            
-    def stop(self, notify_server = True):
-        print("Times socket blocked: ", self.socket_blocked)
-        print("Times messages recvd: ", self.messages_recvd)
+
+    def stop(self, ipc_conn=None, notify_server=True):
+        if ipc_conn:
+            self.sel.unregister(ipc_conn)
         self.do_DELETE()
         super().shutdown(notify_server)
-
-    def __update_health_view(self):
-        pass
-
-
-if __name__ == '__main__':
-    controller = Controller()
-    controller.start()
+        self.sel.close()

@@ -1,8 +1,3 @@
-# ==============================================================================
-# -- find carla module ---------------------------------------------------------
-# ==============================================================================
-
-
 import glob
 import os
 import sys
@@ -15,33 +10,18 @@ try:
 except IndexError:
     pass
 
-
-# ==============================================================================
-# -- imports -------------------------------------------------------------------
-# ==============================================================================
-
-
-import carla
 import datetime
 import math
+
+import carla
 import pygame
-from HelpText import HelpText
-from FadingText import FadingText
 
-
-# ==============================================================================
-# -- Global functions ----------------------------------------------------------
-# ==============================================================================
+from Text import FadingText, HelpText
 
 
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
-
-
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
 
 
 class HUD(object):
@@ -90,15 +70,19 @@ class HUD(object):
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps(),
             '',
-            'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
+            'Vehicle: % 20s' % get_actor_display_name(
+                world.player, truncate=20),
             'Map:     % 20s' % world.map.name,
-            'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
+            'Simulation time: % 12s' % datetime.timedelta(
+                seconds=int(self.simulation_time)),
             '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
+            'Speed:   % 15.0f km/h' % (3.6 *
+                                       math.sqrt(v.x**2 + v.y**2 + v.z**2)),
             # u'Compass:% 17.0f\N{DEGREE SIGN} % 2s' % (compass, heading),
             # 'Accelero: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.accelerometer),
             # 'Gyroscop: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.gyroscope),
-            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
+            'Location:% 20s' % ('(% 5.1f, % 5.1f)' %
+                                (t.location.x, t.location.y)),
             # 'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % t.location.z,
             '']
@@ -123,8 +107,10 @@ class HUD(object):
             'Number of vehicles: % 8d' % len(vehicles)]
         if len(vehicles) > 1:
             self._info_text += ['Nearby vehicles:']
-            distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
-            vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
+            def distance(l): return math.sqrt((l.x - t.location.x) **
+                                              2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
+            vehicles = [(distance(x.get_location()), x)
+                        for x in vehicles if x.id != world.player.id]
             for d, vehicle in sorted(vehicles, key=lambda vehicles: vehicles[0]):
                 if d > 200.0:
                     break
@@ -153,29 +139,36 @@ class HUD(object):
                     break
                 if isinstance(item, list):
                     if len(item) > 1:
-                        points = [(x + 8, v_offset + 8 + (1.0 - y) * 30) for x, y in enumerate(item)]
-                        pygame.draw.lines(display, (255, 136, 0), False, points, 2)
+                        points = [(x + 8, v_offset + 8 + (1.0 - y) * 30)
+                                  for x, y in enumerate(item)]
+                        pygame.draw.lines(
+                            display, (255, 136, 0), False, points, 2)
                     item = None
                     v_offset += 18
                 elif isinstance(item, tuple):
                     if isinstance(item[1], bool):
-                        rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect, 0 if item[1] else 1)
+                        rect = pygame.Rect(
+                            (bar_h_offset, v_offset + 8), (6, 6))
+                        pygame.draw.rect(display, (255, 255, 255),
+                                         rect, 0 if item[1] else 1)
                     else:
-                        rect_border = pygame.Rect((bar_h_offset, v_offset + 8), (bar_width, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect_border, 1)
+                        rect_border = pygame.Rect(
+                            (bar_h_offset, v_offset + 8), (bar_width, 6))
+                        pygame.draw.rect(
+                            display, (255, 255, 255), rect_border, 1)
                         f = (item[1] - item[2]) / (item[3] - item[2])
                         if item[2] < 0.0:
-                            rect = pygame.Rect((bar_h_offset + f * (bar_width - 6), v_offset + 8), (6, 6))
+                            rect = pygame.Rect(
+                                (bar_h_offset + f * (bar_width - 6), v_offset + 8), (6, 6))
                         else:
-                            rect = pygame.Rect((bar_h_offset, v_offset + 8), (f * bar_width, 6))
+                            rect = pygame.Rect(
+                                (bar_h_offset, v_offset + 8), (f * bar_width, 6))
                         pygame.draw.rect(display, (255, 255, 255), rect)
                     item = item[0]
                 if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
+                    surface = self._font_mono.render(
+                        item, True, (255, 255, 255))
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
-
-

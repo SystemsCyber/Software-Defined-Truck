@@ -1,22 +1,24 @@
 import json
-import Routes
-from json.decoder import JSONDecodeError
-from jsonschema import ValidationError
-from selectors import *
-from DeviceCollection import DeviceCollection
-from jsonschema.protocols import Validator
+import selectors as sel
 from http import HTTPStatus
 from io import BytesIO
 from ipaddress import IPv4Address
+from json.decoder import JSONDecodeError
 from typing import Dict, List
+
+from jsonschema import ValidationError
+from jsonschema.protocols import Validator
+
+import Routes
 from Device import Device
+from DeviceCollection import DeviceCollection
+
+SELECTOR = sel.DefaultSelector
+KEY = sel.SelectorKey
+
 
 class SensorNodes(DeviceCollection):
-    def __init__(
-        self,
-        _sel: DefaultSelector,
-        _multicast_ips: List
-        ) -> None:
+    def __init__(self, _sel: SELECTOR, _multicast_ips: List) -> None:
         super().__init__(_sel, _multicast_ips)
         self.reg_schema, _ = self.compile_schema("ControllerRegistration.json")
         self.request_schema, _ = self.compile_schema("ControllerRequest.json")
@@ -38,25 +40,25 @@ class SensorNodes(DeviceCollection):
 
     @Routes.add("/CONTROLLER", "GET")
     @DeviceCollection.type_required("CONTROLLER")
-    def get_devices(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_devices(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().get_devices(key, rfile, wfile)
 
     @Routes.add("/CONTROLLER/REGISTER", "GET")
-    def get_registration_schema(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def get_registration_schema(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().get_registration_schema(key, rfile, wfile)
 
     @Routes.add("/CONTROLLER/REGISTER", "POST")
-    def register(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def register(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().register(key, rfile, wfile)
-    
+
     @Routes.add("/CONTROLLER/REGISTER", "PUT")
     @DeviceCollection.type_required("CONTROLLER")
-    def modify_registration(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def modify_registration(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().modify_registration(key, rfile, wfile)
-    
+
     @Routes.add("/CONTROLLER/REGISTER", "DELETE")
     @DeviceCollection.type_required("CONTROLLER")
-    def unregister(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def unregister(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         return super().unregister(key, rfile, wfile)
 
     def __create_start_message(self) -> bytes:
@@ -96,13 +98,13 @@ class SensorNodes(DeviceCollection):
                 self.error(f'{key.data.addr[0]} is not available.')
                 return []
         return members
-    
+
     def __initiate_session_request(self, requested: Dict, wfile: BytesIO):
         if requested["MAC"] != self.key.data.MAC:
             self.error(
                 "Cannot initiate session request for a "
                 "different controller. Banning this controller."
-                )
+            )
             return HTTPStatus.FORBIDDEN
         else:
             members = self.__gather_requested_devices(requested["Devices"])
@@ -120,7 +122,7 @@ class SensorNodes(DeviceCollection):
     @DeviceCollection.set_key
     @DeviceCollection.registration_required
     @DeviceCollection.type_required("CONTROLLER")
-    def start_session(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def start_session(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         self.info("Initiated session request.")
         try:
             data = json.loads(rfile.read(4096))
@@ -130,12 +132,12 @@ class SensorNodes(DeviceCollection):
             self.error(jde)
             key.data.close_connection = True
             return HTTPStatus.BAD_REQUEST
-    
+
     @Routes.add("/CONTROLLER/SESSION", "DELETE")
     @DeviceCollection.set_key
     @DeviceCollection.registration_required
     @DeviceCollection.type_required("CONTROLLER")
-    def stop_session(self, key: SelectorKey, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
+    def stop_session(self, key: KEY, rfile: BytesIO, wfile: BytesIO) -> HTTPStatus:
         if key.data.in_use:
             self.info("Ended its session.")
             self.handle_end_session()
