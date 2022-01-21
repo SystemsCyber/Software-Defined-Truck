@@ -1,8 +1,3 @@
-# ==============================================================================
-# -- find carla module ---------------------------------------------------------
-# ==============================================================================
-
-
 import glob
 import os
 import sys
@@ -15,20 +10,10 @@ try:
 except IndexError:
     pass
 
-
-# ==============================================================================
-# -- imports -------------------------------------------------------------------
-# ==============================================================================
-
-
-import carla
 import math
 import weakref
 
-
-# ==============================================================================
-# -- IMUSensor -----------------------------------------------------------------
-# ==============================================================================
+import carla
 
 
 class IMUSensor(object):
@@ -59,7 +44,9 @@ class IMUSensor(object):
             max(limits[0], min(limits[1], sensor_data.accelerometer.y)),
             max(limits[0], min(limits[1], sensor_data.accelerometer.z)))
         self.gyroscope = (
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.x))),
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),
+            max(limits[0], min(limits[1], math.degrees(
+                sensor_data.gyroscope.x))),
+            max(limits[0], min(limits[1], math.degrees(
+                sensor_data.gyroscope.y))),
             max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))
         # self.compass = math.degrees(sensor_data.compass)

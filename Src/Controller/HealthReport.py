@@ -1,16 +1,17 @@
 import copy
-from ctypes import *
+from ctypes import Structure, c_float, c_uint32
 from dataclasses import dataclass
 from time import time
+from typing import Dict, Tuple
+
 from pandas import DataFrame
-from SensorNode import COMMBlock
-from typing import List, Tuple, Dict
 
 
 @dataclass
 class HealthBasics:
     last_message_time: float = time()
     last_sequence_number: int = 0
+
 
 class HealthCore(Structure):
     _pack_ = 4
@@ -28,7 +29,7 @@ class HealthCore(Structure):
             f'\tCount: {self.count} Min: {self.min} Max: {self.max}\n'
             f'\tMean: {self.mean} Variance: {self.variance}\n'
             f'\tSumOfSquaredDifferences: {self.sumOfSquaredDifferences}\n'
-            )
+        )
 
 
 class NodeReport(Structure):
@@ -39,13 +40,14 @@ class NodeReport(Structure):
         ("jitter", HealthCore),
         ("goodput", HealthCore)
     ]
+
     def __repr__(self) -> str:
         return (
             f'PacketLoss: {self.packetLoss}\n'
             f'Latency: \n{self.latency}\n'
             f'Jitter: \n{self.jitter}\n'
             f'Goodput: \n{self.goodput}\n'
-            )
+        )
 
 
 class NetworkStats:
@@ -57,18 +59,22 @@ class NetworkStats:
             HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
             HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
             HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0)
-            )] * _num_members
+        )] * _num_members
 
     def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
         now = int(time() * 1000)
         sequence_offset = sequence_number - self.basics[i].last_sequence_number
         ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000
-        if ellapsedSeconds == 0.0: ellapsedSeconds = 0.001 # Required since we dont have sub-microsecond precision
+        if ellapsedSeconds == 0.0:
+            ellapsedSeconds = 0.001  # Required since we dont have sub-microsecond precision
 
         self.calculate(self.health_report[i].latency, now - timestamp)
-        self.calculate(self.health_report[i].jitter, self.health_report[i].latency.variance)
-        self.health_report[i].packetLoss = sequence_offset - self.health_report[i].latency.count
-        self.calculate(self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
+        self.calculate(
+            self.health_report[i].jitter, self.health_report[i].latency.variance)
+        self.health_report[i].packetLoss = sequence_offset - \
+            self.health_report[i].latency.count
+        self.calculate(
+            self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
 
         self.basics[i].last_message_time = now
         self.basics[i].last_sequence_number = sequence_number
@@ -94,7 +100,6 @@ class NetworkStats:
         edge.variance = edge.sumOfSquaredDifferences / edge.count
 
 
-
 class HealthReport:
     def __init__(self, _num_members: int) -> None:
         self.report = NodeReport * _num_members
@@ -115,14 +120,14 @@ class HealthReport:
         self.jitter = copy.deepcopy(base_dict)
         self.goodput = copy.deepcopy(base_dict)
 
-
     def __update(self, measure: Dict[str, DataFrame], index: Tuple[int, int], reported: HealthCore) -> None:
         measure["count"].loc[index[0], index[1]] = reported.count
         measure["min"].loc[index[0], index[1]] = reported.min
         measure["max"].loc[index[0], index[1]] = reported.max
         measure["mean"].loc[index[0], index[1]] = reported.mean
         measure["variance"].loc[index[0], index[1]] = reported.variance
-        measure["sumOfSquaredDifferences"].loc[index[0], index[1]] = reported.sumOfSquaredDifferences
+        measure["sumOfSquaredDifferences"].loc[index[0],
+                                               index[1]] = reported.sumOfSquaredDifferences
 
     def update(self, index: int, report):
         for i in self._members:

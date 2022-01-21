@@ -1,8 +1,3 @@
-# ==============================================================================
-# -- find carla module ---------------------------------------------------------
-# ==============================================================================
-
-
 import glob
 import os
 import sys
@@ -15,43 +10,30 @@ try:
 except IndexError:
     pass
 
-
-# ==============================================================================
-# -- imports -------------------------------------------------------------------
-# ==============================================================================
-
-
-import carla
 import random
 import re
+
+import carla
+
 from CameraManager import CameraManager
-from RadarSensor import RadarSensor
-from IMUSensor import IMUSensor
-from GnssSensor import GnssSensor
-from LaneInvasionSensor import LaneInvasionSensor
 from CollisionSensor import CollisionSensor
-
-
-# ==============================================================================
-# -- Global functions ----------------------------------------------------------
-# ==============================================================================
+from GnssSensor import GnssSensor
+from IMUSensor import IMUSensor
+from LaneInvasionSensor import LaneInvasionSensor
+from RadarSensor import RadarSensor
 
 
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+    def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+    presets = [x for x in dir(carla.WeatherParameters)
+               if re.match('[A-Z].+', x)]
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
-
-
-# ==============================================================================
-# -- World ---------------------------------------------------------------------
-# ==============================================================================
 
 
 class World(object):
@@ -63,7 +45,8 @@ class World(object):
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
+            print(
+                '  Make sure it exists, has the same name of your town, and is correct.')
             sys.exit(1)
         self.hud = hud
         self.player = None
@@ -98,26 +81,31 @@ class World(object):
         ]
 
     def restart(self):
-        self.player_max_speed = 1.589  #These values were suggested by the CARLA devs
+        self.player_max_speed = 1.589  # These values were suggested by the CARLA devs
         self.player_max_speed_fast = 3.713
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
         # Get a random blueprint.
-        blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
+        blueprint = random.choice(
+            self.world.get_blueprint_library().filter(self._actor_filter))
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
+            color = random.choice(
+                blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
         if blueprint.has_attribute('driver_id'):
-            driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
+            driver_id = random.choice(
+                blueprint.get_attribute('driver_id').recommended_values)
             blueprint.set_attribute('driver_id', driver_id)
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
         # set the max speed
         if blueprint.has_attribute('speed'):
-            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
-            self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
+            self.player_max_speed = float(
+                blueprint.get_attribute('speed').recommended_values[1])
+            self.player_max_speed_fast = float(
+                blueprint.get_attribute('speed').recommended_values[2])
         else:
             print("No recommended values for 'speed' attribute")
         # Spawn the player.
@@ -135,7 +123,8 @@ class World(object):
                 print('Please add some Vehicle Spawn Point to your UE4 scene.')
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+            spawn_point = random.choice(
+                spawn_points) if spawn_points else carla.Transform()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             self.modify_vehicle_physics(self.player)
         # Set up the sensors.
@@ -204,12 +193,10 @@ class World(object):
             # self.lane_invasion_sensor.sensor,
             # self.gnss_sensor.sensor,
             # self.imu_sensor.sensor
-            ]
+        ]
         for sensor in sensors:
             if sensor is not None:
                 sensor.stop()
                 sensor.destroy()
         if self.player is not None:
             self.player.destroy()
-
-

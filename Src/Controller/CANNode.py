@@ -1,40 +1,18 @@
-import netifaces
 import logging
-import copy
-from os import path, walk, getcwd
-from logging.handlers import TimedRotatingFileHandler
-from ipaddress import IPv4Address
+import selectors as sel
+import socket as soc
+from ctypes import (Structure, Union, c_bool, c_int8, c_uint8, c_uint16,
+                    c_uint32)
 from enum import Enum, auto
-from getmac import get_mac_address as gma
-from threading import Lock
+from ipaddress import IPv4Address
+from multiprocessing import Lock
 from types import SimpleNamespace
-from socket import *
-from selectors import *
-from ctypes import *
-import traceback
 
-# COPIED FROM: https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output?page=1&tab=votes#tab-top
-class ColoredConsoleHandler(logging.StreamHandler):
-    def emit(self, record):
-        # Need to make a actual copy of the record
-        # to prevent altering the message for other loggers
-        myrecord = copy.copy(record)
-        levelno = myrecord.levelno
-        if(levelno >= 50):  # CRITICAL / FATAL
-            color = '\x1b[31m'  # red
-        elif(levelno >= 40):  # ERROR
-            color = '\x1b[31m'  # red
-        elif(levelno >= 30):  # WARNING
-            color = '\x1b[33m'  # yellow
-        elif(levelno >= 20):  # INFO
-            color = '\x1b[32m'  # green
-        elif(levelno >= 10):  # DEBUG
-            color = '\x1b[35m'  # pink
-        else:  # NOTSET and anything else
-            color = '\x1b[0m'  # normal
-        myrecord.levelname = color + str(myrecord.levelname) + '\x1b[0m'  # normal
-        logging.StreamHandler.emit(self, myrecord)
-# ------------------------------------------------------------
+import netifaces
+from getmac import get_mac_address as gma
+
+from Environment import LogSetup
+
 
 class FLAGS_FD(Structure):
     _pack_ = 4
@@ -42,12 +20,13 @@ class FLAGS_FD(Structure):
         ("extended", c_bool),
         ("overrun", c_bool),
         ("reserved", c_bool)
-        ]
+    ]
 
     def __repr__(self) -> str:
         return (
             f'\textended: {self.extended} overrun: {self.overrun} reserved: {self.reserved}\n'
         )
+
 
 class CANFD_message_t(Structure):
     _pack_ = 4
@@ -64,7 +43,7 @@ class CANFD_message_t(Structure):
         ("mb", c_int8),
         ("bus", c_uint8),
         ("seq", c_bool)
-        ]
+    ]
 
     def __repr__(self) -> str:
         return (
@@ -73,7 +52,8 @@ class CANFD_message_t(Structure):
             f'{self.flags}'
             f'\tlen: {self.len} buf: {self.buf}\n'
             f'\tmb: {self.mb} bus: {self.bus} seq: {self.seq}\n'
-            )
+        )
+
 
 class FLAGS(Structure):
     _pack_ = 4
@@ -82,12 +62,13 @@ class FLAGS(Structure):
         ("remote", c_bool),
         ("overrun", c_bool),
         ("reserved", c_bool)
-        ]
+    ]
 
     def __repr__(self) -> str:
         return (
             f'\textended: {self.extended} remote: {self.remote} overrun: {self.overrun} reserved: {self.reserved}\n'
         )
+
 
 class CAN_message_t(Structure):
     _pack_ = 4
@@ -101,7 +82,7 @@ class CAN_message_t(Structure):
         ("mb", c_int8),
         ("bus", c_uint8),
         ("seq", c_bool)
-        ]
+    ]
 
     def __repr__(self) -> str:
         return (
@@ -109,7 +90,8 @@ class CAN_message_t(Structure):
             f'{self.flags}'
             f'\tlen: {self.len} buf: {self.buf}\n'
             f'\tmb: {self.mb} bus: {self.bus} seq: {self.seq}\n'
-            )
+        )
+
 
 class WCANFrame(Union):
     _pack_ = 4
@@ -117,6 +99,7 @@ class WCANFrame(Union):
         ("can", CAN_message_t),
         ("can_FD", CANFD_message_t)
     ]
+
 
 class WCANBlock(Structure):
     _anonymous_ = ("frame",)
@@ -139,17 +122,17 @@ class WCANBlock(Structure):
             s += f'\tFrame:\n{self.frame.can}\n'
         return s
 
-class CANNode:
+class CANNode(object):
     class SessionStatus(Enum):
         Inactive = auto()
         Active = auto()
 
-    def __init__(self) -> None:
-        self.__init_logging()
+    def __init__(self, *args, **kwargs) -> None:
+        LogSetup.init_logging()
         self.__can_ip = IPv4Address
         self.__can_port = 0
 
-        self.sel = DefaultSelector()
+        self.sel = sel.DefaultSelector()
         self.sel_lock = Lock()
 
         self.mac = gma()
@@ -162,49 +145,24 @@ class CANNode:
         self.socket_blocked = 0
         self.messages_recvd = 0
 
-    def __findpath(self, log_name):
-        base_dir = path.abspath(getcwd())
-        for root, dirs, files in walk(base_dir):
-            for name in dirs:
-                if name == "Logs":
-                    log_path = path.join(root, name)
-                    return path.join(log_path, log_name)
-        log_path = path.join(base_dir, "Logs")
-        return path.join(log_path, log_name)
-    
-    def __init_logging(self) -> None:
-        filename = self.__findpath("controller_log")
-        logging.basicConfig(
-            format='%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s',
-            level=logging.DEBUG,
-            handlers=[
-                TimedRotatingFileHandler(
-                    filename=filename,
-                    when="midnight",
-                    interval=1,
-                    backupCount=7,
-                    encoding='utf-8'
-                    ),
-                ColoredConsoleHandler()
-                ]
-            )
-    
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
-        self.__can_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        self.__can_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_LOOP, False)
-        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_TTL, 128)
-        self.__can_sock.setsockopt(IPPROTO_IP, IP_MULTICAST_IF, iface)
-        self.__can_sock.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, mreq)
+        self.__can_sock = soc.socket(
+            soc.AF_INET, soc.SOCK_DGRAM, soc.IPPROTO_UDP)
+        self.__can_sock.setsockopt(soc.SOL_SOCKET, soc.SO_REUSEADDR, 1)
+        self.__can_sock.setsockopt(
+            soc.IPPROTO_IP, soc.IP_MULTICAST_LOOP, False)
+        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_TTL, 128)
+        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_IF, iface)
+        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_ADD_MEMBERSHIP, mreq)
         self.__can_sock.setblocking(False)
         self.__can_sock.bind(('', can_port))
-    
+
     def __create_group_info(self, ip: IPv4Address) -> bytes:
         default_gw = netifaces.gateways()["default"][netifaces.AF_INET]
         gw = IPv4Address(default_gw[0])
         logging.info(f"Default IPv4 Gateway: {gw}")
-        device_addresses = gethostbyname_ex(gethostname())[2]
+        device_addresses = soc.gethostbyname_ex(soc.gethostname())[2]
         logging.info(f"Device interface addresses: {device_addresses}")
         closest_ip = str
         smallest_diff = 9999999999
@@ -216,8 +174,8 @@ class CANNode:
                 closest_ip = str(_ip)
         logging.info(f"Closest IP found to default gateway: {closest_ip}")
         logging.info("Multicast interface chosen: " + closest_ip)
-        iface = inet_aton(closest_ip)
-        group = inet_aton(str(ip))
+        iface = soc.inet_aton(closest_ip)
+        group = soc.inet_aton(str(ip))
         mreq = group + iface
         return iface, mreq
 
@@ -226,9 +184,10 @@ class CANNode:
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
         self.__init_socket(self.__can_port, self.__mreq, self.__iface)
-        can_data = SimpleNamespace(callback = self.read, message = None)
+        can_data = SimpleNamespace(callback=self.read, message=None)
         with self.sel_lock:
-            self.can_key = self.sel.register(self.__can_sock, EVENT_READ, can_data)
+            self.can_key = self.sel.register(
+                self.__can_sock, sel.EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self) -> bytes:
@@ -247,7 +206,7 @@ class CANNode:
             False,
             False,
             WCANFrame(can_frame)
-            )
+        )
         self._sequence_number += 1
         return message
 
@@ -257,7 +216,7 @@ class CANNode:
             False,
             True,
             WCANFrame(can_frame)
-            )
+        )
         self._sequence_number += 1
         return message
 
@@ -266,7 +225,7 @@ class CANNode:
             return self.__can_sock.sendto(
                 message,
                 (str(self.__can_ip), self.__can_port)
-                )
+            )
         except OSError as oe:
             logging.error(oe)
 
@@ -277,7 +236,8 @@ class CANNode:
             logging.info("Shutting down CAN socket.")
             with self.sel_lock:
                 self.sel.unregister(self.__can_sock)
-            self.__can_sock.setsockopt(IPPROTO_IP, IP_DROP_MEMBERSHIP, self.__mreq)
-            self.__can_sock.shutdown(SHUT_RDWR)
+            self.__can_sock.setsockopt(
+                soc.IPPROTO_IP, soc.IP_DROP_MEMBERSHIP, self.__mreq)
+            self.__can_sock.shutdown(soc.SHUT_RDWR)
             self.__can_sock.close()
             self.session_status = self.SessionStatus.Inactive
