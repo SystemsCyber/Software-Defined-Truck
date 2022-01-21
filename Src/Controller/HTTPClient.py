@@ -25,6 +25,9 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         self.protocol_version = "HTTP/1.1"
         self.close_connection = False
 
+        self.request_schema = Validator
+        self.sessions_schema = Validator
+
     # Overrides for the parent functions
 
     def log_error(self, format, *args):
@@ -44,8 +47,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             logging.info("Connecting to the server.")
             self.ctrl = HTTPConnection(self.__server_ip)
             self.ctrl.connect()
-            with self.sel_lock:
-                self.sel.register(self.ctrl.sock, sel.EVENT_READ)
+            self.sel.register(self.ctrl.sock, sel.EVENT_READ)
         except HTTPException as httpe:
             logging.error("Failed to connect to server.")
             logging.error(httpe)
@@ -68,15 +70,14 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             logging.error(f'\tFailure Reason: {self.response.reason}')
             return False
 
-    def __getresponse(self, timeout=None) -> bool:
+    def __getresponse(self, timeout=5) -> bool:
         try:
-            with self.sel_lock:
-                self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
-                if self.sel.select(timeout=timeout):
-                    self.response = self.ctrl.getresponse()
-                    length = self.response.length
-                    self.response_data = self.response.read(length)
-                    return True
+            self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
+            if self.sel.select(timeout=timeout):
+                self.response = self.ctrl.getresponse()
+                length = self.response.length
+                self.response_data = self.response.read(length)
+                return True
         except TimeoutError:
             logging.error("Timed-out waiting for response.")
             return False
@@ -165,7 +166,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
             self.handle_one_request()
         if self.close_connection:
             logging.error("Server closed the connection.")
-            self.shutdown(False)
+            self.stop_session()
 
     def do_POST(self):
         try:
@@ -186,8 +187,7 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
         try:
             headers = {"Connection": "keep-alive"}
             self.ctrl.request("DELETE", path, headers=headers)
-            with self.sel_lock:
-                self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
+            self.sel.modify(self.ctrl.sock, sel.EVENT_READ)
         except HTTPException as httpe:
             logging.error("-> Delete request failed to send.")
             logging.error(httpe)
@@ -200,8 +200,13 @@ class HTTPClient(CANNode, BaseHTTPRequestHandler):
     def shutdown(self, notify_server=True):
         logging.debug("Shutting down server connection.")
         if notify_server:
-            self.__send_delete("/controller/register")
-        with self.sel_lock:
-            self.sel.unregister(self.ctrl.sock)
+            if not self.close_connection:
+                self.__send_delete("/controller/register")
+            else:
+                logging.warning(
+                    "Cannot unregister with server because "
+                    "server already closed the connection."
+                    )
+        self.sel.unregister(self.ctrl.sock)
         self.ctrl.sock.shutdown(soc.SHUT_RDWR)
         self.ctrl.sock.close()

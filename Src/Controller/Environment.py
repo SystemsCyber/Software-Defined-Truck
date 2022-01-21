@@ -4,12 +4,12 @@ import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from jsonschema import Draft7Validator, RefResolver
+from jsonschema import Draft7Validator, RefResolver, Validator
 
 
 class Schema:
     @staticmethod
-    def compile_schema(schema_name) -> None:
+    def compile_schema(schema_name) -> Validator:
         dir = Schema.find_schema_folder()
         schema_path = os.path.join(dir, schema_name)
         with open(schema_path, 'rb') as schema_file:

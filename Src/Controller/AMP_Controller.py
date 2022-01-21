@@ -17,8 +17,11 @@ except IndexError:
 import argparse
 import logging
 import multiprocessing as mp
-from multiprocessing import SimpleQueue
+import socket
+import random
 import signal
+from multiprocessing.connection import Connection, Listener
+from typing import Tuple
 
 import carla
 import pygame
@@ -134,16 +137,33 @@ def init_argparser() -> argparse.ArgumentParser:
     return argparser
 
 
-def setup_loop(conn: SimpleQueue) -> None:
+def choose_ipc_port() -> int:
+    ports = [random.randrange(2**12, 2**16) for i in range(10)]
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)
+        for port in ports:
+            logging.debug("Choosing a port for IPC.")
+            result = sock.connect_ex(('localhost', port))
+            if result == 0:
+                logging.error(f"Port {port} is in use. Choosing another.")
+            else:
+                return port
+        logging.error("Cannot find a free port. Exiting...")
+        exit()
+
+
+def setup_loop(listener: Listener) -> Connection:
+    conn = listener.accept()
     while True:
-        msg = conn.get()
+        msg = conn.recv()
         if (msg is None) or (msg == "break"):
             break
         elif msg == "ask":
-            conn.put(input(''))
+            conn.send(input(''))
+    return conn
 
 
-def game_loop(conn: SimpleQueue, frame_rate: int, args):
+def game_loop(conn: Connection, frame_rate: int, args):
     pygame.init()
     pygame.font.init()
     world = None
@@ -170,9 +190,7 @@ def game_loop(conn: SimpleQueue, frame_rate: int, args):
             # p = world.player.get_physics_control()
             # t = world.player.get_transform()
             # v = world.player.get_velocity()
-            if not conn.empty():
-                conn.get()
-            conn.put((
+            conn.send((
                 float(c.throttle),
                 float(c.steer),
                 float(c.brake),
@@ -205,6 +223,9 @@ def main():
     frame_rate = 60
 
     LogSetup.init_logging(log_level)
+    mp_logger = mp.get_logger()
+    mp_logger.propagate = True
+    mp_logger.setLevel(log_level)
     Text.printdoc()
     logging.info('Listening to carla server %s:%s.', args.carla, args.port)
 
@@ -213,16 +234,19 @@ def main():
         _frame_rate=frame_rate,
         _server_ip=args.server
     )
-    conn = mp.SimpleQueue()
-    listen = mp.Event()
-    listen.set()
-    ctrl_thread = mp.Process(target=ctrl.start, args=(conn, listen,))
+    port = choose_ipc_port()
+    running = mp.Event()
+    running.set()
+    ctrl_thread = mp.Process(target=ctrl.start, args=(port, running,))
+    listener = Listener(('localhost', port), authkey=ctrl_thread.authkey)
 
     ctrl_thread.start()
-    setup_loop(conn)
+    conn = setup_loop(listener)
     game_loop(conn, frame_rate, args)
-    listen.clear()
-    ctrl_thread.join(3)
+
+    running.clear()
+    listener.close()
+    ctrl_thread.join(1)
     ctrl_thread.close()
 
 

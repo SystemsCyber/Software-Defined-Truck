@@ -90,7 +90,11 @@ void SSSF::forwardingLoop(bool print)
                 networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
             }
-            else if (msg.type == 3) write(networkHealth->HealthReport);
+            else if (msg.type == 3)
+            {
+                write(networkHealth->HealthReport);
+                networkHealth->reset();
+            }
         }
         if (numSignals > 0)
         {

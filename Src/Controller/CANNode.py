@@ -5,7 +5,6 @@ from ctypes import (Structure, Union, c_bool, c_int8, c_uint8, c_uint16,
                     c_uint32)
 from enum import Enum, auto
 from ipaddress import IPv4Address
-from multiprocessing import Lock
 from types import SimpleNamespace
 
 import netifaces
@@ -122,6 +121,7 @@ class WCANBlock(Structure):
             s += f'\tFrame:\n{self.frame.can}\n'
         return s
 
+
 class CANNode(object):
     class SessionStatus(Enum):
         Inactive = auto()
@@ -131,9 +131,7 @@ class CANNode(object):
         LogSetup.init_logging()
         self.__can_ip = IPv4Address
         self.__can_port = 0
-
         self.sel = sel.DefaultSelector()
-        self.sel_lock = Lock()
 
         self.mac = gma()
         self._sequence_number = 1
@@ -141,9 +139,6 @@ class CANNode(object):
 
         self.mac = "00:0C:29:DE:AD:BE"  # For testing purposes
         logging.debug(f"The testing MAC address is: {self.mac}")
-
-        self.socket_blocked = 0
-        self.messages_recvd = 0
 
     def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
         logging.info("Creating CANNode socket.")
@@ -185,18 +180,14 @@ class CANNode(object):
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
         self.__init_socket(self.__can_port, self.__mreq, self.__iface)
         can_data = SimpleNamespace(callback=self.read, message=None)
-        with self.sel_lock:
-            self.can_key = self.sel.register(
-                self.__can_sock, sel.EVENT_READ, can_data)
+        self.can_key = self.sel.register(
+            self.__can_sock, sel.EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self) -> bytes:
         try:
-            buffer = self.__can_sock.recv(1024)
-            self.messages_recvd += 1
-            return buffer
+            return self.__can_sock.recv(1024)
         except OSError as oe:
-            self.socket_blocked += 1
             logging.debug("Occured in read")
             logging.error(oe)
 
@@ -234,8 +225,7 @@ class CANNode(object):
         self.__can_port = 0
         if self.session_status == self.SessionStatus.Active:
             logging.info("Shutting down CAN socket.")
-            with self.sel_lock:
-                self.sel.unregister(self.__can_sock)
+            self.sel.unregister(self.__can_sock)
             self.__can_sock.setsockopt(
                 soc.IPPROTO_IP, soc.IP_DROP_MEMBERSHIP, self.__mreq)
             self.__can_sock.shutdown(soc.SHUT_RDWR)
