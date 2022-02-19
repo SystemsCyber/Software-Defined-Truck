@@ -6,10 +6,11 @@ from typing import Dict, Tuple
 
 from pandas import DataFrame
 
+from Time_Client import Time_Client
 
 @dataclass
 class HealthBasics:
-    last_message_time: float = time()
+    last_message_time: float = 0.0
     last_sequence_number: int = 0
 
 
@@ -51,8 +52,9 @@ class NodeReport(Structure):
 
 
 class NetworkStats:
-    def __init__(self, _num_members: int) -> None:
+    def __init__(self, _num_members: int, _time_client: Time_Client) -> None:
         self.size = _num_members
+        self.time_client = _time_client
         self.basics = [HealthBasics()] * _num_members
         self.health_report = [NodeReport(
             0.0,
@@ -62,17 +64,29 @@ class NetworkStats:
         )] * _num_members
 
     def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
-        now = int(time() * 1000)
-        sequence_offset = sequence_number - self.basics[i].last_sequence_number
+        now = self.time_client.time_ms()
+        delay = now - timestamp
+        print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
         ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000
         if ellapsedSeconds == 0.0:
-            ellapsedSeconds = 0.001  # Required since we dont have sub-microsecond precision
+            ellapsedSeconds = 0.0001
 
-        self.calculate(self.health_report[i].latency, now - timestamp)
+        self.calculate(self.health_report[i].latency, abs(delay))
         self.calculate(
             self.health_report[i].jitter, self.health_report[i].latency.variance)
-        self.health_report[i].packetLoss = sequence_offset - \
-            self.health_report[i].latency.count
+        '''
+        The issue here is that when no packets are lost then sequence offset is
+        1 so we just get 1 - the current count.
+
+        sequence_offset = sequence_number - self.basics[i].last_sequence_number
+        self.health_report[i].packetLoss = sequence_offset - self.health_report[i].latency.count
+        '''
+        # If no packet loss then sequence number = last sequence number + 1
+        packetsLost = sequence_number - (self.basics[i].last_sequence_number + 1)
+        # If packetsLost is negative then this usually indicates duplicate or
+        # out of order frame.
+        self.health_report[i].packetLoss += packetsLost if packetsLost > 0 else 0
+        
         self.calculate(
             self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
 

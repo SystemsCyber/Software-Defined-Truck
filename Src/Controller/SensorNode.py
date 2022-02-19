@@ -2,7 +2,7 @@ import logging
 import selectors as sel
 import struct
 from ctypes import (POINTER, Structure, Union, c_float, c_uint8, c_uint32,
-                    sizeof)
+                    c_uint64, sizeof)
 from ipaddress import IPv4Address
 from time import time
 from typing import List, Tuple
@@ -38,7 +38,7 @@ class COMMBlock(Structure):
     _fields_ = [
         ("index", c_uint32),
         ("frame_number", c_uint32),
-        ("timestamp", c_uint32),
+        ("timestamp", c_uint64),
         ("type", c_uint8),
         ("frame", WCOMMFrame)
     ]
@@ -59,7 +59,7 @@ class Member_Node():
     def __init__(self, _id=-1, _devices=None) -> None:
         self.id = _id
         self.devices = _devices
-        self.last_received_frame = -1
+        self.last_received_frame = 1
         self.health_report = None
 
 
@@ -83,6 +83,8 @@ class SensorNode(CANNode):
         self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
         self._signal_offset = self.comm_head_size + 4
 
+        self.times_retrans = 0
+
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
         super().start_session(ip, port)
         self._id = request_data["ID"]
@@ -103,8 +105,7 @@ class SensorNode(CANNode):
         self._max_retrans_notified = False
         signalArray = c_float * l
         signals = signalArray(*sensors)
-        msg = COMMBlock(self.index, self.frame_number,
-                        int(time() * 1000), 2,
+        msg = COMMBlock(self.index, self.frame_number, self.time_client.time_ms(), 2,
                         WCOMMFrame(WCANBlock(), WSenseBlock(l, signals)))
         self.frame_number += 1
         return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
@@ -139,18 +140,18 @@ class SensorNode(CANNode):
             logging.error(ae)
             return (None, None)
 
-    def __recvd_frame(self, member: Member_Node, current_time: float) -> bool:
+    def __recvd_frame(self, member: Member_Node, now: float) -> bool:
         not_recvd = member.last_received_frame != self.frame_number
-        timedout = current_time >= self._timeout
-        if not_recvd and timedout:
+        if not_recvd and (self._attempts <= self._max_retransmissions):
+            self.times_retrans += 1
+            self._timeout = now + self.timeout_additive
             self.can_key.data.callback = self.write
             self.sel.modify(self.can_key.fileobj,
                             sel.EVENT_WRITE, self.can_key.data)
             return False
 
     def check_members(self, now: float) -> None:
-        if not self._timeout:
-            return
-        for member in self.members:
-            if self.__recvd_frame(member, now):
-                break
+        if self._timeout and (now >= self._timeout):
+            for member in self.members[1:]:
+                if self.__recvd_frame(member, now):
+                    break

@@ -4,7 +4,7 @@
 #include <CANNode/CANNode.h>
 #include <HTTP/HTTPClient.h>
 #include <NetworkStats/NetworkStats.h>
-#include <W_NTPClient/W_NTPClient.h>
+#include <TimeClient/TimeClient.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <Dns.h>
@@ -73,10 +73,6 @@ void SSSF::forwardingLoop(bool print)
         int packetSize = readCOMMBlock(&msg);
         if (packetSize > 0)
         {
-            // For testing
-            canFrame = {0};
-            write(canFrame);
-            // -----------
             if (print) Serial.println(dumpCOMMBlock(msg));
             if (msg.type == 1)
             {
@@ -89,6 +85,10 @@ void SSSF::forwardingLoop(bool print)
             {
                 networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
+                // For testing
+                canFrame = {0};
+                write(canFrame);
+                // -----------
             }
             else if (msg.type == 3)
             {
@@ -109,7 +109,7 @@ void SSSF::write(struct CAN_message_t &canFrame)
     struct COMMBlock msg = {0};
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = millis();
+    msg.timestamp = timeClient.getEpochTimeMS();
     msg.type = 1;
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = false;
@@ -124,7 +124,7 @@ void SSSF::write(struct CANFD_message_t &canFrame)
     struct COMMBlock msg = {0};
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = millis();
+    msg.timestamp = timeClient.getEpochTimeMS();
     msg.type = 1;
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = true;
@@ -139,7 +139,7 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
     struct COMMBlock msg = {0};
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = millis();
+    msg.timestamp = timeClient.getEpochTimeMS();
     msg.type = 4;
     CANNode::beginPacket();
     int reportSize = networkHealth->size * sizeof(NetworkStats::NodeReport);
@@ -152,8 +152,7 @@ void SSSF::write(NetworkStats::NodeReport *healthReport)
 
 int SSSF::readCOMMBlock(struct COMMBlock *buffer)
 {
-    int remaining = CANNode::parsePacket();
-    if (remaining)
+    if (CANNode::parsePacket())
     {
         uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
         int recvdHeaders = CANNode::read(buf, comHeadSize);
@@ -194,7 +193,7 @@ void SSSF::pollServer()
         {
             id = 0;
             index = 0;
-            frameNumber = 0;
+            frameNumber = 1;
             stop();
         }
         else
@@ -222,8 +221,8 @@ void SSSF::start(struct Request *request)
     id = request->json["ID"];
     index = request->json["Index"];
     size_t membersSize = request->json["Devices"].size();
-    frameNumber = 0;
-    networkHealth = new NetworkStats(membersSize);
+    frameNumber = 1;
+    networkHealth = new NetworkStats(membersSize, &timeClient);
     String ip = request->json["IP"];
     if (CANNode::startSession(ip, request->json["Port"]))
     {
@@ -243,7 +242,9 @@ String SSSF::dumpCOMMBlock(struct COMMBlock &commBlock)
 {
     String msg = "Index: " + String(commBlock.index) + "\n";
     msg += "Frame Number: " + String(commBlock.frameNumber) + "\n";
-    msg += "Timestamp: " + String(commBlock.timestamp) + "\n";
+    char timestamp[20];
+    sprintf(timestamp, "%" PRIu64, commBlock.timestamp);
+    msg += "Timestamp: " + String(timestamp) + "\n";
     msg += "Type: " + String(commBlock.type) + "\n";
     if (commBlock.type == 1)
     {

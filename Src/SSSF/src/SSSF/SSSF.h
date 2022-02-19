@@ -5,7 +5,7 @@
 #include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
 #include <NetworkStats/NetworkStats.h>
-#include <W_NTPClient/W_NTPClient.h>
+#include <TimeClient/TimeClient.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
@@ -17,7 +17,7 @@ private:
     uint32_t id;
     uint32_t index;
     uint32_t frameNumber;
-    W_NTPClient timeClient;
+    TimeClient timeClient;
 
     NetworkStats *networkHealth;
 
@@ -29,7 +29,7 @@ public:
     {
         uint32_t index;
         uint32_t frameNumber;
-        uint32_t timestamp;
+        uint64_t timestamp;
         uint8_t type;
         union
         {

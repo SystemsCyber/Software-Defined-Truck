@@ -3,6 +3,8 @@ import json
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
+from multiprocessing import Event, Queue
+from queue import Empty
 
 from jsonschema import Draft7Validator, RefResolver, Validator
 
@@ -65,7 +67,7 @@ class LogSetup:
         return os.path.join(log_path, log_name)
 
     @staticmethod
-    def init_logging(log_level = logging.DEBUG) -> None:
+    def init_logging(log_level=logging.DEBUG) -> None:
         filename = LogSetup.findpath("controller_log")
         logging.basicConfig(
             format='%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s',
@@ -81,3 +83,36 @@ class LogSetup:
                 ColoredConsoleHandler()
             ]
         )
+
+
+class LogListener:
+    @staticmethod
+    def configure():
+        filename = LogSetup.findpath("controller_log")
+        root = logging.getLogger()
+        file_handler = TimedRotatingFileHandler(
+            filename=filename,
+            when="midnight",
+            interval=1,
+            backupCount=7,
+            encoding='utf-8'
+        )
+        console_handler = ColoredConsoleHandler()
+        formatter = logging.Formatter('%(asctime)-15s %(module)-10.10s %(levelname)s %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        root.addHandler(file_handler)
+        root.addHandler(console_handler)
+        root.setLevel(logging.DEBUG)
+
+    @staticmethod
+    def listen(run: Event, queue: Queue):
+        LogListener.configure()
+        while run.is_set():
+            try:
+                record = queue.get(block=True, timeout=1)
+            except (Empty, InterruptedError) as ie:
+                continue
+            else:
+                logger = logging.getLogger(record.name)
+                logger.handle(record)
