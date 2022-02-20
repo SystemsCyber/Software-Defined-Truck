@@ -1,0 +1,13 @@
+@startuml
+class ECU{
+    type
+    year
+    make
+    model
+    serial no
+}
+class SSSFHello{
+
+}
+SSSFHello ->"1..n" ECU
+@enduml
