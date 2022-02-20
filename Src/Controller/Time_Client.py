@@ -27,7 +27,7 @@ class Time_Client(NTPClient):
         self._is_setup = False
         self._ip_translated = True
         self._server = self.__get_addr_info(
-            ["dailyserver", "time.nist.gov", "pool.ntp.org"])
+            ["dailyserver.", "time.nist.gov", "pool.ntp.org"])
         logging.info(f"Chosen NTP server: {self._server[0]}.")
 
         self._polling_interval = 1
@@ -40,7 +40,8 @@ class Time_Client(NTPClient):
         ntp_stats = {
             "Delay": sys.maxsize,
             "Offset": sys.maxsize,
-            "Time": 0
+            "Time": 0,
+            "Used": False
         }
         self._buffer = [ntp_stats.copy() for i in range(8)]
         self._index = 0
@@ -72,16 +73,16 @@ class Time_Client(NTPClient):
         logging.info("Synchronizing with the NTP server for the first time.")
         self.update(time.time())
 
-    def __set_polling_interval(self, ) -> None:
+    def __set_polling_interval(self) -> None:
         if self._status == Status.Received:
-            if self._polling_interval < 6:
+            if self._polling_interval < 4:
                 self._polling_interval += 1
                 logging.info(
                     f"Increasing NTP polling interval to: "
                     f"{2**self._polling_interval}s."
                     )
-            elif self._polling_interval > 6:
-                self._polling_interval = 6
+            elif self._polling_interval > 4:
+                self._polling_interval = 4
         elif self._status == Status.Timedout:
             logging.error(
                 f"Unable to reach NTP server. Doubling polling interval.")
@@ -115,6 +116,7 @@ class Time_Client(NTPClient):
         self._buffer[self._index]["Delay"] = stats.delay
         self._buffer[self._index]["Offset"] = stats.offset
         self._buffer[self._index]["Time"] = now
+        self._buffer[self._index]["Used"] = False
 
     """
     Get the offset from the peer update with the lowest delay from the past 8
@@ -123,15 +125,26 @@ class Time_Client(NTPClient):
     """
     def __get_peer_update(self) -> float:
         pui = self._index
-        logging.info(f'Recent Delay: {self._buffer[pui]["Delay"]}')
-        logging.info(f'Recent Offset: {self._buffer[pui]["Offset"]}')
+        delay0 = self._buffer[pui]["Delay"]
+        offset0 = self._buffer[pui]["Offset"]
+        logging.info(f'Recent Delay: {delay0}')
+        logging.info(f'Recent Offset: {offset0}')
         for i in range(8):
             small_delay = self._buffer[i]["Delay"] < self._buffer[pui]["Delay"]
             recent = self._buffer[i]["Time"] >= self._previous_clock_update
             if small_delay and recent:
                 pui = i
-        peer_update = self._buffer[pui]["Offset"]
-        self._buffer[pui]["Offset"] = 0.0
+        delay1 = self._buffer[pui]["Delay"]
+        offset1 = self._buffer[pui]["Offset"]
+        peer_update = 0
+        if not self._buffer[pui]["Used"]:
+            peer_update = offset1
+            if offset0 > offset1:
+                peer_update -= ((delay0 - delay1) / 2)
+            elif offset0 < offset1:
+                peer_update += ((delay0 - delay1) / 2)
+        logging.info(f'Offset: {peer_update}')
+        self._buffer[pui]["Used"] = True
         self._previous_clock_update = self._buffer[pui]["Time"]
         return peer_update
 
@@ -177,15 +190,17 @@ class Time_Client(NTPClient):
         self._sock.close()
 
 
-if __name__ == "__main__":
-    s = sel.DefaultSelector()
-    a = Time_Client(s)
-    a.setup()
-    while True:
-        now = time.time()
-        a.update(now)
-        ce = s.select(1)
-        for key, mask in ce:
-            callback = key.data.callback
-            callback(key)
-        print("Timestamp: ", a.time_ms())
+# if __name__ == "__main__":
+#     root = logging.getLogger()
+#     root.setLevel(logging.DEBUG)
+#     s = sel.DefaultSelector()
+#     a = Time_Client(s)
+#     a.setup()
+#     while True:
+#         now = time.time()
+#         a.update(now)
+#         ce = s.select(1)
+#         for key, mask in ce:
+#             callback = key.data.callback
+#             callback(key)
+        # print("Timestamp: ", a.time_ms())

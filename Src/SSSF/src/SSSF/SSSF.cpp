@@ -86,8 +86,8 @@ void SSSF::forwardingLoop(bool print)
                 networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
                 // For testing
-                canFrame = {0};
-                write(canFrame);
+                // canFrame = {0};
+                // write(canFrame);
                 // -----------
             }
             else if (msg.type == 3)
@@ -193,7 +193,7 @@ void SSSF::pollServer()
         {
             id = 0;
             index = 0;
-            frameNumber = 1;
+            frameNumber = 0;
             stop();
         }
         else
@@ -218,10 +218,11 @@ void SSSF::pollCANNetwork(struct CAN_message_t &canFrame)
 
 void SSSF::start(struct Request *request)
 {
+    timeClient.session = true;
     id = request->json["ID"];
     index = request->json["Index"];
     size_t membersSize = request->json["Devices"].size();
-    frameNumber = 1;
+    frameNumber = 0;
     networkHealth = new NetworkStats(membersSize, &timeClient);
     String ip = request->json["IP"];
     if (CANNode::startSession(ip, request->json["Port"]))
@@ -232,6 +233,7 @@ void SSSF::start(struct Request *request)
 
 void SSSF::stop()
 {
+    timeClient.session = false;
     id = 0;
     index = 0;
     delete networkHealth;

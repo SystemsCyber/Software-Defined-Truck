@@ -10,7 +10,7 @@
 Load config;
 SSSF *sssf;
 
-IPAddress ip(192,168,1,47);
+// IPAddress ip(192,168,1,47);
 
 void setup() {
     // Open serial communications and wait for port to open:
@@ -22,8 +22,8 @@ void setup() {
         }
     }
     config.init();
-    // sssf = new SSSF("LAPTOP-A89GD15G", config.config, 250000);
-    sssf = new SSSF(ip, config.config, 250000);
+    sssf = new SSSF("LAPTOP-A89GD15G", config.config, 250000);
+    // sssf = new SSSF(ip, config.config, 250000);
     sssf->setup();
 }
 
@@ -52,6 +52,7 @@ void loop() {
 //     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
 //     timeClient = new TimeClient(&Log);
 //     timeClient->setup();
+//     timeClient->session = true;
 // }
 
 // void loop()

@@ -18,7 +18,7 @@ public:
     struct HealthBasics
     {
         int64_t lastMessageTime = 0;
-        uint32_t lastSequenceNumber = 0;
+        int64_t lastSequenceNumber = 0;
     };
 
     struct HealthCore

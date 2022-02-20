@@ -66,21 +66,14 @@ class NetworkStats:
     def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
         now = self.time_client.time_ms()
         delay = now - timestamp
-        print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
-        ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000
+        # print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
+        ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000.0
         if ellapsedSeconds == 0.0:
-            ellapsedSeconds = 0.0001
+            ellapsedSeconds = 0.0001  # Retransmission
 
         self.calculate(self.health_report[i].latency, abs(delay))
         self.calculate(
             self.health_report[i].jitter, self.health_report[i].latency.variance)
-        '''
-        The issue here is that when no packets are lost then sequence offset is
-        1 so we just get 1 - the current count.
-
-        sequence_offset = sequence_number - self.basics[i].last_sequence_number
-        self.health_report[i].packetLoss = sequence_offset - self.health_report[i].latency.count
-        '''
         # If no packet loss then sequence number = last sequence number + 1
         packetsLost = sequence_number - (self.basics[i].last_sequence_number + 1)
         # If packetsLost is negative then this usually indicates duplicate or

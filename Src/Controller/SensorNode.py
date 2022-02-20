@@ -79,7 +79,7 @@ class SensorNode(CANNode):
             self.timeout_additive /= (_retrans)
         logging.debug(f"Timeout additive: {self.timeout_additive}")
 
-        self.frame_number = 1
+        self.frame_number = 0
         self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
         self._signal_offset = self.comm_head_size + 4
 
@@ -105,26 +105,19 @@ class SensorNode(CANNode):
         self._max_retrans_notified = False
         signalArray = c_float * l
         signals = signalArray(*sensors)
+        self.frame_number += 1
         msg = COMMBlock(self.index, self.frame_number, self.time_client.time_ms(), 2,
                         WCOMMFrame(WCANBlock(), WSenseBlock(l, signals)))
-        self.frame_number += 1
+        # print(f"Packed Frame: {self.frame_number} at: {time()}")
         return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
 
-    def write(self, *msg: COMMBlock) -> int:
+    def write(self, *msg: bytes) -> int:
         if self._max_retransmissions == 0:
             return super().write(*msg)
         elif self._attempts <= self._max_retransmissions:
             self._attempts += 1
             self._timeout = time() + self.timeout_additive
             return super().write(*msg)
-        elif not self._max_retrans_notified and isinstance(msg[0], COMMBlock):
-            index = msg[0].index
-            logging.error(
-                f"Have not received frame #{self.frame_number} "
-                f"from device with index number {index} after "
-                f"{self._max_retransmissions} attempts."
-            )
-            self._max_retrans_notified = True
 
     def read(self) -> Tuple[COMMBlock, bytes]:
         try:
@@ -132,6 +125,9 @@ class SensorNode(CANNode):
             if buffer and len(buffer) >= sizeof(COMMBlock):
                 msg = COMMBlock.from_buffer_copy(buffer)
                 self.members[msg.index].last_received_frame = msg.frame_number
+                if msg.frame_number == self.frame_number:
+                    self._timeout = None
+                # print(f"recvd frame: {msg.frame_number} current: {self.frame_number} at: {time()}")
                 return msg, buffer
             else:
                 return (None, None)
@@ -142,13 +138,25 @@ class SensorNode(CANNode):
 
     def __recvd_frame(self, member: Member_Node, now: float) -> bool:
         not_recvd = member.last_received_frame != self.frame_number
-        if not_recvd and (self._attempts <= self._max_retransmissions):
-            self.times_retrans += 1
-            self._timeout = now + self.timeout_additive
-            self.can_key.data.callback = self.write
-            self.sel.modify(self.can_key.fileobj,
-                            sel.EVENT_WRITE, self.can_key.data)
+        # print(f"member.last_recv_frame: {member.last_received_frame} current frame_number: {self.frame_number}")
+        # print(f"Retrans. Last: {member.last_received_frame} Current: {self.frame_number} at: {time()}")
+        if not_recvd:
+            if self._attempts <= self._max_retransmissions:
+                self.times_retrans += 1
+                self._timeout = now + self.timeout_additive
+                self.can_key.data.callback = self.write
+                self.sel.modify(self.can_key.fileobj,
+                                sel.EVENT_WRITE, self.can_key.data)
+            elif not self._max_retrans_notified:
+                logging.error(
+                    f"Have not received frame {self.frame_number} "
+                    f"from device with index number {member.id} after "
+                    f"{self._max_retransmissions} attempts."
+                )
+                self._max_retrans_notified = True
             return False
+        else:
+            return True
 
     def check_members(self, now: float) -> None:
         if self._timeout and (now >= self._timeout):

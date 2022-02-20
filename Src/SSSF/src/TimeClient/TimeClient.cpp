@@ -39,6 +39,7 @@ void TimeClient::setup()
     }
     udpSetup = true;
     delay((pow(2, pollingInterval) * MILLISPERSEC));
+    Teensy3Clock.compensate(500);
     update();
 }
 
@@ -126,16 +127,33 @@ void TimeClient::setPollingInterval()
 {
     if (status == Received)
     {
-        if (pollingInterval < 6)
+        if (session)
         {
-            if (logging)
-                logger->notice("Increasing NTP polling interval to: ");
-                logger->noticeln("%ds.", int(pow(2, pollingInterval)));
-            pollingInterval++;
+            if (pollingInterval < 4)
+            {
+                pollingInterval++;
+                if (logging)
+                    logger->notice("Increasing NTP polling interval to: ");
+                    logger->noticeln("%ds.", int(pow(2, pollingInterval)));
+            }
+            else if (pollingInterval > 4)
+            {
+                pollingInterval = 4;
+            }
         }
-        else if (pollingInterval > 6)
+        else
         {
-            pollingInterval = 6;
+            if (pollingInterval < 6)
+            {
+                if (logging)
+                    logger->notice("Increasing NTP polling interval to: ");
+                    logger->noticeln("%ds.", int(pow(2, pollingInterval)));
+                pollingInterval++;
+            }
+            else if (pollingInterval > 6)
+            {
+                pollingInterval = 6;
+            }
         }
     }
     else if (status == Timedout)
@@ -213,6 +231,9 @@ int64_t TimeClient::getPeerUpdate()
     // Serial.printf("Current Index: %d\n", bufferIndex);
     // Serial.printf("Recent Delay: %f\n", double(ntpBuffer[bufferIndex].delay) / double(MICROSPERSEC));
     // Serial.printf("Recent Offset: %f\n", double(ntpBuffer[bufferIndex].offset) / double(MICROSPERSEC));
+    // Recent delay and offset
+    int64_t delay0 = ntpBuffer[bufferIndex].delay;
+    int64_t offset0 = ntpBuffer[bufferIndex].offset;
     int pui = bufferIndex;
     for (int i = 0; i < 8; i++)
     {
@@ -223,8 +244,21 @@ int64_t TimeClient::getPeerUpdate()
             pui = i;
         }
     }
-    int64_t peerUpdate = (ntpBuffer[pui].offset * 2);  // Fix this
-    ntpBuffer[pui].offset = 0;
+    int64_t delay1 = ntpBuffer[pui].delay;
+    int64_t offset1 = ntpBuffer[pui].offset;
+    int64_t peerUpdate = (ntpBuffer[pui].used) ? 0 : offset1;
+    if (peerUpdate != 0)
+    {// Hush and Puff algorithm
+        if (offset0 > offset1)
+        {
+            peerUpdate -= ((delay0 - delay1) / 2);
+        }
+        else if (offset0 < offset1)
+        {
+            peerUpdate += ((delay0 - delay1) / 2);
+        }
+    }
+    ntpBuffer[pui].used = true;
     previousClockUpdate = ntpBuffer[pui].time;
     // Serial.printf("Peer Update Index: %d\n", pui);
     // Serial.printf("Offset: %f\n", double(peerUpdate) / double(MICROSPERSEC));
@@ -250,6 +284,7 @@ int64_t TimeClient::calculateOffset(bool firstTime)
         ntpBuffer[bufferIndex].offset = ((t2 - t1) + (t3 - t4)) / 2;
         ntpBuffer[bufferIndex].delay = ((t4 - t1) - (t3 - t2));
         ntpBuffer[bufferIndex].time = t4;
+        ntpBuffer[bufferIndex].used = false;
 
         int64_t offset = getPeerUpdate();
         bufferIndex = (bufferIndex + 1) % 8;

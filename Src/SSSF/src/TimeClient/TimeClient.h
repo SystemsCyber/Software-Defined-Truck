@@ -61,6 +61,7 @@ private:
         int64_t offset = INT64_MAX;
         int64_t delay = INT64_MAX;
         uint64_t time = 0;
+        bool used = false;
     };
     NTPPacket ntpBuffer[8];
     int bufferIndex = 0;
@@ -101,6 +102,7 @@ private:
     bool logging;
 
 public:
+    bool session = false;
 
     TimeClient();
     TimeClient(Logging* _logger);
@@ -115,6 +117,9 @@ public:
      * configured in the TimeClient constructor.
      */
     void update();
+
+    void startSession();
+    void stopSession();
 
     uint32_t getDay();
     uint32_t getHours();

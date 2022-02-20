@@ -19,14 +19,22 @@ class Controller(SensorNode, HTTPClient):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._last_request = time()
+        self.number_of_dropped_carla_frames = 0
+        self.number_of_dropped_can_frames = 0
+        self.total_can_frames = 0
 
     def __request_health(self, now: float) -> None:
         if (now - self._last_request) >= 1.0:
             self._last_request = now
             msg = COMMBlock(self.index, self.frame_number,
                             int(now * 1000), 3, WCOMMFrame())
-            # for i in range(len(self.members)):
-            #         print(self.network_stats.health_report[i])
+            print("Controller Health Report: ")
+            for i in range(len(self.members)):
+                print(self.network_stats.health_report[i])
+            if (self.network_stats.health_report[1].packetLoss > 0) and (self.network_stats.health_report[1].packetLoss < 100):
+                self.number_of_dropped_can_frames += self.network_stats.health_report[1].packetLoss
+            if (self.network_stats.health_report[1].latency.count > 0) and (self.network_stats.health_report[1].latency.count < 1000):
+                self.total_can_frames += self.network_stats.health_report[1].latency.count
             self.health_report.update(
                 self.index, self.network_stats.health_report)
             self.network_stats.reset()
@@ -59,7 +67,7 @@ class Controller(SensorNode, HTTPClient):
 
     def __listen(self, running: Event) -> None:
         while running.is_set() and not self.close_connection:
-            connection_events = self.sel.select(timeout=self.timeout_additive)
+            connection_events = self.sel.select(timeout=0.001)
             for key, mask in connection_events:
                 callback = key.data.callback
                 callback(key)
@@ -168,6 +176,7 @@ class Controller(SensorNode, HTTPClient):
     def write(self, *key) -> None:
         if isinstance(key[0], sel.SelectorKey):
             super().write(key[0].data.message)
+            # print(f"Sent frame: {self.frame_number} at: {time()}")
             key[0].data.callback = self.read
             self.sel.modify(key[0].fileobj, sel.EVENT_READ, key[0].data)
         elif self.session_status == self.SessionStatus.Active:
@@ -192,12 +201,19 @@ class Controller(SensorNode, HTTPClient):
                 report = self.health_report.report.from_buffer_copy(
                     buffer, self.comm_head_size
                 )
+                print("Received Health Report: ")
                 for i in range(len(self.members)):
                     print(report[i])
+                if (report[0].packetLoss > 0) and (report[0].packetLoss < 100):
+                    self.number_of_dropped_carla_frames += report[0].packetLoss
                 self.health_report.update(msg.index, report)
 
     def stop(self, ipc_conn=None, notify_server=True):
-        print(f"Times Retrans: {self.times_retrans}")
+        print(f"Dropped Carla Frames: {self.number_of_dropped_carla_frames}")
+        print(f"Dropped Can Frames: {self.number_of_dropped_can_frames}")
+        print(f"Times Carla Frames Retransmitted: {self.times_retrans}")
+        print(f"Total Carla Frames: {self.frame_number}")
+        print(f"Total Can Frames: {self.total_can_frames}")
         if ipc_conn:
             self.sel.unregister(ipc_conn)
         self.do_DELETE()

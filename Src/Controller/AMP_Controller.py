@@ -238,9 +238,9 @@ def main():
     log_listener.start()
 
     init_mp_logging(log_queue, log_level)
-    mp_logger = mp.get_logger()
-    mp_logger.propagate = True
-    mp_logger.setLevel(log_level)
+    # mp_logger = mp.get_logger()
+    # mp_logger.propagate = True
+    # mp_logger.setLevel(log_level)
     Text.printdoc()
     logging.info('Listening to carla server %s:%s.', args.carla, args.port)
 
