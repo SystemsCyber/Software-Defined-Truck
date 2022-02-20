@@ -1,0 +1,28 @@
+@startuml
+    ' title <u>Health Monitoring Data Structures</u>
+    class HealthBasics {
+        uint32_t lastMessageTime
+        uint32_t lastSequenceNumber
+    }
+    ' note bottom of HealthBasics: The difference between HealthBasics and HealthCore,\nis that HealthBasics contains "per-node"\ninformation, where as HealthCore contains\n"per-node-per-statistic" information.
+    class HealthCore{
+        -uint32_t count
+        +float min
+        +float max
+        +float avg
+        +float variance
+        -float sumOfSquaredDifferences
+    }
+
+    HealthCore -u[hidden]->HealthBasics
+    ' note bottom of HealthCore: How would we actually implement count and\nsumOfSquaredDifferences in a private way?
+
+    class NodeReport{
+        latency: HealthCore
+        jitter: HealthCore
+        packetLoss: float
+        goodput: HealthCore
+    }
+    class HealthReport
+    HealthReport *--"1..n" NodeReport
+@enduml
