@@ -7,7 +7,7 @@ update w_signal_block.signals
 sent_frame_number++
 w_signal_block.frame_number = sent_frame_number
 endhnote
-loop retransmits < max_retransmits and\nsent_frame_number != recv_frame_number
+loop retransmits < \nmax_retransmits and\nsent_frame_number \n!= recv_frame_number
 Controller --> SSSF: w_signal_block
 Controller -> Controller: Wait for (1000/\n(carla_frame_rate*max_retransmits))\nmilliseconds
 end

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  20 FEB 2022 22:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  21 FEB 2022 10:39
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -679,47 +679,44 @@ Overfull \hbox (38.3783pt too wide) in paragraph at lines 78--78
 \T1/pcr/m/n/10 number-[]of-[]vehicles-[]per-[]household-[]in-[]the-[]united-[]states/$[][]| 
  []
 
-<images/design_goal.drawio.png, id=84, 347.2975pt x 262.9825pt>
+<images/design_goal.drawio.png, id=88, 325.215pt x 262.9825pt>
 File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
-Package pdftex.def Info: images/design_goal.drawio.png  used on input line 93.
-(pdftex.def)             Requested size: 241.02039pt x 182.51347pt.
-<images/system_design.drawio.png, id=86, 520.94624pt x 297.11pt>
-File: images/system_design.drawio.png Graphic file (type png)
-<use images/system_design.drawio.png>
-Package pdftex.def Info: images/system_design.drawio.png  used on input line 110.
-(pdftex.def)             Requested size: 505.89pt x 288.52277pt.
-<out/images/data_structures/data_structures.png, id=87, 366.36874pt x 277.035pt>
-File: out/images/data_structures/data_structures.png Graphic file (type png)
-<use out/images/data_structures/data_structures.png>
-Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 129.
-(pdftex.def)             Requested size: 241.02039pt x 182.25185pt.
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+Package pdftex.def Info: images/design_goal.drawio.png  used on input line 95.
+(pdftex.def)             Requested size: 241.02039pt x 194.90495pt.
+[1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
 ]
-<out/images/signal_control/signal_control.png, id=101, 510.90875pt x 547.04375pt>
+<images/system_design.drawio.png, id=107, 520.94624pt x 297.11pt>
+File: images/system_design.drawio.png Graphic file (type png)
+<use images/system_design.drawio.png>
+Package pdftex.def Info: images/system_design.drawio.png  used on input line 124.
+(pdftex.def)             Requested size: 505.89pt x 288.52277pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+<out/images/data_structures/data_structures.png, id=108, 366.36874pt x 277.035pt>
+File: out/images/data_structures/data_structures.png Graphic file (type png)
+<use out/images/data_structures/data_structures.png>
+Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 153.
+(pdftex.def)             Requested size: 241.02039pt x 182.25185pt.
+<out/images/signal_control/signal_control.png, id=109, 500.87125pt x 573.14125pt>
 File: out/images/signal_control/signal_control.png Graphic file (type png)
 <use out/images/signal_control/signal_control.png>
-Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 144.
-(pdftex.def)             Requested size: 241.02039pt x 258.06216pt.
-<out/images/can_exchange/can_exchange.png, id=102, 469.755pt x 492.84125pt>
+Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 161.
+(pdftex.def)             Requested size: 241.02039pt x 275.79556pt.
+<out/images/can_exchange/can_exchange.png, id=110, 469.755pt x 492.84125pt>
 File: out/images/can_exchange/can_exchange.png Graphic file (type png)
 <use out/images/can_exchange/can_exchange.png>
-Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 151.
+Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 168.
 (pdftex.def)             Requested size: 241.02039pt x 252.86476pt.
-<out/images/network_health/network_health.png, id=103, 374.39874pt x 280.04625pt>
+<out/images/network_health/network_health.png, id=111, 374.39874pt x 280.04625pt>
 File: out/images/network_health/network_health.png Graphic file (type png)
 <use out/images/network_health/network_health.png>
-Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 158.
+Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 175.
 (pdftex.def)             Requested size: 241.02039pt x 180.28017pt.
- (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
-Underfull \vbox (badness 1178) has occurred while \output is active []
-
-
+ (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl [2 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>]
 Underfull \hbox (badness 1077) in paragraph at lines 11--18
 \T1/ptm/m/n/12 (+20) Kan-tor, Danny An-der-son, Ho-vav Shacham,
  []
@@ -729,28 +726,26 @@ Underfull \hbox (badness 2368) in paragraph at lines 11--18
 \T1/ptm/m/n/12 (+20) Franziska Roes-ner, and Ta-dayoshi Kohno.
  []
 
-) [2 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>] [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png (PNG copy)>] [4
-
- </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
+) [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)>] [4 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
 
 LaTeX Warning: There were multiply-defined labels.
 
 Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: 0CA1355264AC8846F02EF99964D25112;2839.
+(rerunfilecheck)             Checksum: 6F200F2942EC329D382709C0D040B4E5;2946.
  ) 
 Here is how much of TeX's memory you used:
- 21466 strings out of 478994
- 392917 string characters out of 5858185
- 693202 words of memory out of 5000000
- 38304 multiletter control sequences out of 15000+600000
- 463183 words of font info for 224 fonts, out of 8000000 for 9000
+ 21497 strings out of 478994
+ 393222 string characters out of 5858185
+ 694246 words of memory out of 5000000
+ 38306 multiletter control sequences out of 15000+600000
+ 464448 words of font info for 242 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 113i,9n,116p,862b,368s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 113i,9n,116p,862b,450s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (4 pages, 240122 bytes).
+Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (4 pages, 242265 bytes).
 PDF statistics:
- 151 PDF objects out of 1000 (max. 8388607)
- 131 compressed objects within 2 object streams
- 34 named destinations out of 1000 (max. 500000)
- 79035 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 158 PDF objects out of 1000 (max. 8388607)
+ 138 compressed objects within 2 object streams
+ 36 named destinations out of 1000 (max. 500000)
+ 79043 words of extra memory for PDF output out of 89155 (max. 10000000)
 
