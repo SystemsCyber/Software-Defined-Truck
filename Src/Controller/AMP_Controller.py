@@ -17,9 +17,10 @@ except IndexError:
 import argparse
 import logging
 import multiprocessing as mp
-import socket
 import random
 import signal
+import socket
+from logging.handlers import QueueHandler
 from multiprocessing.connection import Connection, Listener
 from typing import Tuple
 
@@ -28,7 +29,7 @@ import pygame
 
 import Text
 from Controller import Controller
-from Environment import LogSetup
+from Environment import LogListener
 from HUD import HUD
 from KeyboardControl import KeyboardControl
 from World import World
@@ -137,6 +138,12 @@ def init_argparser() -> argparse.ArgumentParser:
     return argparser
 
 
+def init_mp_logging(queue: mp.Queue, log_level=logging.DEBUG):
+    root = logging.getLogger()
+    root.addHandler(QueueHandler(queue))
+    root.setLevel(log_level)
+
+
 def choose_ipc_port() -> int:
     ports = [random.randrange(2**12, 2**16) for i in range(10)]
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -222,10 +229,18 @@ def main():
     log_level = logging.DEBUG if args.debug else logging.INFO
     frame_rate = 60
 
-    LogSetup.init_logging(log_level)
-    mp_logger = mp.get_logger()
-    mp_logger.propagate = True
-    mp_logger.setLevel(log_level)
+    log_queue = mp.Queue()
+    listen_for_logs = mp.Event()
+    listen_for_logs.set()
+
+    log_listener = mp.Process(
+        target=LogListener.listen, args=(listen_for_logs, log_queue))
+    log_listener.start()
+
+    init_mp_logging(log_queue, log_level)
+    # mp_logger = mp.get_logger()
+    # mp_logger.propagate = True
+    # mp_logger.setLevel(log_level)
     Text.printdoc()
     logging.info('Listening to carla server %s:%s.', args.carla, args.port)
 
@@ -237,7 +252,8 @@ def main():
     port = choose_ipc_port()
     running = mp.Event()
     running.set()
-    ctrl_thread = mp.Process(target=ctrl.start, args=(port, running,))
+    ctrl_thread = mp.Process(
+        target=ctrl.start, args=(port, running, log_queue, log_level))
     listener = Listener(('localhost', port), authkey=ctrl_thread.authkey)
 
     ctrl_thread.start()
@@ -248,6 +264,10 @@ def main():
     listener.close()
     ctrl_thread.join(1)
     ctrl_thread.close()
+    
+    listen_for_logs.clear()
+    log_listener.join(2)
+    log_listener.close()
 
 
 if __name__ == '__main__':

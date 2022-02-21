@@ -68,7 +68,7 @@ bool CANNode::startSession(IPAddress _ip, uint16_t _port)
 {
     canIP = _ip;
     canPort = _port;
-    sequenceNumber = 0;
+    sequenceNumber = 1;
 
     if (canSock.beginMulticast(canIP, canPort))
     {
@@ -90,10 +90,11 @@ bool CANNode::startSession(IPAddress _ip, uint16_t _port)
 bool CANNode::startSession(String _ip, uint16_t _port)
 {
     DNSClient dns;
+    dns.begin(Ethernet.dnsServerIP());
     IPAddress ipConverted;
     /* Manually converts IP address here because the ethernet
        class will try to convert it before every message */
-    if (!dns.inet_aton(_ip.c_str(), ipConverted))
+    if (dns.inet_aton(_ip.c_str(), ipConverted) != 1)
     {
         Log.errorln("Failed to parse multicast IP address.");
         return false;

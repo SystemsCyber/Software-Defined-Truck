@@ -3,7 +3,7 @@ collections ECUs
 participant SSSF
 database "pub/sub endpoint" as pbs
 par
-ECUs -> SSSF : sample CAN frame
+ECUs <- SSSF : sample CAN frame
 ECUs -->> SSSF: CAN frame
 hnote over SSSF
 update w_can_block.frames[ind++]

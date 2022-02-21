@@ -1,7 +1,8 @@
 import logging
 import selectors as sel
 from io import BytesIO
-from multiprocessing import Event, current_process
+from logging.handlers import QueueHandler
+from multiprocessing import Event, Queue, current_process
 from multiprocessing.connection import Client, Connection
 from pprint import pprint
 from time import time
@@ -18,14 +19,22 @@ class Controller(SensorNode, HTTPClient):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._last_request = time()
+        self.number_of_dropped_carla_frames = 0
+        self.number_of_dropped_can_frames = 0
+        self.total_can_frames = 0
 
     def __request_health(self, now: float) -> None:
         if (now - self._last_request) >= 1.0:
             self._last_request = now
             msg = COMMBlock(self.index, self.frame_number,
                             int(now * 1000), 3, WCOMMFrame())
+            print("Controller Health Report: ")
             for i in range(len(self.members)):
-                    print(self.network_stats.health_report[i])
+                print(self.network_stats.health_report[i])
+            if (self.network_stats.health_report[1].packetLoss > 0) and (self.network_stats.health_report[1].packetLoss < 100):
+                self.number_of_dropped_can_frames += self.network_stats.health_report[1].packetLoss
+            if (self.network_stats.health_report[1].latency.count > 0) and (self.network_stats.health_report[1].latency.count < 1000):
+                self.total_can_frames += self.network_stats.health_report[1].latency.count
             self.health_report.update(
                 self.index, self.network_stats.health_report)
             self.network_stats.reset()
@@ -33,6 +42,17 @@ class Controller(SensorNode, HTTPClient):
             self.can_key.data.message = bytes(msg)
             self.sel.modify(self.can_key.fileobj,
                             sel.EVENT_WRITE, self.can_key.data)
+    
+    def __first_ntp_sync(self) -> None:
+        logging.info("Synchronizing with the NTP server for the first time.")
+        logging.info("This takes several seconds.")
+        end_sync = time() + 14
+        while(end_sync > time()):
+            connection_events = self.sel.select(timeout=0.5)
+            for key, mask in connection_events:
+                callback = key.data.callback
+                callback(key)
+            self.time_client.update(time())
 
     def __write_signals(self, key: sel.SelectorKey) -> None:
         try:
@@ -47,13 +67,14 @@ class Controller(SensorNode, HTTPClient):
 
     def __listen(self, running: Event) -> None:
         while running.is_set() and not self.close_connection:
-            connection_events = self.sel.select(timeout=self.timeout_additive)
+            connection_events = self.sel.select(timeout=0.001)
             for key, mask in connection_events:
                 callback = key.data.callback
                 callback(key)
             now = time()
             self.check_members(now)
             self.__request_health(now)
+            self.time_client.update(now)
 
     def __request_devices(self, req: list, devices: list, conn: Connection) -> List[int]:
         if self.request_devices(req, devices):
@@ -106,6 +127,7 @@ class Controller(SensorNode, HTTPClient):
 
     def __provision_devices(self, conn: Connection, running: Event) -> None:
         requested = self.__request_available_devices(conn)
+        self.__first_ntp_sync()
         conn.send("break")
         if requested:
             data = SimpleNamespace(
@@ -117,7 +139,10 @@ class Controller(SensorNode, HTTPClient):
         else:
             tw.write("Exiting", tw.red)
 
-    def start(self, port: int, running: Event) -> None:
+    def start(self, port: int, running: Event, log_queue: Queue, log_level=logging.DEBUG) -> None:
+        root = logging.getLogger()
+        root.addHandler(QueueHandler(log_queue))
+        root.setLevel(log_level)
         authkey = current_process().authkey
         conn = Client(('localhost', port), authkey=authkey)
         data = SimpleNamespace(callback=self.__write_signals)
@@ -133,9 +158,9 @@ class Controller(SensorNode, HTTPClient):
                 tw.write("Received session information:", tw.magenta)
                 pprint(request_data)
                 self.start_session(ip, port, request_data)
-                self.network_stats = NetworkStats(len(self.members))
+                self.network_stats = NetworkStats(len(self.members), self.time_client)
                 self.health_report = HealthReport(len(self.members))
-                self._last_request = time() + 5  # Give it a few secs for carla to start
+                self._last_request = time() + 10  # Time to sync with NTP server
                 tw.write("Starting the session!", tw.yellow)
             else:
                 tw.write("Did not receive session information.", tw.magenta)
@@ -151,6 +176,7 @@ class Controller(SensorNode, HTTPClient):
     def write(self, *key) -> None:
         if isinstance(key[0], sel.SelectorKey):
             super().write(key[0].data.message)
+            # print(f"Sent frame: {self.frame_number} at: {time()}")
             key[0].data.callback = self.read
             self.sel.modify(key[0].fileobj, sel.EVENT_READ, key[0].data)
         elif self.session_status == self.SessionStatus.Active:
@@ -169,15 +195,25 @@ class Controller(SensorNode, HTTPClient):
                     msg.timestamp,
                     msg.frame.canFrame.sequence_number
                 )
+                # print(msg)
+                # print(f'Frame Number: {msg.frame_number} Count: {self.network_stats.health_report[1].latency.count} SeqNum: {msg.frame.canFrame.sequence_number}')
             elif msg.type == 4:
                 report = self.health_report.report.from_buffer_copy(
                     buffer, self.comm_head_size
                 )
+                print("Received Health Report: ")
                 for i in range(len(self.members)):
                     print(report[i])
+                if (report[0].packetLoss > 0) and (report[0].packetLoss < 100):
+                    self.number_of_dropped_carla_frames += report[0].packetLoss
                 self.health_report.update(msg.index, report)
 
     def stop(self, ipc_conn=None, notify_server=True):
+        print(f"Dropped Carla Frames: {self.number_of_dropped_carla_frames}")
+        print(f"Dropped Can Frames: {self.number_of_dropped_can_frames}")
+        print(f"Times Carla Frames Retransmitted: {self.times_retrans}")
+        print(f"Total Carla Frames: {self.frame_number}")
+        print(f"Total Can Frames: {self.total_can_frames}")
         if ipc_conn:
             self.sel.unregister(ipc_conn)
         self.do_DELETE()

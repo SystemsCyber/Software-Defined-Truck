@@ -11,6 +11,7 @@ import netifaces
 from getmac import get_mac_address as gma
 
 from Environment import LogSetup
+from Time_Client import Time_Client
 
 
 class FLAGS_FD(Structure):
@@ -128,10 +129,11 @@ class CANNode(object):
         Active = auto()
 
     def __init__(self, *args, **kwargs) -> None:
-        LogSetup.init_logging()
+        # LogSetup.init_logging()
         self.__can_ip = IPv4Address
         self.__can_port = 0
         self.sel = sel.DefaultSelector()
+        self.time_client = Time_Client(self.sel)
 
         self.mac = gma()
         self._sequence_number = 1
@@ -175,6 +177,7 @@ class CANNode(object):
         return iface, mreq
 
     def start_session(self, _ip: IPv4Address, _port: int) -> None:
+        self.time_client.setup()
         self.__can_ip = _ip
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
@@ -224,6 +227,7 @@ class CANNode(object):
         self.__can_ip = IPv4Address
         self.__can_port = 0
         if self.session_status == self.SessionStatus.Active:
+            self.time_client.shutdown()
             logging.info("Shutting down CAN socket.")
             self.sel.unregister(self.__can_sock)
             self.__can_sock.setsockopt(

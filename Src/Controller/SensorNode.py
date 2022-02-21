@@ -2,7 +2,7 @@ import logging
 import selectors as sel
 import struct
 from ctypes import (POINTER, Structure, Union, c_float, c_uint8, c_uint32,
-                    sizeof)
+                    c_uint64, sizeof)
 from ipaddress import IPv4Address
 from time import time
 from typing import List, Tuple
@@ -38,7 +38,7 @@ class COMMBlock(Structure):
     _fields_ = [
         ("index", c_uint32),
         ("frame_number", c_uint32),
-        ("timestamp", c_uint32),
+        ("timestamp", c_uint64),
         ("type", c_uint8),
         ("frame", WCOMMFrame)
     ]
@@ -59,7 +59,7 @@ class Member_Node():
     def __init__(self, _id=-1, _devices=None) -> None:
         self.id = _id
         self.devices = _devices
-        self.last_received_frame = -1
+        self.last_received_frame = 1
         self.health_report = None
 
 
@@ -79,9 +79,11 @@ class SensorNode(CANNode):
             self.timeout_additive /= (_retrans)
         logging.debug(f"Timeout additive: {self.timeout_additive}")
 
-        self.frame_number = 1
+        self.frame_number = 0
         self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
         self._signal_offset = self.comm_head_size + 4
+
+        self.times_retrans = 0
 
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
         super().start_session(ip, port)
@@ -103,27 +105,19 @@ class SensorNode(CANNode):
         self._max_retrans_notified = False
         signalArray = c_float * l
         signals = signalArray(*sensors)
-        msg = COMMBlock(self.index, self.frame_number,
-                        int(time() * 1000), 2,
-                        WCOMMFrame(WCANBlock(), WSenseBlock(l, signals)))
         self.frame_number += 1
+        msg = COMMBlock(self.index, self.frame_number, self.time_client.time_ms(), 2,
+                        WCOMMFrame(WCANBlock(), WSenseBlock(l, signals)))
+        # print(f"Packed Frame: {self.frame_number} at: {time()}")
         return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
 
-    def write(self, *msg: COMMBlock) -> int:
+    def write(self, *msg: bytes) -> int:
         if self._max_retransmissions == 0:
             return super().write(*msg)
         elif self._attempts <= self._max_retransmissions:
             self._attempts += 1
             self._timeout = time() + self.timeout_additive
             return super().write(*msg)
-        elif not self._max_retrans_notified and isinstance(msg[0], COMMBlock):
-            index = msg[0].index
-            logging.error(
-                f"Have not received frame #{self.frame_number} "
-                f"from device with index number {index} after "
-                f"{self._max_retransmissions} attempts."
-            )
-            self._max_retrans_notified = True
 
     def read(self) -> Tuple[COMMBlock, bytes]:
         try:
@@ -131,6 +125,9 @@ class SensorNode(CANNode):
             if buffer and len(buffer) >= sizeof(COMMBlock):
                 msg = COMMBlock.from_buffer_copy(buffer)
                 self.members[msg.index].last_received_frame = msg.frame_number
+                if msg.frame_number == self.frame_number:
+                    self._timeout = None
+                # print(f"recvd frame: {msg.frame_number} current: {self.frame_number} at: {time()}")
                 return msg, buffer
             else:
                 return (None, None)
@@ -139,18 +136,30 @@ class SensorNode(CANNode):
             logging.error(ae)
             return (None, None)
 
-    def __recvd_frame(self, member: Member_Node, current_time: float) -> bool:
+    def __recvd_frame(self, member: Member_Node, now: float) -> bool:
         not_recvd = member.last_received_frame != self.frame_number
-        timedout = current_time >= self._timeout
-        if not_recvd and timedout:
-            self.can_key.data.callback = self.write
-            self.sel.modify(self.can_key.fileobj,
-                            sel.EVENT_WRITE, self.can_key.data)
+        # print(f"member.last_recv_frame: {member.last_received_frame} current frame_number: {self.frame_number}")
+        # print(f"Retrans. Last: {member.last_received_frame} Current: {self.frame_number} at: {time()}")
+        if not_recvd:
+            if self._attempts <= self._max_retransmissions:
+                self.times_retrans += 1
+                self._timeout = now + self.timeout_additive
+                self.can_key.data.callback = self.write
+                self.sel.modify(self.can_key.fileobj,
+                                sel.EVENT_WRITE, self.can_key.data)
+            elif not self._max_retrans_notified:
+                logging.error(
+                    f"Have not received frame {self.frame_number} "
+                    f"from device with index number {member.id} after "
+                    f"{self._max_retransmissions} attempts."
+                )
+                self._max_retrans_notified = True
             return False
+        else:
+            return True
 
     def check_members(self, now: float) -> None:
-        if not self._timeout:
-            return
-        for member in self.members:
-            if self.__recvd_frame(member, now):
-                break
+        if self._timeout and (now >= self._timeout):
+            for member in self.members[1:]:
+                if self.__recvd_frame(member, now):
+                    break

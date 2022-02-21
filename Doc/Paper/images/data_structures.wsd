@@ -3,35 +3,30 @@ hide methods
     ' title <u>Communication Data Structures</u>
 
     abstract class COMMBLOCK{
-        ' uint32_t id
-        uint32_t frame_number
+        uint32_t index
+        uint32_t frameNumber
+        uint64_t timestamp
         {abstract} #uint8_t type
     }
 
     class WSignalBlock{
         type = 2
-        ' timestamp = NULL
         uint8_t num_signals
-        float signals[19]
+        float* signals
     }
     COMMBLOCK <|-d- WSignalBlock
 
     class WCANFrame{
-        uint32_t id
-        uint8_t dlc
-        uint64_t data
-        char[4] iface
     }
-    ' WCANFrame .|> FlexCAN.CAN_message_t
-    ' WCANFrame .|> FlexCAN.CANFD_message_t
+    WCANFrame .|> FlexCAN.CAN_message_t
+    WCANFrame .|> FlexCAN.CANFD_message_t
     class WCANBlock{
         type = 1
-        uint32_t timestamp
-        uin32_t sequence_number
-        uint8_t num_frames
-        bool need_response
+        uint32_t sequenceNumber
+        bool needResponse
+        bool fd
     }
 
     COMMBLOCK <|-r- WCANBlock
-    WCANBlock *-d-"1..num_frames\nframes"WCANFrame 
+    WCANBlock <|-- WCANFrame 
 @enduml
