@@ -1,13 +1,20 @@
 @startuml
-class ECU{
-    type
-    year
-    make
-    model
-    serial no
-}
-class SSSFHello{
 
+class ControllerRegistration{
+    string mac
 }
-SSSFHello ->"1..n" ECU
+
+class SSSFRegistration{
+    string mac
+}
+
+class ECU{
+    string type
+    int year
+    string make
+    string model
+    string serial_no
+}
+
+SSSFRegistration <-d-"1..n" ECU
 @enduml

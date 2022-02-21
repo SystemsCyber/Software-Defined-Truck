@@ -4,6 +4,7 @@ Controller -> Server: Connect
 Server -> Controller: Available ECU descriptions
 Controller -> Server: Desired network configuration
 Server -> SSSF: Multicast endpoint(s)
+Server -> Controller: Multicast endpoint(s)
 SSSF -> SSSF: Wait for first CARLA packet,\ntransmit CAN frames
 Controller -> Controller: Configure and launch CARLA
 Controller -> Controller: Wait for first CARLA packet, \ntransmit CAN frames

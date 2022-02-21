@@ -205,7 +205,7 @@ void SSSF::pollServer()
 }
 
 void SSSF::pollCANNetwork(struct CAN_message_t &canFrame)
-{
+{ // If messages build up in the queue this should be a while loop
     if (can0BaudRate && can0.read(canFrame))
     {
         write(canFrame);
