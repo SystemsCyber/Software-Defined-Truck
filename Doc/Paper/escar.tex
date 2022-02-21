@@ -85,6 +85,8 @@ Existing solutions
 
 In this 
 
+\section{Related Work}
+
 % The problem of remotely accessible testbeds for automotive control systems has been addressed in the past \cite{tagarev_automotive_2021}. A recent survey on the same identified an issue with the adaptability, i.e. the ability to adapt to user demanded configurations. Of the testbeds covered in \cite{tagarev_automotive_2021} and the only effective solution is a portable hardware testbench, PASTA \cite{}. There are two ways to adaptibility, virtualizing the ECU and/or virtaulizeing the network configuration. Most existing solutions have suggested virtualizing the ECU by reprograming the hardware to user demands. While this is viable solution, To achieve both, existing techniques have used a full virtualization scheme. 
 
 \section{Design Goals}
@@ -94,7 +96,19 @@ In this
     \caption{Design Goal of CANLay}
     \label{fig:goal}
 \end{figure}
-% The overarching design goal of this project is eludiated through figure \ref{fig:goal}. In summary, our goal is to create an overlay over TCP/IP that can transport CAN frames and vehicle control signals to ECUs located in different subnets accross the globe. The control signals can be obtained from and fed back into a vehicle simulator that is the under the user's control. 
+The overarching design goal of this project is elucidated through figure \ref{fig:goal}. To design a platform that simulates a CAN internetwork within a running vehicle using ECUs from separate subnets within the internet a. la. the software-defined truck \cite{mukherjee_towards_2021}. 
+Clearly, this has to be achieved over in-vehicle communication overlays on top of protocols of the internet.
+
+The distributed overlay nature of the project introduces a set of fidelity-related challenges when emulating the tightly integrated infrastructure within the vehicle. 
+Firstly, CAN provides a low-latency, strong reliability communication media that may be difficult to emulate over long-range communication channels. This requirement is even stronger for the physical signals that are usually transmitted over direct wiring in a real-world setting. 
+% A major requirement of this project is, therefore, to provide adequate assurance about the quality of communication in the overlay network. 
+Secondly, the broadcast nature of CAN may be difficult to realize in a distributed manner over the (typically) unicast internet protocols. Using unicast packets for multi/broadcast may require duplication in linear time. This is both space and time-intensive, especially if performed in a smaller scale local network that has limited bandwidth.
+The final challenge is to realize the complexity of interactions between the different components of the vehicle that normally operate in the same physical setting.
+%TODO Dr. Daily, provide an example here
+
+Albeit, all of these challenges can be difficult to realize in full in an adaptability-centric setting like ours. Even so, a major goal of this project is to optimize and report the quality of experimentation, thereby creating a transparent and usable environment for the experimenter. 
+
+% In summary, our goal is to create an overlay over TCP/IP that can transport CAN frames and vehicle control signals to ECUs located in different subnets accross the globe. The control signals can be obtained from and fed back into a vehicle simulator that is the under the user's control. 
 % The simulator is expoted to be useful in controlling the sensory inputs to the ECUs as well realize the effect of actuation. The overlay is expected to serve two purposes: create user demanded network configurations and make use of ECUs from different physical locations, possibly crowsourced. This model is designed in light of the software defined truck paradigm introduced in \cite{mukherjee_towards_2021}. In pursuit of the above mentinoned design goals, we identified four tasks. These task, along with the associated challenges, are described next. 
 
 % \paragraph{Overlay Connection Management}
@@ -111,6 +125,7 @@ In this
     \caption{Proposed System}
     \label{fig:goal}
 \end{figure*}
+ECUs in our system are required to interface with Smart Sensors Simulator (SSSF) devices. These devices act as gateways to the CANLay system. At startup they communicate with a central server thereby registering themselves. This communication happens over HTTP(s). 
 
 \subsection{Current Status of Development}
 
@@ -145,12 +160,6 @@ We haven't implemented the transformation or the VCAN stuff yet so idk if it sho
 A large drawback of connecting devices over a shared/multipurpose network is the increase of networking delays. When a user creates a virtual test bed using CARLay they are logically forming a virtual network for that session, but physically each device is still connected to the same network as before. As a result, communication between devices in a virtual test bed could suffer from network delays that are out of the user’s control. The Network Health Monitor provides the user with useful information about the current status of the network so they can ensure that the current network conditions are not affecting their results. The network information is gathered from the perspective of all devices in a session rather than collecting it from just the perspective of the Controller. This provides a more full view of the current state of the network.
 
 \subsection{Behavior Descriptions}
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
-    \caption{}
-    \label{fig:}
-\end{figure}
 
 \subsubsection{Overlay Setup}
 A typical setup of the CANLay system begins by first starting up the central server. Once started the central server can begin accepting HTTP API calls. HTTP API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it. The HTTP Uniform Resource Indicator (URI) is used to distinguish the object or api endpoint to be invoked. At the top level the Server has two main api endpoints namely “\\Controller” and “\\SSSF”. Nested underneath each of these endpoints are the endpoints “\\Register” and “\\Session”. The “\\Register” endpoint is used to control the registration of the connected device and the “\\Session” endpoint is used to control the session associated with the connected device. The HTTP method is used to describe the manner in which to invoke the api endpoint. Typically “GET” is used to gather information, “POST” or “PUT” are used to supply information, and “DELETE” is used to remove information. Examples of these HTTP API calls will be shown throughout the paper. (Also the http api description doesn’t seem like it belongs here but I feel like it is important for the reader to understand how a device actually registers or starts a session)
@@ -170,6 +179,14 @@ Once any device receives a session setup message it will parse and validate the 
 %     \label{fig:}
 % \end{figure}
 \subsubsection{X-in-the-loop Simulation}
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
+    
+    \caption{}
+    \label{fig:}
+\end{figure}
+
 \begin{figure}[t!]
     \centering
     \includegraphics[width=\linewidth]{out/images/signal_control/signal_control.png}

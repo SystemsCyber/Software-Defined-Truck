@@ -689,15 +689,19 @@ Overfull \hbox (38.3783pt too wide) in paragraph at lines 78--78
 \T1/pcr/m/n/10 number-[]of-[]vehicles-[]per-[]household-[]in-[]the-[]united-[]states/$[][]| 
  []
 
-<images/design_goal.drawio.png, id=84, 347.2975pt x 262.9825pt>
+<images/design_goal.drawio.png, id=88, 325.215pt x 262.9825pt>
 File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
-Package pdftex.def Info: images/design_goal.drawio.png  used on input line 93.
-(pdftex.def)             Requested size: 241.02039pt x 182.51347pt.
-<images/system_design.drawio.png, id=86, 520.94624pt x 297.11pt>
+Package pdftex.def Info: images/design_goal.drawio.png  used on input line 95.
+(pdftex.def)             Requested size: 241.02039pt x 194.90495pt.
+[1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+
+
+]
+<images/system_design.drawio.png, id=107, 520.94624pt x 297.11pt>
 File: images/system_design.drawio.png Graphic file (type png)
 <use images/system_design.drawio.png>
-Package pdftex.def Info: images/system_design.drawio.png  used on input line 110.
+Package pdftex.def Info: images/system_design.drawio.png  used on input line 124.
 (pdftex.def)             Requested size: 505.89pt x 288.52277pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -754,7 +758,7 @@ Underfull \hbox (badness 2368) in paragraph at lines 11--18
 LaTeX Warning: There were multiply-defined labels.
 
 Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: 0CA1355264AC8846F02EF99964D25112;2839.
+(rerunfilecheck)             Checksum: 6F200F2942EC329D382709C0D040B4E5;2946.
  ) 
 Here is how much of TeX's memory you used:
  22732 strings out of 478278

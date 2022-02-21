@@ -16,6 +16,12 @@ Stephen Checkoway, Damon McCoy, Brian Kantor, Danny Anderson, Hovav Shacham,
 \newblock In {\em {USENIX} {Security} {Symposium}}, volume~4, pages 447--462,
   San Francisco, CA, USA, 2011. USENIX Association.
 
+\bibitem{mukherjee_towards_2021}
+Subhojeet Mukherjee and Jeremy Daily.
+\newblock Towards a {Software} {Defined} {Truck}.
+\newblock In {\em Proceedings of the 31st {Annual} {INCOSE} {International}
+  {Symposium}}, page~16, Online, 2021. INCOSE.
+
 \bibitem{mukherjee_practical_2016}
 Subhojeet Mukherjee, Hossein Shirazi, Indrakshi Ray, Jeremy Daily, and Rose
   Gamble.
