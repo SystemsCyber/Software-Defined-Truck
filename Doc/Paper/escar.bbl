@@ -16,6 +16,13 @@ Stephen Checkoway, Damon McCoy, Brian Kantor, Danny Anderson, Hovav Shacham,
 \newblock In {\em {USENIX} {Security} {Symposium}}, volume~4, pages 447--462,
   San Francisco, CA, USA, 2011. USENIX Association.
 
+\bibitem{Dosovitskiy17}
+Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen
+  Koltun.
+\newblock {CARLA}: {An} open urban driving simulator.
+\newblock In {\em Proceedings of the 1st Annual Conference on Robot Learning},
+  pages 1--16, 2017.
+
 \bibitem{mukherjee_towards_2021}
 Subhojeet Mukherjee and Jeremy Daily.
 \newblock Towards a {Software} {Defined} {Truck}.
