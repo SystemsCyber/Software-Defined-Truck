@@ -9,6 +9,7 @@ w_signal_block.frame_number = sent_frame_number
 endhnote
 loop retransmits < \nmax_retransmits and\nsent_frame_number \n!= recv_frame_number
 Controller --> SSSF: w_signal_block
+SSSF ->> SSSF: process_signal()
 Controller -> Controller: Wait for (1000/\n(carla_frame_rate*max_retransmits))\nmilliseconds
 end
 hnote over Controller

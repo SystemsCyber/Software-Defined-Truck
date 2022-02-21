@@ -6,3 +6,10 @@ Src/Controller/Logs/*
 Src/Server/Logs/*
 !Src/Server/Logs/README.md
 !Src/Controller/Logs/README.md
+Doc/Paper/escar.aux
+Doc/Paper/escar.blg
+Doc/Paper/escar.fdb_latexmk
+Doc/Paper/escar.fls
+Doc/Paper/escar.log
+Doc/Paper/escar.pdf
+Doc/Paper/escar.synctex.gz
