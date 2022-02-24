@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  24 FEB 2022 10:06
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  24 FEB 2022 12:38
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -716,7 +716,7 @@ File: out/images/network_health/network_health.png Graphic file (type png)
 <use out/images/network_health/network_health.png>
 Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 282.
 (pdftex.def)             Requested size: 241.02039pt x 202.25859pt.
- [6 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png (PNG copy)>]
+ [6 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png>]
 Underfull \hbox (badness 1931) in paragraph at lines 290--291
 []\T1/ptm/m/n/12 (+20) The next im-por-tant met-ric in-cluded in the
  []
@@ -730,7 +730,7 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [7 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png (PNG copy)>]
 Underfull \vbox (badness 6510) has occurred while \output is active []
 
-<images/escar_paper_screenshot_all_3 - Copy.png, id=139, 1410.77063pt x 738.50906pt>
+<images/escar_paper_screenshot_all_3 - Copy.png, id=140, 1410.77063pt x 738.50906pt>
 File: images/escar_paper_screenshot_all_3 - Copy.png Graphic file (type png)
 <use images/escar_paper_screenshot_all_3 - Copy.png>
 Package pdftex.def Info: images/escar_paper_screenshot_all_3 - Copy.png  used on input line 300.
@@ -758,17 +758,17 @@ Package rerunfilecheck Info: File `escar.out' has not changed.
 (rerunfilecheck)             Checksum: 31944D3D7C5F38A5276CE1BF7DFB9D64;2782.
  ) 
 Here is how much of TeX's memory you used:
- 21563 strings out of 478994
- 394363 string characters out of 5858185
+ 21560 strings out of 478994
+ 394336 string characters out of 5858185
  694771 words of memory out of 5000000
  38325 multiletter control sequences out of 15000+600000
- 466619 words of font info for 268 fonts, out of 8000000 for 9000
+ 466492 words of font info for 266 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  113i,9n,116p,1499b,458s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (10 pages, 1462119 bytes).
+Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (10 pages, 1457770 bytes).
 PDF statistics:
- 193 PDF objects out of 1000 (max. 8388607)
+ 194 PDF objects out of 1000 (max. 8388607)
  164 compressed objects within 2 object streams
  43 named destinations out of 1000 (max. 500000)
  79533 words of extra memory for PDF output out of 89155 (max. 10000000)
