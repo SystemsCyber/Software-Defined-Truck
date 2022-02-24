@@ -1,0 +1,1 @@
+Placeholder README file for the Server log files folder

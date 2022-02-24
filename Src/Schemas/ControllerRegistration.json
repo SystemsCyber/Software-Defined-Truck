@@ -1,0 +1,26 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "title": "Controller POST Schema",
+    "description": "POST Schema for Controllers.",
+    "type": "object",
+    "examples": [
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/0"
+            }
+        },
+        {
+            "MAC": {
+                "$ref": "VMMAC.json/#/examples/1"
+            }
+        }
+    ],
+    "required": [
+        "MAC"
+    ],
+    "properties": {
+        "MAC": {
+            "$ref": "VMMAC.json"
+        }
+    }
+}

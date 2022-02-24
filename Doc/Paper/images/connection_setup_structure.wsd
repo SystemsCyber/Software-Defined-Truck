@@ -1,0 +1,20 @@
+@startuml
+
+class ControllerRegistration{
+    string mac
+}
+
+class SSSFRegistration{
+    string mac
+}
+
+class ECU{
+    string type
+    int year
+    string make
+    string model
+    string serial_no
+}
+
+SSSFRegistration <-d-"1..n" ECU
+@enduml
