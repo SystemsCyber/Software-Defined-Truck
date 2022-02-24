@@ -23,6 +23,14 @@ Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen
 \newblock In {\em Proceedings of the 1st Annual Conference on Robot Learning},
   pages 1--16, 2017.
 
+\bibitem{tagarev_automotive_2021}
+Shahid Mahmood, Hoang~Nga Nguyen, and Siraj~A. Shaikh.
+\newblock Automotive {Cybersecurity} {Testing}: {Survey} of {Testbeds} and
+  {Methods}.
+\newblock In {\em Digital {Transformation}, {Cyber} {Security} and {Resilience}
+  of {Modern} {Societies}}, volume~84, pages 219--243. Springer International
+  Publishing, Cham, 2021.
+
 \bibitem{mukherjee_towards_2021}
 Subhojeet Mukherjee and Jeremy Daily.
 \newblock Towards a {Software} {Defined} {Truck}.
@@ -36,5 +44,9 @@ Subhojeet Mukherjee, Hossein Shirazi, Indrakshi Ray, Jeremy Daily, and Rose
   {Vehicles}.
 \newblock In {\em International {Conference} on {Information} {Systems}
   {Security}}, pages 23--42, Jaipur, Rajasthan, India, 2016. Springer.
+
+\bibitem{society_of_automotive_engineers_sae_nodate}
+{Society of Automotive Engineers}.
+\newblock {SAE} {J1939} {Standards} {Collection}.
 
 \end{thebibliography}

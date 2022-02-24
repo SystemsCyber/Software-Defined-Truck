@@ -942,6 +942,11 @@ INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/times/ptmri7t.tfm
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/times/ptmri7t.tfm
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/times/ptmr8t.tfm
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/public/pslatex/pcrr8tn.tfm
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/vf/adobe/times/ptmb8t.vf
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/times/ptmb8r.tfm
 INPUT /usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map
@@ -955,11 +960,6 @@ INPUT /usr/local/texlive/2021/texmf-dist/fonts/vf/adobe/times/ptmr8t.vf
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/vf/public/pslatex/pcrr8tn.vf
 INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/public/pslatex/pcrr8rn.tfm
-INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
-INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
-INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
-INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
-INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png
@@ -988,11 +988,19 @@ INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/ima
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png
+INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/public/pslatex/pcrr8tn.tfm
+INPUT /usr/local/texlive/2021/texmf-dist/fonts/vf/public/pslatex/pcrr8tn.vf
+INPUT /usr/local/texlive/2021/texmf-dist/fonts/tfm/public/pslatex/pcrr8rn.tfm
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/escar_paper_screenshot_all_3 - Copy.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/escar_paper_screenshot_all_3 - Copy.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/escar_paper_screenshot_all_3 - Copy.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/escar_paper_screenshot_all_3 - Copy.png
+INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/escar_paper_screenshot_all_3 - Copy.png
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
 INPUT /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl

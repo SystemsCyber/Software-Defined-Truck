@@ -62,57 +62,60 @@ Your abstract text goes here. Just a few facts. Whet our appetites.
 Not more than 200 words, if possible, and preferably closer to 150.
 \end{abstract}
 
-% -------------- Plan ----
-
-
-% --------------
-
-
-
-\section{Introduction}
+\section{Introduction and Background}
 %-------------------------------------------------------------------------------
-In recent years automotive security has been a much talked about topic of research. 
-Researchers \cite{checkoway_comprehensive_2011} have shown that remote interfaces on modern passenger vehicles can be used to intrude into the in-vehicle network of embedded controllers, also referred to as Electronic Control Units (ECU). 
-MHD vehicles expose similar interfaces that can be used to control/disrupt critical functions \cite{mukherjee_practical_2016,burakova_truck_2016} typically operated by ECUs using sensors and actuators. 
-To evaluate the effectiveness of their approaches, researchers have traditionally experimented on real-vehicles or homegrown testbed setups that mimic real vehicles. 
+In recent years security of the Controller Area Network (CAN) has been a much talked about topic of research. CAN is a broadcast media that enables reliable and low-latency communication between in-vehicle devices, also referred to as Electronic Control Units (ECU). This broadcast nature of CAN, along with the fact that it is inherrently unauthenticaed, makes it susseptible to network-wide cyber threats. 
+It has been shown \cite{checkoway_comprehensive_2011, mukherjee_practical_2016,burakova_truck_2016} that remote interfaces on modern vehicles can be used to intrude into CAN networks and inject message to control and/or disrtupt the operations of the vehicle.
+% MHD vehicles expose similar interfaces that can be used to control/disrupt critical functions \cite{mukherjee_practical_2016,burakova_truck_2016} typically operated by ECUs using sensors and actuators. 
+% In general, security reseach in this area 
+To evaluate the effectiveness of their approaches, researchers have typically experimented on real-vehicles or homegrown testbed setups that mimic real vehicles. 
 While most households in the United States have at least one passenger car\footnote{\url{https://www.statista.com/statistics/551403/number-of-vehicles-per-household-in-the-united-states/}}, this is not the same for medium and heavy-duty (MHD) vehicles. 
-Moreover, creating homegrown testbeds is both logistically and economically challenging. To that end, the need for a publicly accessible testbench is imminent.
+Moreover, creating homegrown testbeds is both logistically and economically challenging. To that end, the need for a publicly accessible testbench is imminent. This is where the concept of the Software Define Truck (SDT) \cite{mukherjee_towards_2021} is critical to the in-vehicle networking community. It aims to provide a distributed virtualization infrastructure on which in-vehicle security experiments can be performed. Although proposed primarily for the heavy-trucks, SDT can easily be adapted for light-weight passenger vehicles as well. SDT's information exchange goal is shown in figure \ref{fig:goal}. CAN frames and physical signals need to be exchanged between ECUs and vehicle simulators located in different subnetworks accross the globe. CANLay is the designed to be the networking backbone of SDT and provide the neccesseary infrastructure to enable this service.
 
-% The first criteria to this type of testbed is accessibility the ease with each the testbench can be accessed. 
-There are two important criteria that reseach in this area has established for this type of testbench. The first is fidelity, i.e. the ability of the setup to replicate a real-world in-vehicle networking infrastructure. The second is adapability i.e. the ability to be reconfigured to suit different needs. It may be difficult to maximixe the extent to which both these criteria is achieved. The most adaptible testbed is the one in which ECUs as well as the network  configuration can be programmed on the fly. Existing solutions have enabled ECU virtualization but not network virtualization for real-world ECUs. In those setups, ECUs from different physical locations cannot be used in the same testbed, neither can networks be configured on demand, unless the ECU is virtualized.
-We believe that having real-world ECUs in the testing setup is critical. This not only provides greater fidelity but also alleviates any concerns with intellectual privacy and availability on the ECUs. Another aspect to fidelity and adaptibility is the realization of vehicular conquality of the network 
-Existing solutions 
-
-In this 
-
-\section{Related Work}
-A recent survey presents a broad overview. 
-THe main concerns are fidelity and adaptbility. More you virtualize, more you loose fidelity. 
-There is no general about to an optimum measure but it depends on the type of experimentation the testbed aims to support. Experiments could be reliant on subtle physical features or the data being transmitted. Virtualization is suited for the first kind, while definitely providing greater adaptbility. Virtualization can be applied at three levels namely, ECUs, network, and physical. 
-ECU virtualization may be critical but extremely challenging to acheive due to intellectual property regulations. 
-Network virtualization may be a more viable route but, to the best of our knowledge, most testbed proposals have eluded this feature. Albeit, experiments that rely on low-level features of networking, like signaling schemes and timing patterns may be difficult to acompolish here, but it may be a more concrete ground for data oriented reseach with certainly a more diverse specturm of testing setups. 
-
-
-% The problem of remotely accessible testbeds for automotive control systems has been addressed in the past \cite{tagarev_automotive_2021}. A recent survey on the same identified an issue with the adaptability, i.e. the ability to adapt to user demanded configurations. Of the testbeds covered in \cite{tagarev_automotive_2021} and the only effective solution is a portable hardware testbench, PASTA \cite{}. There are two ways to adaptibility, virtualizing the ECU and/or virtaulizeing the network configuration. Most existing solutions have suggested virtualizing the ECU by reprograming the hardware to user demands. While this is viable solution, To achieve both, existing techniques have used a full virtualization scheme. 
-
-\section{Design Goals}
 \begin{figure}[t!]
     \centering
     \includegraphics[width=\linewidth]{images/design_goal.drawio.png}
-    \caption{Design Goal of CANLay}
+    \caption{Scope of CANLay}
     \label{fig:goal}
 \end{figure}
-The overarching design goal of this project is elucidated through figure \ref{fig:goal}. To design a platform that simulates a CAN internetwork within a running vehicle using ECUs from separate subnets within the internet a. la. the software-defined truck \cite{mukherjee_towards_2021}. 
-Clearly, this has to be achieved over in-vehicle communication overlays on top of protocols of the internet.
 
-The distributed overlay nature of the project introduces a set of fidelity-related challenges when emulating the tightly integrated infrastructure within the vehicle. 
-Firstly, CAN provides a low-latency, strong reliability communication media that may be difficult to emulate over long-range communication channels. This requirement is even stronger for the physical signals that are usually transmitted over direct wiring in a real-world setting. 
-% A major requirement of this project is, therefore, to provide adequate assurance about the quality of communication in the overlay network. 
-Secondly, the broadcast nature of CAN may be difficult to realize in a distributed manner over the (typically) unicast internet protocols. Using unicast packets for multi/broadcast may require duplication in linear time. This is both space and time-intensive, especially if performed in a smaller scale local network that has limited bandwidth.
-The final challenge is to realize the complexity of interactions between the different components of the vehicle that normally operate in the same physical setting.
+Previous research \cite{tagarev_automotive_2021} has established two critical quality evaluation criteria for testbeds namely, fidelity and adaptability. Fidelity is the ability to emulate a real-world in-vehicle networking infrastructure to the best. Adaptability is the ability to emulate different real-world in-vehicle networking infrastructures. As such, it may be difficult to optimize both these criteria at the same time. To make a system adaptable, the underlying components need to be virtualized so they can be reconfigured to suit user needs. Albeit, this hampers the fidelity of the system. While CANLay allows on-demand network configuring, it also provides a real-time health report for the underlying network. This allows the user to assess the fidelity of the overlay in terms of standard networking metrics like latency, rate of packet drop, etc.
+
+Network virtualization for CAN has been approached in different ways. First, there has been the software-defined-networking adapted for CAN. This approach is largely hardware basd and is targetted primarily for in-vehicle networking, not over long range networking. For range relaying of CAN frames, there has been the CAN-to-ethernet direction of research. Reconfigurability and network performance has not been a cornerstone for these systems. Then again, neither of these paradigms have been designed to transport vehicle signals over long distances. A few research works have ventured into that area. Albeit, they have not resorted to network virtualization for the same.
+
+In the rest of this paper.
+
+% \section{Related Work}
+% A recent survey presents a broad overview. 
+% THe main concerns are fidelity and adaptbility. More you virtualize, more you loose fidelity. 
+% There is no general about to an optimum measure but it depends on the type of experimentation the testbed aims to support. Experiments could be reliant on subtle physical features or the data being transmitted. Virtualization is suited for the first kind, while definitely providing greater adaptbility. Virtualization can be applied at three levels namely, ECUs, network, and physical. 
+% ECU virtualization may be critical but extremely challenging to acheive due to intellectual property regulations. 
+% Network virtualization may be a more viable route but, to the best of our knowledge, most testbed proposals have eluded this feature. Albeit, experiments that rely on low-level features of networking, like signaling schemes and timing patterns may be difficult to acompolish here, but it may be a more concrete ground for data oriented reseach with certainly a more diverse specturm of testing setups. 
+
+
+% \section{Design Goals}
+% \begin{figure}[t!]
+%     \centering
+%     \includegraphics[width=\linewidth]{images/design_goal.drawio.png}
+%     \caption{Design Goal of CANLay}
+%     \label{fig:goal}
+% \end{figure}
+% The overarching design goal of this project is elucidated through figure \ref{fig:goal}. Routing physical signals and CAN frames between ECUs, a vehicle simulator of some sort that can produce and consume the signals, and a laptop that can act as the user's gateway to this communication portal. In phase 1 our goal was to enable digital networking between these endpoints and focus on the analog parts at a later phase. Mentioned below is a list of tasks we aimed to accomplish in phase 1. 
+% \begin{itemize}
+%     \item A means to communicate simulator generated signals to ECUs. We decided to generate the structural and behavioral aspects  the networking framework first 
+% \end{itemize}
+
+% To design a platform that simulates a CAN internetwork within a running vehicle using ECUs from separate subnets within the internet a. la. the software-defined truck \cite{mukherjee_towards_2021}. 
+% Clearly, this has to be achieved over in-vehicle communication overlays on top of protocols of the internet.
+
+% The distributed overlay nature of the project introduces a set of fidelity-related challenges when emulating the tightly integrated infrastructure within the vehicle. 
+% Firstly, CAN provides a low-latency, strong reliability communication media that may be difficult to emulate over long-range communication channels. This requirement is even stronger for the physical signals that are usually transmitted over direct wiring in a real-world setting. 
+% % A major requirement of this project is, therefore, to provide adequate assurance about the quality of communication in the overlay network. 
+% Secondly, the broadcast nature of CAN may be difficult to realize in a distributed manner over the (typically) unicast internet protocols. Using unicast packets for multi/broadcast may require duplication in linear time. This is both space and time-intensive, especially if performed in a smaller scale local network that has limited bandwidth.
+% The final challenge is to realize the complexity of interactions between the different components of the vehicle that normally operate in the same physical setting.
 %TODO Dr. Daily, provide an example here
 
-Albeit, all of these challenges can be difficult to realize in full in an adaptability-centric setting like ours. Even so, a major goal of this project is to optimize and report the quality of experimentation, thereby creating a transparent and usable environment for the experimenter. 
+% Albeit, all of these challenges can be difficult to realize in full in an adaptability-centric setting like ours. Even so, a major goal of this project is to optimize and report the quality of experimentation, thereby creating a transparent and usable environment for the experimenter. 
 
 % In summary, our goal is to create an overlay over TCP/IP that can transport CAN frames and vehicle control signals to ECUs located in different subnets accross the globe. The control signals can be obtained from and fed back into a vehicle simulator that is the under the user's control. 
 % The simulator is expoted to be useful in controlling the sensory inputs to the ECUs as well realize the effect of actuation. The overlay is expected to serve two purposes: create user demanded network configurations and make use of ECUs from different physical locations, possibly crowsourced. This model is designed in light of the software defined truck paradigm introduced in \cite{mukherjee_towards_2021}. In pursuit of the above mentinoned design goals, we identified four tasks. These task, along with the associated challenges, are described next. 
@@ -163,10 +166,13 @@ The Server helps in setting up the publishers and subscribers for an experiment.
 Add some implementation details - like python, thread etc. Sockets.
 The Server accepts HTTP API calls. API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it.
 
-\subsubsection{Vehicle Simulator}
-In theory, the Vehicle Simulator can be any software that provides the user with the ability to control a vehicle in a digital world. To be compatible with CANLay, the Vehicle Simulator must expose its operating signals in some manner. For the purpose of this paper, we chose the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
+% \subsubsection{Vehicle Simulator}
+% In theory, the Vehicle Simulator can be any software that provides the user with the ability to control a vehicle in a digital world. To be compatible with CANLay, the Vehicle Simulator must expose its operating signals in some manner. For the purpose of this paper, we chose the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
 
-Although the Carla project mainly focuses on autonomous driving research it exposes its in-game signals through an easy-to-use python api and pays close attention to the scientific details represented in its simulator. While this is not required, the more realistic and accurate the signals are, the easier it will be to transform them into CAN messages. Furthermore, CARLA is highly configurarble, robust and has been used for purposes similar to ours.
+% Although the Carla project mainly focuses on autonomous driving research it exposes its in-game signals through an easy-to-use python api and pays close attention to the scientific details represented in its simulator. While this is not required, the more realistic and accurate the signals are, the easier it will be to transform them into CAN messages. Furthermore, CARLA is highly configurarble, robust and has been used for purposes similar to ours.
+
+% \subsubsection{User Interface to CAN}
+% We forward the recieved CAN frame on a virtual CAN (VCAN) interface that is provided by the user at startup. A user can access these frames via socketCAN \footnote{\url{https://www.kernel.org/doc/html/latest/networking/can.html}} and assosiated tools.
 
 \subsubsection{Publish/Subscribe Endpoints}
 UDO is used to connect the publishers and subscribers in the CANLay system. 
@@ -177,9 +183,6 @@ To find a suitable pub/sub mechanism that closely resembled that of a CAN networ
 % In addition the transport mechanism must not have any implicit congestion control or flow control since none is found in CAN networks. Finally, it's preferable if the communication mechanism transported data as individual messages rather than streams of data.
 
 At this time we have chosen UDP multicasting as a suitable pub/sub mechanism as it does not require a message broker with high performance requirements. We realize that multicasting outside a local network may lead to increased cost for the implementers, but the current goal was to test its usability and make future decisions based on the observed throughout. At this time, we are also exploring other potential pub/sub implementations such as MQTT.
-
-\subsubsection{User Interface to CAN}
-We forward the recieved CAN frame on a virtual CAN (VCAN) interface that is provided by the user at startup. A user can access these frames via socketCAN \footnote{\url{https://www.kernel.org/doc/html/latest/networking/can.html}} and assosiated tools.
 
 
 \subsubsection{Network health monitor}
@@ -219,31 +222,46 @@ Once endpoints receives the multicast IP addresses they resync with NTP, allocat
 %     \caption{}
 %     \label{fig:}
 % \end{figure}
-\subsubsection{X-in-the-loop Simulation}
 \begin{figure}[t!]
     \centering
     \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
-    
-    \caption{}
-    \label{fig:}
+    \caption{Useful Data Structures}
+    \label{fig:ds}
 \end{figure}
-
 \begin{figure}[t!]
     \centering
     \includegraphics[width=\linewidth]{out/images/signal_control/signal_control.png}
-    \caption{}
-    \label{fig:}
+    \caption{Signal Tranmission Activity}
+    \label{fig:sig_x}
 \end{figure}
-\subsubsection{CAN communication}
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/can_exchange/can_exchange.png}
-    \caption{}
-    \label{fig:}
-\end{figure}
-In order to create a virtual test bench of ECUs the devices must be able to communicate with each other as if they were talking via a CAN bus. Most ECUs do not come with built in ethernet ports and the ability to broadcast CAN frames via Ethernet. So in order to connect an ECU to Ethernet we need a device that can interface with a CAN network and interface with an Ethernet Network. This is why the Smart Sensor Simulator and Forwarder is necessary. It acts as a programmable gateway that can transfer messages between the CAN network and the Ethernet Network.
+\subsubsection{Signal Transmission (ref. \ref{fig:sig_x})} \label{sec:sig_x}
 
-When the SSSF is in an active experiment it first checks if one or both of its CAN networks were assigned baud rates. If the CAN network was assigned a baud rate, it attempts to read a message from the CAN network. If it reads a message from the CAN network, it proceeds to create the COMMBlock message that will be written to the CANLay network. The COMMBlock message requires some additional information before it can be written to the network. First a type ID is added which indicates the type of message the COMMBlock is carrying. In this case the type will be 1, indicating that it is carrying a CAN message. It will also need to add the current millisecond timestamp at which it is sending the message. This is used by other devices to calculate the network latency for the network path from this device. Also, a sequence number is added and incremented every time a CAN message is sent. If other devices on the network detect gaps in the sequence numbers they know that a message has been lost. In addition it will also append the frame number of the last frame it received from the Controller. If it has not received any frames from the Controller then this number will be zero. The last seen frame number indicates to the Controller which SSSFs have and have not received the last sent frame. Also, the SSSF will mark whether this CAN message is a canFD CAN frame. Finally, the SSSF will mark whether or not this message requires a response. The CAN message requires a response if its CAN frame’s PGN matches a list received from the user.
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[scale=0.8]{out/images/can_exchange/can_exchange.png}
+    \caption{CAN Communication Activity}
+    \label{fig:can_x}
+\end{figure*}
+\subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
+% In order to create the simulated CAN network of ECUs, the devices must be able to communicate with each other with minimum per
+% as if they were talking via a CAN bus. 
+% Most ECUs do not come with built in ethernet ports and the ability to broadcast CAN frames via Ethernet. So in order to connect an ECU to Ethernet we need a device that can interface with a CAN network and interface with an Ethernet Network. This is why 
+% the Smart Sensor Simulator and Forwarder is necessary. It acts as a programmable gateway that can transfer messages between the CAN network and the Ethernet Network.
+
+When the SSSF is in an active experiment it 
+% first checks if CAN networks were assigned baud rates. If the CAN network was assigned a baud rate, it 
+attempts to read a message from the CAN network. If it reads a message from the CAN network, it proceeds to create the COMMBlock data structure (ref. figure \ref{fig:ds}) that will be written to the CANLay network. In the current scenario we set \texttt{num\_frames} to 1. Therefore, a COMMBlock data structure is transmitted after the receipt of every message.
+COMMBlock requires some additional information before it can be written to the network. 
+First, a type is added to indicate the subclass it is carrying. In this case the type will be 1, indicating that it is carrying a WCANFrame. 
+It also adds the current millisecond timestamp at which it is sending the message
+% This is used by other devices to calculate the network latency for the network path from this device. 
+, a sequence number that is incremented every time a CAN message is sent
+% If other devices on the network detect gaps in the sequence numbers they know that a message has been lost. 
+and a frame number of the last frame it received from the Controller.
+While the first two are used for network health monitoring (described in section \ref{sec:nethealth}), the last one is used to for retransmission of retranmission of WSignalBlock structures as alread seen in section \ref{sec:sig_x}.
+% If it has not received any frames from the Controller then this number will be zero. The last seen frame number indicates to the Controller which SSSFs have and have not received the last sent frame. 
+% Also, the SSSF will mark whether this CAN message is a canFD CAN frame. 
+The SSSF also marks whether this message requires a response. The CAN message requires a response if its CAN frame’s PGN matches a list received from the user.
 
 After the SSSF is done checking for CAN messages from the CAN network, it moves on to check for messages from the pub/sub network. Again, CAN messages sent to the pub/sub endpoint are considered type 1 messages. So if an SSSF device receives a type 1 message it first checks if the message requires a response. If so, it replies to the pub/sub endpoint with a type 5 message with the frame number equal to the sequence number of the message it just received. Next it updates its network statistics about the device it came from using the sequence number, timestamp, and other metrics from the COMMBlock and then it writes the FlexCAN CAN frame onto its available CAN networks.
 % This is supposed to be sudo code btw
@@ -258,7 +276,7 @@ After the SSSF is done checking for CAN messages from the CAN network, it moves 
         if (can1BaudRate) can1.write(msg.canFrame.can);
     }
 
-\subsubsection{Network health monitoring}
+\subsubsection{Network health monitoring}\label{sec:nethealth}
 \begin{figure}[t!]
     \centering
     \includegraphics[width=\linewidth]{out/images/network_health/network_health.png}
@@ -276,9 +294,26 @@ Overall, these indicators enable each device to calculate four network statistic
 Every second the Controller sends out a type 3 message which requests the health report from each device. After each device has sent their health report to the Controller they reset their statistics, keeping only the last message timestamp and the last seen sequence number. This effectively creates a measurement period of 1 second. As the Controller receives the health reports, it updates the network statistic data structure and displays the new results to the user. By collecting health reports from each network node we are able to get the statistics about a network edge from devices on each side of that network edge (how do I explain the importance of the network stats matrix better?).
 
 
-\section{Analysis}
+\section{Usage Example}
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=\linewidth]{images/escar_paper_screenshot_all_3 - Copy.png}
+    \caption{CANLay at work in the Software Defined Truck}
+    \label{fig:usabiity}
+\end{figure*}
+Figure \ref{fig:usabiity} shows CANLay at work. The windows in the figure display CAN frames on left, the vehicle simulator on the bottom right and CANLay's network health monitoring on the top right. Each of these components were already described in figure \ref{fig:system}. For the current purpose we have been using the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
+Although the Carla project mainly focuses on autonomous driving research it exposes its in-game signals through an easy-to-use python api and pays close attention to the scientific details represented in its simulator. While this is not required, the more realistic and accurate the signals are, the easier it will be to transform them into CAN messages. In this case, a specific CAN frames is being printed as they are broadcasted on the overlay for this particular experiment. The ID of this frame is defined by the SAE-J1939 standards \cite{society_of_automotive_engineers_sae_nodate} and identifies engine parameters transmitted by an engine control module (ECM). The data bytes carried in the CAN frame are showed next. Of these, the third byte is shown to be changing. This particular byte carries the percentage throttle demanded by the driver. The value is also non-zero on the simulator frontend provided by the CARLA simulator.
 
+On the top right is the network health monitoring window. It shows four matrices showing
+four differnet metrics to estimate network health: packet loss, latency in milliseconds, jitter and goodput. The significance of each of these metrics and their calculation methods were already described in the previous section. In this case, the experiment is performed over a gigabit local area network with a layer 3 switch in between an SSSF and a controller. The figure shows no packets were lost while the latency in the last cycle of health report collection was about ~4 milliseconds between the endpoints. Although CANLay does not explicitly perform any latency reducing functions, the general latency of 4 milliseconds is considered to be substainable for seamless CARLA emulation at standard frame rates. In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparsion to the latency. The goodput, i.e. the application data rate is understandibly higher for the controller as it sends WSignalBlock frames that are slightly larger in size than the WCANBlock frames. 
 
+\section{Conclusion and Future Work}
+In this paper, we described the concepts behind the design of CANLay, the networking backbone for the Software Defined Truck. SDT is a virtualization based experimentation framework for CAN-based security experiments and CANLay is the carrier of physical control and CAN data over long distance networks. Essentially CANLay enables network virtualization for SDT. CAN is a reliable and low-latency network. CANLay does not explicitly ensure reliability and low latency, but provides a health monitoring service that provides real-time measures of network parameters to the user. This allows the user to make critical decisions about the state of the experiment they are in.
+
+We believe more than one additional works can still be done on CANLay. 
+Need response
+Dynamic buffer adjustment
+ 
 %-------------------------------------------------------------------------------
 \bibliographystyle{plain}
 \bibliography{bib}
