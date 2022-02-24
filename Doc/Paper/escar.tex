@@ -38,7 +38,7 @@
 \date{}
 
 % make title bold and 14 pt font (Latex default is non-bold, 16 pt)
-\title{\Large \bf Towards CANLay: An X-in-the-loop Virtual Testbench for In-Vehicle Security Testing with Real-time Network Performance Monitoring}
+\title{\Large \bf CANLay: User-Centered Overlay Design for In-Vehicle Data Dissemination in a Network Virtualized TestBed}
 
 % %for single author (just remove % characters)
 % \author{
@@ -64,13 +64,11 @@ Not more than 200 words, if possible, and preferably closer to 150.
 
 \section{Introduction and Background}
 %-------------------------------------------------------------------------------
-In recent years security of the Controller Area Network (CAN) has been a much talked about topic of research. CAN is a broadcast media that enables reliable and low-latency communication between in-vehicle devices, also referred to as Electronic Control Units (ECU). This broadcast nature of CAN, along with the fact that it is inherrently unauthenticaed, makes it susseptible to network-wide cyber threats. 
-It has been shown \cite{checkoway_comprehensive_2011, mukherjee_practical_2016,burakova_truck_2016} that remote interfaces on modern vehicles can be used to intrude into CAN networks and inject message to control and/or disrtupt the operations of the vehicle.
-% MHD vehicles expose similar interfaces that can be used to control/disrupt critical functions \cite{mukherjee_practical_2016,burakova_truck_2016} typically operated by ECUs using sensors and actuators. 
-% In general, security reseach in this area 
-To evaluate the effectiveness of their approaches, researchers have typically experimented on real-vehicles or homegrown testbed setups that mimic real vehicles. 
+In recent years security of the Controller Area Network (CAN) has been a much talked about topic of research. CAN is a broadcast media that enables reliable and low-latency communication between in-vehicle devices, also referred to as Electronic Control Units (ECU). This broadcast nature of CAN, along with the fact that it is inherently unauthenticated, makes it susceptible to network-wide cyber threats. 
+Security researchers have shown \cite{checkoway_comprehensive_2011, mukherjee_practical_2016,burakova_truck_2016} that remote interfaces on modern vehicles can be used to intrude into internal CAN networks and inject messages to control and/or disrupt the operations of the vehicle. At the same time, the development of security solutions can be pursued to detect and/or prevent this scenario from occurring.
+To evaluate the effectiveness of their methods, researchers have typically experimented on real-vehicles or homegrown testbed setups that mimic real vehicles. 
 While most households in the United States have at least one passenger car\footnote{\url{https://www.statista.com/statistics/551403/number-of-vehicles-per-household-in-the-united-states/}}, this is not the same for medium and heavy-duty (MHD) vehicles. 
-Moreover, creating homegrown testbeds is both logistically and economically challenging. To that end, the need for a publicly accessible testbench is imminent. This is where the concept of the Software Define Truck (SDT) \cite{mukherjee_towards_2021} is critical to the in-vehicle networking community. It aims to provide a distributed virtualization infrastructure on which in-vehicle security experiments can be performed. Although proposed primarily for the heavy-trucks, SDT can easily be adapted for light-weight passenger vehicles as well. SDT's information exchange goal is shown in figure \ref{fig:goal}. CAN frames and physical signals need to be exchanged between ECUs and vehicle simulators located in different subnetworks accross the globe. CANLay is the designed to be the networking backbone of SDT and provide the neccesseary infrastructure to enable this service.
+Moreover, creating homegrown testbeds is both logistically and economically challenging. To that end, the need for a publicly accessible testbench is imminent. This is where the concept of the Software Define Truck (SDT) \cite{mukherjee_towards_2021} is critical to the in-vehicle networking community. It aims to provide a distributed network virtualized platform on which in-vehicle security experiments can be performed. Although proposed primarily for the heavy-trucks, SDT can easily be adapted for lightweight passenger vehicles. SDT's information exchange goal is shown in figure \ref{fig:goal}. CAN frames and physical signals need to be exchanged between ECUs and vehicle simulators located in different subnetworks around the globe. CANLay is the networking backbone of the SDT and aims to provide the necessary infrastructure to enable this service.
 
 \begin{figure}[t!]
     \centering
@@ -79,34 +77,20 @@ Moreover, creating homegrown testbeds is both logistically and economically chal
     \label{fig:goal}
 \end{figure}
 
-Previous research \cite{tagarev_automotive_2021} has established two critical quality evaluation criteria for testbeds namely, fidelity and adaptability. Fidelity is the ability to emulate a real-world in-vehicle networking infrastructure to the best. Adaptability is the ability to emulate different real-world in-vehicle networking infrastructures. As such, it may be difficult to optimize both these criteria at the same time. To make a system adaptable, the underlying components need to be virtualized so they can be reconfigured to suit user needs. Albeit, this hampers the fidelity of the system. While CANLay allows on-demand network configuring, it also provides a real-time health report for the underlying network. This allows the user to assess the fidelity of the overlay in terms of standard networking metrics like latency, rate of packet drop, etc.
+Previous research \cite{tagarev_automotive_2021} has established two critical criteria for quality evaluation of automotive networking testbeds: fidelity and adaptability. Fidelity is the ability to emulate a real-world in-vehicle networking infrastructure. Adaptability is the ability to simulate different real-world in-vehicle networking infrastructures. As such, it may be difficult to optimize both at the same time. To make a system adaptable, the underlying components need to be virtualized so they can be reconfigured to suit user needs. Albeit, this hampers the fidelity of the system. While CANLay provides the means to configure experiment networks on-demand, it also provides a real-time health report for the underlying network. This allows the user to assess the fidelity of the overlay in terms of standard networking metrics like latency, rate of packet drop, etc.
 
-Network virtualization for CAN has been approached in different ways. First, there has been the software-defined-networking adapted for CAN. This approach is largely hardware basd and is targetted primarily for in-vehicle networking, not over long range networking. For range relaying of CAN frames, there has been the CAN-to-ethernet direction of research. Reconfigurability and network performance has not been a cornerstone for these systems. Then again, neither of these paradigms have been designed to transport vehicle signals over long distances. A few research works have ventured into that area. Albeit, they have not resorted to network virtualization for the same.
+Although, CAN is a relatively new communication technology and has a smaller application scope than TCP/IP, there has been some proposals to create virtualize its operations. 
+First, there has been the attempt to adapt the software-defined networking paradigm for CAN \cite{rotermund_requirements_2020,doering_retrofitting_nodate,grewe_bloomycan_2021}. This approach is largely hardware-based and is catered for in-vehicle networking on CAN physical channels, not over long-range overlays. For range relaying of CAN frames, there has been the CAN-to-ethernet direction of research \cite{johanson_relaying_2009,florian_polzlbauer_experience_2019}. Configurability and network performance is typically not addressed in these research efforts. Neither is the CAN-to-ethernet paradigm designed to transport physical signals over long distances. 
+X-in-the-loop (hardware, driver, vehicle etc.) simulation-based in-vehicle testbeds \cite{appel_safety_2020} have been proposed, but the signals from the simulators have been transported over physical connections, not over reconfigurable, long-range network overlays. 
 
-In the rest of this paper.
+In summary, CANLay provides the following features:
+\begin{itemize}
+    \item Transport of CAN frames and physical signals of the vehicle to a distributed network of electronic control units that can be located in different subnets
+    \item Creation of these networks on demand
+    \item Provision on runtime metrics to estimate the health of the network during the ongoing experiment.
+\end{itemize}
+In the rest of this paper we describe the design of CANLay (section \ref{sec:design}), provide a usability analysis (\ref{sec:usage}), and finish with conclusive remarks and future works.
 
-% \section{Related Work}
-% A recent survey presents a broad overview. 
-% THe main concerns are fidelity and adaptbility. More you virtualize, more you loose fidelity. 
-% There is no general about to an optimum measure but it depends on the type of experimentation the testbed aims to support. Experiments could be reliant on subtle physical features or the data being transmitted. Virtualization is suited for the first kind, while definitely providing greater adaptbility. Virtualization can be applied at three levels namely, ECUs, network, and physical. 
-% ECU virtualization may be critical but extremely challenging to acheive due to intellectual property regulations. 
-% Network virtualization may be a more viable route but, to the best of our knowledge, most testbed proposals have eluded this feature. Albeit, experiments that rely on low-level features of networking, like signaling schemes and timing patterns may be difficult to acompolish here, but it may be a more concrete ground for data oriented reseach with certainly a more diverse specturm of testing setups. 
-
-
-% \section{Design Goals}
-% \begin{figure}[t!]
-%     \centering
-%     \includegraphics[width=\linewidth]{images/design_goal.drawio.png}
-%     \caption{Design Goal of CANLay}
-%     \label{fig:goal}
-% \end{figure}
-% The overarching design goal of this project is elucidated through figure \ref{fig:goal}. Routing physical signals and CAN frames between ECUs, a vehicle simulator of some sort that can produce and consume the signals, and a laptop that can act as the user's gateway to this communication portal. In phase 1 our goal was to enable digital networking between these endpoints and focus on the analog parts at a later phase. Mentioned below is a list of tasks we aimed to accomplish in phase 1. 
-% \begin{itemize}
-%     \item A means to communicate simulator generated signals to ECUs. We decided to generate the structural and behavioral aspects  the networking framework first 
-% \end{itemize}
-
-% To design a platform that simulates a CAN internetwork within a running vehicle using ECUs from separate subnets within the internet a. la. the software-defined truck \cite{mukherjee_towards_2021}. 
-% Clearly, this has to be achieved over in-vehicle communication overlays on top of protocols of the internet.
 
 % The distributed overlay nature of the project introduces a set of fidelity-related challenges when emulating the tightly integrated infrastructure within the vehicle. 
 % Firstly, CAN provides a low-latency, strong reliability communication media that may be difficult to emulate over long-range communication channels. This requirement is even stronger for the physical signals that are usually transmitted over direct wiring in a real-world setting. 
@@ -115,22 +99,10 @@ In the rest of this paper.
 % The final challenge is to realize the complexity of interactions between the different components of the vehicle that normally operate in the same physical setting.
 %TODO Dr. Daily, provide an example here
 
-% Albeit, all of these challenges can be difficult to realize in full in an adaptability-centric setting like ours. Even so, a major goal of this project is to optimize and report the quality of experimentation, thereby creating a transparent and usable environment for the experimenter. 
-
-% In summary, our goal is to create an overlay over TCP/IP that can transport CAN frames and vehicle control signals to ECUs located in different subnets accross the globe. The control signals can be obtained from and fed back into a vehicle simulator that is the under the user's control. 
-% The simulator is expoted to be useful in controlling the sensory inputs to the ECUs as well realize the effect of actuation. The overlay is expected to serve two purposes: create user demanded network configurations and make use of ECUs from different physical locations, possibly crowsourced. This model is designed in light of the software defined truck paradigm introduced in \cite{mukherjee_towards_2021}. In pursuit of the above mentinoned design goals, we identified four tasks. These task, along with the associated challenges, are described next. 
-
-% \paragraph{Overlay Connection Management}
-% \paragraph{Facilitation of CAN Data Manipulation via Vehicle Control}
-% \paragraph{Facilitation of Vehicle Control via CAN Data Manipulation}
-% \paragraph{Enabling Crowdsourcing of ECUs}
 
 
-% SDT == Use distributed    
-% CANViZ == Configure and visualize your experiment
 
-
-\section{Design and Current Development}
+\section{Design and Current Development}\label{sec:design}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=\linewidth]{images/system_design.drawio.png}
@@ -294,7 +266,7 @@ Overall, these indicators enable each device to calculate four network statistic
 Every second the Controller sends out a type 3 message which requests the health report from each device. After each device has sent their health report to the Controller they reset their statistics, keeping only the last message timestamp and the last seen sequence number. This effectively creates a measurement period of 1 second. As the Controller receives the health reports, it updates the network statistic data structure and displays the new results to the user. By collecting health reports from each network node we are able to get the statistics about a network edge from devices on each side of that network edge (how do I explain the importance of the network stats matrix better?).
 
 
-\section{Usage Example}
+\section{Usage Example}\label{sec:usage}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=\linewidth]{images/escar_paper_screenshot_all_3 - Copy.png}
