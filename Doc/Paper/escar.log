@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  21 FEB 2022 21:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  28 FEB 2022 21:32
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -8,8 +8,8 @@ entering extended mode
 LaTeX2e <2020-10-01> patch level 4
 L3 programming layer <2021-02-18> (/usr/local/texlive/2021/texmf-dist/tex/latex/base/article.cls
 Document Class: article 2020/04/10 v1.4m Standard LaTeX document class
-(/usr/local/texlive/2021/texmf-dist/tex/latex/base/size12.clo
-File: size12.clo 2020/04/10 v1.4m Standard LaTeX file (size option)
+(/usr/local/texlive/2021/texmf-dist/tex/latex/base/size10.clo
+File: size10.clo 2020/04/10 v1.4m Standard LaTeX file (size option)
 )
 \c@part=\count179
 \c@section=\count180
@@ -525,49 +525,39 @@ LaTeX Info: Redefining \] on input line 2924.
 File: l3backend-pdftex.def 2021-03-18 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count299
 \l__pdf_internal_box=\box60
-) (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux
-
-LaTeX Warning: Label `fig:' multiply defined.
-
-
-LaTeX Warning: Label `fig:' multiply defined.
-
-
-LaTeX Warning: Label `fig:' multiply defined.
-
-)
+) (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
 \openout1 = `escar.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for OMS/pzccm/m/n on input line 34.
-LaTeX Font Info:    Trying to load font information for OMS+pzccm on input line 34.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OMS/pzccm/m/n on input line 8.
+LaTeX Font Info:    Trying to load font information for OMS+pzccm on input line 8.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/omspzccm.fd
 File: omspzccm.fd 2000/01/03 Fontinst v1.801 font definitions for OMS/pzccm.
 )
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 34.
-LaTeX Font Info:    ... okay on input line 34.
-LaTeX Info: Redefining \microtypecontext on input line 34.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Info: Redefining \microtypecontext on input line 8.
 Package microtype Info: Generating PDF output.
 Package microtype Info: Character protrusion enabled (level 2).
 Package microtype Info: Using default protrusion set `alltext'.
 Package microtype Info: Automatic font expansion enabled (level 2),
 (microtype)             stretch: 20, shrink: 20, step: 1, non-selected.
 Package microtype Info: Using default expansion set `alltext-nott'.
-LaTeX Info: Redefining \showhyphens on input line 34.
+LaTeX Info: Redefining \showhyphens on input line 8.
 Package microtype Info: No adjustment of tracking.
 Package microtype Info: Adjustment of interword spacing enabled.
 Package microtype Info: Using default spacing set `alltext-nott'.
@@ -607,7 +597,7 @@ Package grfext Info: Graphics extension search list:
  (/usr/local/texlive/2021/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-Package hyperref Info: Link coloring ON on input line 34.
+Package hyperref Info: Link coloring ON on input line 8.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
  (/usr/local/texlive/2021/texmf-dist/tex/latex/refcount/refcount.sty
@@ -617,14 +607,13 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count306
 )
-LaTeX Info: Redefining \ref on input line 34.
-LaTeX Info: Redefining \pageref on input line 34.
-LaTeX Info: Redefining \nameref on input line 34.
- (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.out) (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.out)
+LaTeX Info: Redefining \ref on input line 8.
+LaTeX Info: Redefining \pageref on input line 8.
+LaTeX Info: Redefining \nameref on input line 8.
 \@outlinefile=\write4
 \openout4 = `escar.out'.
 
-LaTeX Font Info:    Trying to load font information for OT1+ptmcm on input line 56.
+LaTeX Font Info:    Trying to load font information for OT1+ptmcm on input line 29.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/ot1ptmcm.fd
 File: ot1ptmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OT1/ptmcm.
 )
@@ -632,148 +621,309 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `ptmcm' (encoding: OT1).
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
-LaTeX Font Info:    Trying to load font information for OML+ptmcm on input line 56.
+LaTeX Font Info:    Trying to load font information for OML+ptmcm on input line 29.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/omlptmcm.fd
 File: omlptmcm.fd 2000/01/03 Fontinst v1.801 font definitions for OML/ptmcm.
 )
-LaTeX Font Info:    Trying to load font information for OMX+psycm on input line 56.
+LaTeX Font Info:    Trying to load font information for OMX+psycm on input line 29.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/omxpsycm.fd
 File: omxpsycm.fd 2000/01/03 Fontinst v1.801 font definitions for OMX/psycm.
 )
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <14.4> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 56.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10.95> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 56.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 56.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 
 
 LaTeX Warning: No \author given.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
+
+LaTeX Warning: Citation `checkoway_comprehensive_2011' on page 1 undefined on input line 41.
+
+
+LaTeX Warning: Citation `mukherjee_practical_2016' on page 1 undefined on input line 41.
+
+
+LaTeX Warning: Citation `burakova_truck_2016' on page 1 undefined on input line 41.
+
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 78.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `pcr' (encoding: T1).
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-Underfull \hbox (badness 10000) in paragraph at lines 78--78
-[][][][][]$\T1/pcr/m/n/10 https : / / www . statista . com / statistics / 551403 /
+Underfull \hbox (badness 10000) in paragraph at lines 43--43
+[][][][][]$\T1/pcr/m/n/8 https : / / www . statista . com / statistics / 551403 /
  []
 
 
-Overfull \hbox (38.3783pt too wide) in paragraph at lines 78--78
-\T1/pcr/m/n/10 number-[]of-[]vehicles-[]per-[]household-[]in-[]the-[]united-[]states/$[][]| 
- []
-
-[1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+LaTeX Warning: Citation `mukherjee_towards_2021' on page 1 undefined on input line 44.
 
 
-]
-<images/design_goal.drawio.png, id=97, 360.34625pt x 181.67876pt>
+LaTeX Warning: Reference `fig:goal' on page 1 undefined on input line 44.
+
+<images/design_goal.drawio.png, id=10, 360.34625pt x 193.72375pt>
 File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
-Package pdftex.def Info: images/design_goal.drawio.png  used on input line 101.
-(pdftex.def)             Requested size: 241.02039pt x 121.5162pt.
-<images/system_design.drawio.png, id=101, 520.94624pt x 298.11375pt>
+Package pdftex.def Info: images/design_goal.drawio.png  used on input line 48.
+(pdftex.def)             Requested size: 241.02039pt x 129.57253pt.
+
+LaTeX Warning: Citation `tagarev_automotive_2021' on page 1 undefined on input line 53.
+
+
+LaTeX Warning: Citation `rotermund_requirements_2020' on page 1 undefined on input line 56.
+
+
+LaTeX Warning: Citation `doering_retrofitting_nodate' on page 1 undefined on input line 56.
+
+
+LaTeX Warning: Citation `grewe_bloomycan_2021' on page 1 undefined on input line 56.
+
+
+LaTeX Warning: Citation `johanson_relaying_2009' on page 1 undefined on input line 56.
+
+
+LaTeX Warning: Citation `florian_polzlbauer_experience_2019' on page 1 undefined on input line 56.
+
+
+LaTeX Warning: Citation `appel_safety_2020' on page 1 undefined on input line 57.
+
+
+Underfull \vbox (badness 1565) has occurred while \output is active []
+
+ [1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+
+
+ </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>]
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 61.
+ (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/ts1ptm.fd
+File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
+)
+
+LaTeX Warning: Reference `sec:design' on page 2 undefined on input line 65.
+
+
+LaTeX Warning: Reference `sec:usage' on page 2 undefined on input line 65.
+
+<images/system_design.drawio.png, id=25, 520.94624pt x 298.11375pt>
 File: images/system_design.drawio.png Graphic file (type png)
 <use images/system_design.drawio.png>
-Package pdftex.def Info: images/system_design.drawio.png  used on input line 133.
+Package pdftex.def Info: images/system_design.drawio.png  used on input line 81.
 (pdftex.def)             Requested size: 505.89pt x 289.4975pt.
- [2 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>] [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png>]
-Underfull \hbox (badness 10000) in paragraph at lines 182--182
-[][][][][]$\T1/pcr/m/n/10 https : / / www . kernel . org / doc / html / latest /
- []
 
-[4]
-<out/images/connection_setup/connection_setup.png, id=127, 707.64375pt x 556.0775pt>
-File: out/images/connection_setup/connection_setup.png Graphic file (type png)
-<use out/images/connection_setup/connection_setup.png>
-Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 192.
-(pdftex.def)             Requested size: 505.89pt x 397.54149pt.
-<out/images/data_structures/data_structures.png, id=129, 672.5125pt x 256.96pt>
+LaTeX Warning: Reference `fig:system' on page 2 undefined on input line 85.
+
+
+LaTeX Warning: Reference `fig:system' on page 2 undefined on input line 94.
+
+[2]
+
+LaTeX Warning: Citation `kaiser_implementing_1999' on page 3 undefined on input line 125.
+
+
+LaTeX Warning: Citation `kaiser_implementing_1999' on page 3 undefined on input line 127.
+
+[3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png>]
+
+LaTeX Warning: Reference `fig:setup_activity' on page 4 undefined on input line 154.
+
+
+LaTeX Warning: Command \textbackslash invalid in math mode on input line 156.
+
+
+LaTeX Warning: Command \textbackslash invalid in math mode on input line 156.
+
+<out/images/data_structures/data_structures.png, id=43, 274.02374pt x 366.36874pt>
 File: out/images/data_structures/data_structures.png Graphic file (type png)
 <use out/images/data_structures/data_structures.png>
-Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 225.
-(pdftex.def)             Requested size: 241.02039pt x 92.0899pt.
-<out/images/signal_control/signal_control.png, id=130, 497.86pt x 568.1225pt>
-File: out/images/signal_control/signal_control.png Graphic file (type png)
-<use out/images/signal_control/signal_control.png>
-Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 233.
-(pdftex.def)             Requested size: 241.02039pt x 275.03627pt.
-<out/images/can_exchange/can_exchange.png, id=131, 446.66875pt x 507.8975pt>
-File: out/images/can_exchange/can_exchange.png Graphic file (type png)
-<use out/images/can_exchange/can_exchange.png>
-Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 240.
-(pdftex.def)             Requested size: 241.02039pt x 274.05907pt.
- [5]
+Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 174.
+(pdftex.def)             Requested size: 241.02039pt x 322.24895pt.
+
+LaTeX Warning: File `out/images/can_exchange/can_exchange.png' not found on input line 185.
+
+
+/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex:185: Package pdftex.def Error: File `out/images/can_exchange/can_exchange.png' not found: using draft setting.
+
+See the pdftex.def package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.185 ...out/images/can_exchange/can_exchange.png}
+                                                  
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+[4]
+
+LaTeX Warning: Reference `fig:can_x' on page 5 undefined on input line 201.
+
+
+LaTeX Warning: Reference `fig:ds' on page 5 undefined on input line 209.
+
+
+LaTeX Warning: Reference `sec:nethealth' on page 5 undefined on input line 217.
+
+
+LaTeX Warning: Reference `sec:sig_x' on page 5 undefined on input line 217.
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 222--234
+\T1/ptm/m/n/10 (+20) msg.sequenceNumber);  networkHealth->update(msg);
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 222--234
+\T1/ptm/m/n/10 (+20) if (can0BaudRate) can0.write(msg.canFrame.can); if
+ []
+
+
+LaTeX Warning: File `out/images/network_health/network_health.png' not found on input line 238.
+
+
+/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex:238: Package pdftex.def Error: File `out/images/network_health/network_health.png' not found: using draft setting.
+
+See the pdftex.def package documentation for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.238 ...images/network_health/network_health.png}
+                                                  
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+
+Overfull \hbox (94.558pt too wide) in paragraph at lines 284--284
+[]\T1/pcr/m/n/10 NetworkStats::update(index, packetSize, timestamp, sequenceNumber)[] 
+ []
+
+
+Overfull \hbox (139.94778pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 ellapsedSeconds = (now - HealthBasics[index].lastMessageTime) / 1000.0;[] 
+ []
+
+
+Overfull \hbox (37.94827pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].latency, abs(delay));[] 
+ []
+
+
+Overfull \hbox (165.44766pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].jitter, HealthReport[index].latency.variance);[] 
+ []
+
+
+Overfull \hbox (125.92786pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 // If no packet loss then sequence number = last sequence number + 1[] 
+ []
+
+
+Overfull \hbox (134.84781pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 packetsLost = sequenceNumber - (Basics[index].lastSequenceNumber + 1);[] 
+ []
+
+
+Overfull \hbox (194.0075pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 // If packetsLost is negative then this indicates duplicate or out of order frame.[] 
+ []
+
+
+Overfull \hbox (134.84781pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 HealthReport[index].packetLoss += (packetsLost > 0) ? packetsLost : 0;[] 
+ []
+
+[5 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)>]
+Overfull \hbox (160.34769pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].goodput, (packetSize * 8) / ellapsedSeconds);[] 
+ []
+
+
+Overfull \hbox (63.44815pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 HealthBasics[index].lastSequenceNumber = sequenceNumber;[] 
+ []
+
+
+Overfull \hbox (277.13713pt too wide) in paragraph at lines 284--284
+[]\T1/pcr/m/n/10 {// From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm[] 
+ []
+
+
+Overfull \hbox (17.54837pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 edge.sumOfSquaredDifferences += delta * delta2;[] 
+ []
+
+
+Overfull \hbox (73.6481pt too wide) in paragraph at lines 284--284
+[]    \T1/pcr/m/n/10 edge.variance = edge.sumOfSquaredDifferences / edge.count;[] 
+ []
+
+<images/usability.png, id=63, 1445.4pt x 760.34062pt>
+File: images/usability.png Graphic file (type png)
+<use images/usability.png>
+Package pdftex.def Info: images/usability.png  used on input line 290.
+(pdftex.def)             Requested size: 505.89pt x 266.1116pt.
+
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
+
+LaTeX Warning: Reference `fig:usabiity' on page 6 undefined on input line 294.
+
+
+LaTeX Warning: Reference `fig:system' on page 6 undefined on input line 294.
+
+
+LaTeX Warning: Citation `Dosovitskiy17' on page 6 undefined on input line 294.
+
+
+LaTeX Warning: Citation `society_of_automotive_engineers_sae_nodate' on page 6 undefined on input line 295.
+
+
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [6 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/connection_setup/connection_setup.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)>]
+ [6]
+No file escar.bbl.
+[7
 
-LaTeX Warning: Text page 7 contains only floats.
+ </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/usability.png>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
 
-<out/images/network_health/network_health.png, id=142, 343.2825pt x 288.07625pt>
-File: out/images/network_health/network_health.png Graphic file (type png)
-<use out/images/network_health/network_health.png>
-Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 264.
-(pdftex.def)             Requested size: 241.02039pt x 202.25859pt.
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [7 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>]
-Underfull \hbox (badness 1931) in paragraph at lines 272--273
-[]\T1/ptm/m/n/12 (+20) The next im-por-tant met-ric in-cluded in the
- []
-
-[8] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
-Underfull \hbox (badness 1077) in paragraph at lines 11--18
-\T1/ptm/m/n/12 (+20) Kan-tor, Danny An-der-son, Ho-vav Shacham,
- []
+LaTeX Warning: There were undefined references.
 
 
-Underfull \hbox (badness 2368) in paragraph at lines 11--18
-\T1/ptm/m/n/12 (+20) Franziska Roes-ner, and Ta-dayoshi Kohno.
- []
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
 
-Underfull \hbox (badness 6141) in paragraph at lines 20--25
-[]\T1/ptm/m/n/12 (+20) Alexey Doso-vit-skiy, Ger-man Ros, Fe-lipe
- []
+Package rerunfilecheck Warning: File `escar.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
 
-) [9] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
-
-LaTeX Warning: There were multiply-defined labels.
-
-Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: 1BF6F9233831D31122128E4A366BBFD5;2915.
+Package rerunfilecheck Info: Checksums for `escar.out':
+(rerunfilecheck)             Before: <no file>
+(rerunfilecheck)             After:  13370E9F304B1087D24A62E8C1E0DD9B;2858.
  ) 
 Here is how much of TeX's memory you used:
- 21546 strings out of 478994
- 393889 string characters out of 5858185
- 697360 words of memory out of 5000000
- 38313 multiletter control sequences out of 15000+600000
- 465878 words of font info for 264 fonts, out of 8000000 for 9000
+ 21567 strings out of 478994
+ 393852 string characters out of 5858185
+ 699619 words of memory out of 5000000
+ 38336 multiletter control sequences out of 15000+600000
+ 464625 words of font info for 262 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 113i,9n,116p,1647b,344s stack positions out of 5000i,500n,10000p,200000b,80000s
-{/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (9 pages, 273446 bytes).
+ 113i,9n,116p,1671b,481s stack positions out of 5000i,500n,10000p,200000b,80000s
+{/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (7 pages, 1569859 bytes).
 PDF statistics:
- 191 PDF objects out of 1000 (max. 8388607)
- 165 compressed objects within 2 object streams
- 43 named destinations out of 1000 (max. 500000)
- 79040 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 112 PDF objects out of 1000 (max. 8388607)
+ 88 compressed objects within 1 object stream
+ 31 named destinations out of 1000 (max. 500000)
+ 76833 words of extra memory for PDF output out of 89155 (max. 10000000)
 
