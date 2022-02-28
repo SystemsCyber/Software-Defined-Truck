@@ -127,7 +127,7 @@ class TypeWriter:
     def bar():
         # os.system('cls' if os.name == 'nt' else 'clear')
         term_size = get_terminal_size()
-        greeting_message = "* ECU Selection Menu *"
+        greeting_message = "* Network Designer *"
         print(
             f'{TypeWriter.green}'
             f'{greeting_message:*^{term_size[0]-5}}'

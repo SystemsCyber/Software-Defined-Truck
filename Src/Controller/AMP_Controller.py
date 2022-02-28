@@ -32,7 +32,7 @@ import pygame
 import Text
 from Controller import Controller
 from Environment import LogListener
-from HealthReport import NetworkMatrix
+from NetworkMatrix import NetworkMatrix
 from HUD import HUD
 from KeyboardControl import KeyboardControl
 from World import World
