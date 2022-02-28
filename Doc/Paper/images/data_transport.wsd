@@ -1,0 +1,51 @@
+@startuml
+hide footbox
+skinparam maxMessageSize 5
+
+collections SSSFs as r
+participant "Controller/SSSF" as s
+' queue "Circular\nqueue (q)" as q
+
+' par
+== Transmission ==
+    s -> s: sample data()
+    hnote over s
+        wmb := WCommBlock 
+            instance of type
+        wmb.seq <- rbuffs[type]
+            .push(wmb)
+        wmb.timestamp <- 
+            current millisecs
+    endhnote
+    s ->> r: wmb
+    par
+        hnote over r
+            recv_seq[wmb.type][wmb.sid]
+                 <- max(wmb.seq,
+              recv_seq[wmb.type][wmb.sid])
+        endhnote
+
+        r -> r: update_health\n_records()
+        ' hnote over r
+        '     recv_seq[wmb.sid] <-
+        '     max(wmb.seq,
+        '         recv_seq[wmb.sid])
+        ' endhnote
+    else
+        s -> s: q.enque(wmb)
+    end
+' else
+== Verification ==
+    hnote over r
+        create wcb := 
+        instance of WCANBlock
+        wcb.ack <- recv_seq
+    endhnote
+    r -> s: wcb
+    loop i < no. types
+        loop block = get_next(q[i])  
+            r -> s: block  
+        end
+    end
+' end
+@enduml

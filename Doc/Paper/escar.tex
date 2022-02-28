@@ -91,7 +91,7 @@ Figure \ref{fig:system} shows the proposed system design of CANLay. The system s
 \subsection{Component Descriptions}
 \subsubsection{Smart Sensor Simulator and Forwarder (SSSF)}
 The Smart Sensor Simulator and Forwarder acts as a gateway enabling the ECU to access and, more importantly, to be accessed by the CANLay system. In an active experiment, it acts as a forwarder between the Controller and the ECU through User datagram protocol (UDP) channels and CAN interfaces. SSSFs can forward two types of messages. 
-The first type carries signals from the vehicle simulator. Eventually, these signals may have to be transmitted on the analog wirring that is shown using a dashed line figure \ref{fig:system}.  
+The first type carries signals from the vehicle simulator. Eventually, these signals may have to be transmitted on the analog wiring that is shown using a dashed line figure \ref{fig:system}.  
 The second type is CAN data carriers from the ECUs as well from other SSSFs in the current experiment. Through the SSSFs, multiple ECUs can actively communicate with each other to create a rich testing environment.
 
 The SSSF is developed a built on a Teesny 3.6 .... a paragraph describing the SSS2's. Talk about SD cards. PLease include a blcok diagram etc.
@@ -140,112 +140,127 @@ CANLay provides two front-end components: network designer and network health mo
 % The Network Health Monitor provides the user with useful information about the current status of the network so they can ensure that the current network conditions are not affecting their results. 
 % The network information is gathered from the perspective of all devices in a experiment rather than collecting it from just the perspective of the Controller. This provides a more full view of the current state of the network.
 
-\begin{figure*}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/connection_setup/connection_setup.png}
-    \caption{Setup Activity}
-    \label{fig:setup_activity}
-\end{figure*}
+% \begin{figure*}[t!]
+%     \centering
+%     \includegraphics[width=\linewidth]{out/images/connection_setup/connection_setup.png}
+%     \caption{Setup Activity}
+%     \label{fig:setup_activity}
+% \end{figure*}
+
 \subsection{Behavior Descriptions}
-\subsubsection{Setup (ref. figure \ref{fig:setup_activity})}
-While the Server is up and running SSSFs connect to it. SSSFs perform a setup(the) procedure by reading their inbuilt SD card. The type, year, make, model and a serial number of the connected ECUs are required to be included in a predefined file stored on the SD card. 
-Next, the SSSF gathers its MAC address and list of attached devices into a JSON and sends it to the Server via a POST to the HTTP API endpoint $\textbackslash$ \textit{SSSF} $\textbackslash$ \textit{Register}. 
-% The Server will parse and validate the registration. If the registration is satisfactory, it will reply with a code 202 indicating to the SSSF that it has successfully registered with the Server. 
-% If the registration data contains invalid data such as a  attached device, or invalid JSON the Server will respond with the appropriate error code and drop the connection. 
-If the registration fails, the Server responds with an HTTP 202 error code. Otherwise, the SSSF waits for further instructions from the Server on its TCP/HTTPS port. 
 
-The Controller begins by registering with the Server in a similar manner to the SSSF except that the Controller has no attached devices so it only sends its MAC address to the Server.
-% The Server will once again pars/e and validate the registration and respond with the appropriate code. If the Controller successfully registered then it proceeds to make a “GET” to the HTTP API endpoint “\\SSSF”. 
-It asks the Server for a list of all of the available SSSF devices. Please note that if a SSSF device is currently being used in another experiment it is not considered available. After the Controller has received the list of available devices it presents the available ECUs to the user. Notice that while the Server deals with the SSSF devices a user will typically only be interested in the ECUs that the SSSF is acting as a gateway for. After the user finalizes their selection the Controller sends the selected devices via HTTP POST.
+\subsection{Network Setup}
 
-When the Server receives a experiment request it first checks to make sure that the request is coming from a registered Controller. 
-Next the Server confirms that the devices are still available. 
-If any of the devices are no longer available or become unavailable during the experiment setup process, the Server responds to the Controller with the error code 409 indicating there's a conflict in the selection. 
-If the Controller receives this message it starts the experiment selection processes over again. 
-If all of the devices are still available the Server then selects an available pub/sub endpoint for the experiment and assigns an index to each device. The index is used in the collection of network statistics which will be explained later on. 
-At this time the Server sends the connection data to the Controller and selected SSSFs. Connection data contains the unique ID and index of the device, a multicast IP address and port acting as the pub/sub endpoint, and a list containing the ID and attached devices of other nodes in the experiment.
+\subsection{Data Transport}
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
+    \caption{Transport Data Structures}
+    \label{fig:ds}
+\end{figure}
 
-Once endpoints receives the multicast IP addresses they resync with NTP, allocate space for the required data structures, and begin listening for and forwarding messages to and from the pub/sub endpoint. At this point the experiment setup is completed.
+\subsection{Network Health Measurement}
 
+
+% \subsubsection{Setup (ref. figure \ref{fig:setup_activity})}
+% While the Server is up and running SSSFs connect to it. SSSFs perform a setup(the) procedure by reading their inbuilt SD card. The type, year, make, model and a serial number of the connected ECUs are required to be included in a predefined file stored on the SD card. 
+% Next, the SSSF gathers its MAC address and list of attached devices into a JSON and sends it to the Server via a POST to the HTTP API endpoint $\textbackslash$ \textit{SSSF} $\textbackslash$ \textit{Register}. 
+% % The Server will parse and validate the registration. If the registration is satisfactory, it will reply with a code 202 indicating to the SSSF that it has successfully registered with the Server. 
+% % If the registration data contains invalid data such as a  attached device, or invalid JSON the Server will respond with the appropriate error code and drop the connection. 
+% If the registration fails, the Server responds with an HTTP 202 error code. Otherwise, the SSSF waits for further instructions from the Server on its TCP/HTTPS port. 
+
+% The Controller begins by registering with the Server in a similar manner to the SSSF except that the Controller has no attached devices so it only sends its MAC address to the Server.
+% % The Server will once again pars/e and validate the registration and respond with the appropriate code. If the Controller successfully registered then it proceeds to make a “GET” to the HTTP API endpoint “\\SSSF”. 
+% It asks the Server for a list of all of the available SSSF devices. Please note that if a SSSF device is currently being used in another experiment it is not considered available. After the Controller has received the list of available devices it presents the available ECUs to the user. Notice that while the Server deals with the SSSF devices a user will typically only be interested in the ECUs that the SSSF is acting as a gateway for. After the user finalizes their selection the Controller sends the selected devices via HTTP POST.
+
+% When the Server receives a experiment request it first checks to make sure that the request is coming from a registered Controller. 
+% Next the Server confirms that the devices are still available. 
+% If any of the devices are no longer available or become unavailable during the experiment setup process, the Server responds to the Controller with the error code 409 indicating there's a conflict in the selection. 
+% If the Controller receives this message it starts the experiment selection processes over again. 
+% If all of the devices are still available the Server then selects an available pub/sub endpoint for the experiment and assigns an index to each device. The index is used in the collection of network statistics which will be explained later on. 
+% At this time the Server sends the connection data to the Controller and selected SSSFs. Connection data contains the unique ID and index of the device, a multicast IP address and port acting as the pub/sub endpoint, and a list containing the ID and attached devices of other nodes in the experiment.
+
+% Once endpoints receives the multicast IP addresses they resync with NTP, allocate space for the required data structures, and begin listening for and forwarding messages to and from the pub/sub endpoint. At this point the experiment setup is completed.
+
+% % \begin{figure}[t!]
+% %     \centering
+% %     \includegraphics[width=\linewidth]{out/images/network_health/network_health.png}
+% %     \caption{}
+% %     \label{fig:}
+% % \end{figure}
+% \begin{figure}[t!]
+%     \centering
+%     \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
+%     \caption{Useful Data Structures}
+%     \label{fig:ds}
+% \end{figure}
+% \begin{figure}[t!]
+%     \centering
+%     \includegraphics[width=\linewidth]{out/images/signal_control/signal_control.png}
+%     \caption{Signal Tranmission Activity}
+%     \label{fig:sig_x}
+% \end{figure}
+% \subsubsection{Signal Transmission (ref. \ref{fig:sig_x})} \label{sec:sig_x}
+
+% \begin{figure*}[t!]
+%     \centering
+%     \includegraphics[scale=0.8]{out/images/can_exchange/can_exchange.png}
+%     \caption{CAN Communication Activity}
+%     \label{fig:can_x}
+% \end{figure*}
+% \subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
+% % In order to create the simulated CAN network of ECUs, the devices must be able to communicate with each other with minimum per
+% % as if they were talking via a CAN bus. 
+% % Most ECUs do not come with built in ethernet ports and the ability to broadcast CAN frames via Ethernet. So in order to connect an ECU to Ethernet we need a device that can interface with a CAN network and interface with an Ethernet Network. This is why 
+% % the Smart Sensor Simulator and Forwarder is necessary. It acts as a programmable gateway that can transfer messages between the CAN network and the Ethernet Network.
+
+% When the SSSF is in an active experiment it 
+% % first checks if CAN networks were assigned baud rates. If the CAN network was assigned a baud rate, it 
+% attempts to read a message from the CAN network. If it reads a message from the CAN network, it proceeds to create the COMMBlock data structure (ref. figure \ref{fig:ds}) that will be written to the CANLay network. In the current scenario we set \texttt{num\_frames} to 1. Therefore, a COMMBlock data structure is transmitted after the receipt of every message.
+% COMMBlock requires some additional information before it can be written to the network. 
+% First, a type is added to indicate the subclass it is carrying. In this case the type will be 1, indicating that it is carrying a WCANFrame. 
+% It also adds the current millisecond timestamp at which it is sending the message
+% % This is used by other devices to calculate the network latency for the network path from this device. 
+% , a sequence number that is incremented every time a CAN message is sent
+% % If other devices on the network detect gaps in the sequence numbers they know that a message has been lost. 
+% and a frame number of the last frame it received from the Controller.
+% While the first two are used for network health monitoring (described in section \ref{sec:nethealth}), the last one is used to for retransmission of retranmission of WSignalBlock structures as alread seen in section \ref{sec:sig_x}.
+% % If it has not received any frames from the Controller then this number will be zero. The last seen frame number indicates to the Controller which SSSFs have and have not received the last sent frame. 
+% % Also, the SSSF will mark whether this CAN message is a canFD CAN frame. 
+% The SSSF also marks whether this message requires a response. The CAN message requires a response if its CAN frame’s PGN matches a list received from the user.
+
+% After the SSSF is done checking for CAN messages from the CAN network, it moves on to check for messages from the pub/sub network. Again, CAN messages sent to the pub/sub endpoint are considered type 1 messages. So if an SSSF device receives a type 1 message it first checks if the message requires a response. If so, it replies to the pub/sub endpoint with a type 5 message with the frame number equal to the sequence number of the message it just received. Next it updates its network statistics about the device it came from using the sequence number, timestamp, and other metrics from the COMMBlock and then it writes the FlexCAN CAN frame onto its available CAN networks.
+% % This is supposed to be sudo code btw
+%     if (msg.type == 1)
+%     {
+%         if (msg.needsResponse)
+%         {
+%             writeToMcastEndpoint(5. msg.sequenceNumber);
+%         }
+%         networkHealth->update(msg);
+%         if (can0BaudRate) can0.write(msg.canFrame.can);
+%         if (can1BaudRate) can1.write(msg.canFrame.can);
+%     }
+
+% \subsubsection{Network health monitoring}\label{sec:nethealth}
 % \begin{figure}[t!]
 %     \centering
 %     \includegraphics[width=\linewidth]{out/images/network_health/network_health.png}
 %     \caption{}
 %     \label{fig:}
 % \end{figure}
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/data_structures/data_structures.png}
-    \caption{Useful Data Structures}
-    \label{fig:ds}
-\end{figure}
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/signal_control/signal_control.png}
-    \caption{Signal Tranmission Activity}
-    \label{fig:sig_x}
-\end{figure}
-\subsubsection{Signal Transmission (ref. \ref{fig:sig_x})} \label{sec:sig_x}
+% As discussed earlier, monitoring the health of the network is key to ensuring that bad delays or large amounts of packet loss are not affecting your test results. In order to enable the devices to collect network statistics during an active experiment, each message is loaded with additional information. The first piece of additional information is a frame number. The Controller increments the frame number everytime it sends out new signals. When the SSSFs receive a message with a frame number higher than the previous frame number they saw, they send their frame number to the new frame number. Whenever SSSF devices send a message they add that frame number to the top of it. Therefore when a Controller receives a CAN message it can check the last frame the device had received when it sent the CAN message by checking the frame number in the COMMBlock. This system enables acknowledgement of messages without having to send any additional messages. In addition if an SSSF spots a gap in the frame numbers that is larger than 1, then it knows that a frame has been lost.
 
-\begin{figure*}[t!]
-    \centering
-    \includegraphics[scale=0.8]{out/images/can_exchange/can_exchange.png}
-    \caption{CAN Communication Activity}
-    \label{fig:can_x}
-\end{figure*}
-\subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
-% In order to create the simulated CAN network of ECUs, the devices must be able to communicate with each other with minimum per
-% as if they were talking via a CAN bus. 
-% Most ECUs do not come with built in ethernet ports and the ability to broadcast CAN frames via Ethernet. So in order to connect an ECU to Ethernet we need a device that can interface with a CAN network and interface with an Ethernet Network. This is why 
-% the Smart Sensor Simulator and Forwarder is necessary. It acts as a programmable gateway that can transfer messages between the CAN network and the Ethernet Network.
+% The type 1 COMMBlock messages (messages containing CAN frames) include a sequence number in addition to the frame number discussed earlier. Whenever an SSSF device sends out a CAN message, it adds a sequence number and increments it by 1. Signals from the Controller are sent at the frame rate of the game. This means that with a frame rate of 60fps the Controller is sending messages about 3-4x slower than the message rate seen in on a 250,000 baud ECU operating at nominal bus load. As such we cannot expect the acknowledgement mechanism used for the Controller messages to work for the CAN messages. However other devices can still use the sequence numbers to detect dropped CAN messages by looking for gaps larger than 1.
 
-When the SSSF is in an active experiment it 
-% first checks if CAN networks were assigned baud rates. If the CAN network was assigned a baud rate, it 
-attempts to read a message from the CAN network. If it reads a message from the CAN network, it proceeds to create the COMMBlock data structure (ref. figure \ref{fig:ds}) that will be written to the CANLay network. In the current scenario we set \texttt{num\_frames} to 1. Therefore, a COMMBlock data structure is transmitted after the receipt of every message.
-COMMBlock requires some additional information before it can be written to the network. 
-First, a type is added to indicate the subclass it is carrying. In this case the type will be 1, indicating that it is carrying a WCANFrame. 
-It also adds the current millisecond timestamp at which it is sending the message
-% This is used by other devices to calculate the network latency for the network path from this device. 
-, a sequence number that is incremented every time a CAN message is sent
-% If other devices on the network detect gaps in the sequence numbers they know that a message has been lost. 
-and a frame number of the last frame it received from the Controller.
-While the first two are used for network health monitoring (described in section \ref{sec:nethealth}), the last one is used to for retransmission of retranmission of WSignalBlock structures as alread seen in section \ref{sec:sig_x}.
-% If it has not received any frames from the Controller then this number will be zero. The last seen frame number indicates to the Controller which SSSFs have and have not received the last sent frame. 
-% Also, the SSSF will mark whether this CAN message is a canFD CAN frame. 
-The SSSF also marks whether this message requires a response. The CAN message requires a response if its CAN frame’s PGN matches a list received from the user.
+% The next important metric included in the COMMBlock messages is a timestamp. Timestamp is included to allow devices to calculate the latency along the network edge from the sending device to the receiving device. Of course this could be done by performing network tests during an active experiment but unless the latency is guaranteed to always be low, this testing could interrupt the normal flow of the other messages being sent in the experiment. So instead the timestamp is included with each message that is sent so that network health metrics can be calculated on the fly and performed without interrupting the testing. The latency is calculated by subtracting the time at which the message was sent from the time at which the message was received. The downside to this method is that it requires all of the device's clocks to be synchronized as close as possible. With the current basic implementation of the NTP protocol, the devices on average stay within a millisecond or two of each other when they are all referencing an NTP Server on the same network. Unfortunately when the devices use different NTP Servers that are much farther away the devices tend to stray between 5-15 milliseconds from each other. This creates issues when trying to measure the latency of devices that are very close to each other. It's important to note that more advanced implementations of NTP may be able to shrink these numbers.
 
-After the SSSF is done checking for CAN messages from the CAN network, it moves on to check for messages from the pub/sub network. Again, CAN messages sent to the pub/sub endpoint are considered type 1 messages. So if an SSSF device receives a type 1 message it first checks if the message requires a response. If so, it replies to the pub/sub endpoint with a type 5 message with the frame number equal to the sequence number of the message it just received. Next it updates its network statistics about the device it came from using the sequence number, timestamp, and other metrics from the COMMBlock and then it writes the FlexCAN CAN frame onto its available CAN networks.
-% This is supposed to be sudo code btw
-    if (msg.type == 1)
-    {
-        if (msg.needsResponse)
-        {
-            writeToMcastEndpoint(5. msg.sequenceNumber);
-        }
-        networkHealth->update(msg);
-        if (can0BaudRate) can0.write(msg.canFrame.can);
-        if (can1BaudRate) can1.write(msg.canFrame.can);
-    }
+% Overall, these indicators enable each device to calculate four network statistics for every other device on the network namely packet loss, latency, jitter, and goodput. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes for a message to go from the sender to its receiver. Jitter is the variance in latency. There are many different types of network jitter but we use the simplest form which is often called packet jitter or constant jitter which is defined as “packet jitter or packet delay variation (PDV) is the variation in latency as measured in the variability over time of the end-to-end delay across a network” (cite https://networkencyclopedia.com/jitter/). Goodput is the measurement of application level throughput. In our case it is calculated in bytes per second.
 
-\subsubsection{Network health monitoring}\label{sec:nethealth}
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=\linewidth]{out/images/network_health/network_health.png}
-    \caption{}
-    \label{fig:}
-\end{figure}
-As discussed earlier, monitoring the health of the network is key to ensuring that bad delays or large amounts of packet loss are not affecting your test results. In order to enable the devices to collect network statistics during an active experiment, each message is loaded with additional information. The first piece of additional information is a frame number. The Controller increments the frame number everytime it sends out new signals. When the SSSFs receive a message with a frame number higher than the previous frame number they saw, they send their frame number to the new frame number. Whenever SSSF devices send a message they add that frame number to the top of it. Therefore when a Controller receives a CAN message it can check the last frame the device had received when it sent the CAN message by checking the frame number in the COMMBlock. This system enables acknowledgement of messages without having to send any additional messages. In addition if an SSSF spots a gap in the frame numbers that is larger than 1, then it knows that a frame has been lost.
-
-The type 1 COMMBlock messages (messages containing CAN frames) include a sequence number in addition to the frame number discussed earlier. Whenever an SSSF device sends out a CAN message, it adds a sequence number and increments it by 1. Signals from the Controller are sent at the frame rate of the game. This means that with a frame rate of 60fps the Controller is sending messages about 3-4x slower than the message rate seen in on a 250,000 baud ECU operating at nominal bus load. As such we cannot expect the acknowledgement mechanism used for the Controller messages to work for the CAN messages. However other devices can still use the sequence numbers to detect dropped CAN messages by looking for gaps larger than 1.
-
-The next important metric included in the COMMBlock messages is a timestamp. Timestamp is included to allow devices to calculate the latency along the network edge from the sending device to the receiving device. Of course this could be done by performing network tests during an active experiment but unless the latency is guaranteed to always be low, this testing could interrupt the normal flow of the other messages being sent in the experiment. So instead the timestamp is included with each message that is sent so that network health metrics can be calculated on the fly and performed without interrupting the testing. The latency is calculated by subtracting the time at which the message was sent from the time at which the message was received. The downside to this method is that it requires all of the device's clocks to be synchronized as close as possible. With the current basic implementation of the NTP protocol, the devices on average stay within a millisecond or two of each other when they are all referencing an NTP Server on the same network. Unfortunately when the devices use different NTP Servers that are much farther away the devices tend to stray between 5-15 milliseconds from each other. This creates issues when trying to measure the latency of devices that are very close to each other. It's important to note that more advanced implementations of NTP may be able to shrink these numbers.
-
-Overall, these indicators enable each device to calculate four network statistics for every other device on the network namely packet loss, latency, jitter, and goodput. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes for a message to go from the sender to its receiver. Jitter is the variance in latency. There are many different types of network jitter but we use the simplest form which is often called packet jitter or constant jitter which is defined as “packet jitter or packet delay variation (PDV) is the variation in latency as measured in the variability over time of the end-to-end delay across a network” (cite https://networkencyclopedia.com/jitter/). Goodput is the measurement of application level throughput. In our case it is calculated in bytes per second.
-
-Every second the Controller sends out a type 3 message which requests the health report from each device. After each device has sent their health report to the Controller they reset their statistics, keeping only the last message timestamp and the last seen sequence number. This effectively creates a measurement period of 1 second. As the Controller receives the health reports, it updates the network statistic data structure and displays the new results to the user. By collecting health reports from each network node we are able to get the statistics about a network edge from devices on each side of that network edge (how do I explain the importance of the network stats matrix better?).
+% Every second the Controller sends out a type 3 message which requests the health report from each device. After each device has sent their health report to the Controller they reset their statistics, keeping only the last message timestamp and the last seen sequence number. This effectively creates a measurement period of 1 second. As the Controller receives the health reports, it updates the network statistic data structure and displays the new results to the user. By collecting health reports from each network node we are able to get the statistics about a network edge from devices on each side of that network edge (how do I explain the importance of the network stats matrix better?).
 
 
-\section{Usage Example}\label{sec:usage}
+\section{Current Implementation}\label{sec:usage}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=\linewidth]{images/usability.png}

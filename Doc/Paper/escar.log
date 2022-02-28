@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  24 FEB 2022 17:35
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  28 FEB 2022 09:32
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -661,7 +661,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 43--43
 [][][][][]$\T1/pcr/m/n/10 https : / / www . statista . com / statistics / 551403 /
  []
 
-<images/design_goal.drawio.png, id=75, 360.34625pt x 193.72375pt>
+<images/design_goal.drawio.png, id=71, 360.34625pt x 193.72375pt>
 File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
 Package pdftex.def Info: images/design_goal.drawio.png  used on input line 48.
@@ -674,77 +674,29 @@ LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 61
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
-<images/system_design.drawio.png, id=103, 520.94624pt x 298.11375pt>
+<images/system_design.drawio.png, id=99, 520.94624pt x 298.11375pt>
 File: images/system_design.drawio.png Graphic file (type png)
 <use images/system_design.drawio.png>
 Package pdftex.def Info: images/system_design.drawio.png  used on input line 81.
 (pdftex.def)             Requested size: 505.89pt x 289.4975pt.
  [2] [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png>]
-<out/images/connection_setup/connection_setup.png, id=124, 707.64375pt x 556.0775pt>
-File: out/images/connection_setup/connection_setup.png Graphic file (type png)
-<use out/images/connection_setup/connection_setup.png>
-Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 145.
-(pdftex.def)             Requested size: 505.89pt x 397.54149pt.
-
-
-LaTeX Warning: Command \textbackslash invalid in math mode on input line 152.
-
-
-LaTeX Warning: Command \textbackslash invalid in math mode on input line 152.
-
+<out/images/data_structures/data_structures.png, id=120, 274.02374pt x 366.36874pt>
+File: out/images/data_structures/data_structures.png Graphic file (type png)
+<use out/images/data_structures/data_structures.png>
+Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 157.
+(pdftex.def)             Requested size: 241.02039pt x 322.24895pt.
 
 Underfull \vbox (badness 1902) has occurred while \output is active []
 
- [4]
-<out/images/data_structures/data_structures.png, id=134, 366.36874pt x 250.9375pt>
-File: out/images/data_structures/data_structures.png Graphic file (type png)
-<use out/images/data_structures/data_structures.png>
-Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 178.
-(pdftex.def)             Requested size: 241.02039pt x 165.08319pt.
-<out/images/signal_control/signal_control.png, id=135, 497.86pt x 568.1225pt>
-File: out/images/signal_control/signal_control.png Graphic file (type png)
-<use out/images/signal_control/signal_control.png>
-Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 184.
-(pdftex.def)             Requested size: 241.02039pt x 275.03627pt.
-<out/images/can_exchange/can_exchange.png, id=137, 446.66875pt x 507.8975pt>
-File: out/images/can_exchange/can_exchange.png Graphic file (type png)
-<use out/images/can_exchange/can_exchange.png>
-Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 192.
-(pdftex.def)             Requested size: 357.33548pt x 406.31856pt.
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [5 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/connection_setup/connection_setup.png (PNG copy)>]
-Underfull \vbox (badness 1867) has occurred while \output is active []
-
-<out/images/network_health/network_health.png, id=149, 343.2825pt x 288.07625pt>
-File: out/images/network_health/network_health.png Graphic file (type png)
-<use out/images/network_health/network_health.png>
-Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 233.
-(pdftex.def)             Requested size: 241.02039pt x 202.25859pt.
- [6 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)> </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png>]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
-
-Underfull \hbox (badness 1931) in paragraph at lines 241--242
-[]\T1/ptm/m/n/12 (+20) The next im-por-tant met-ric in-cluded in the
- []
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [7 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/can_exchange/can_exchange.png (PNG copy)>]
-Underfull \vbox (badness 6510) has occurred while \output is active []
-
-<images/usability.png, id=161, 1445.4pt x 760.34062pt>
+<images/usability.png, id=121, 1445.4pt x 760.34062pt>
 File: images/usability.png Graphic file (type png)
 <use images/usability.png>
-Package pdftex.def Info: images/usability.png  used on input line 251.
+Package pdftex.def Info: images/usability.png  used on input line 266.
 (pdftex.def)             Requested size: 505.89pt x 266.1116pt.
- [8 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>]
+ [4 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [9 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/usability.png>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
+ [5 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/usability.png>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 28--32
 []\T1/ptm/m/n/12 (+20) Michael Do-er-ing and Marco Wag-ner.
  []
@@ -779,30 +731,30 @@ Underfull \hbox (badness 10000) in paragraph at lines 48--54
 \T1/ptm/m/it/12 (+20) 94th Ve-hic-u-lar Tech-nol-ogy Con-fer-ence
  []
 
-[10]
+[6]
 Underfull \hbox (badness 2689) in paragraph at lines 93--99
 \T1/ptm/m/n/12 (+20) Re-quire-ments Anal-y-sis and Per-for-mance
  []
 
-) [11
+) [7
 
 ] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
 Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: EF4825A92735CBBE7E4AA286DC8EC6D5;2769.
+(rerunfilecheck)             Checksum: 096068208969467EF6FFA420445D18D5;2404.
  ) 
 Here is how much of TeX's memory you used:
- 21629 strings out of 478994
- 395236 string characters out of 5858185
- 695190 words of memory out of 5000000
- 38357 multiletter control sequences out of 15000+600000
- 469557 words of font info for 284 fonts, out of 8000000 for 9000
+ 21573 strings out of 478994
+ 393792 string characters out of 5858185
+ 695904 words of memory out of 5000000
+ 38328 multiletter control sequences out of 15000+600000
+ 467243 words of font info for 275 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 113i,9n,116p,1499b,452s stack positions out of 5000i,500n,10000p,200000b,80000s
-{/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (11 pages, 1665053 bytes).
+ 113i,9n,116p,1501b,452s stack positions out of 5000i,500n,10000p,200000b,80000s
+{/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (7 pages, 1545031 bytes).
 PDF statistics:
- 221 PDF objects out of 1000 (max. 8388607)
- 189 compressed objects within 2 object streams
- 51 named destinations out of 1000 (max. 500000)
- 81581 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 180 PDF objects out of 1000 (max. 8388607)
+ 158 compressed objects within 2 object streams
+ 42 named destinations out of 1000 (max. 500000)
+ 81041 words of extra memory for PDF output out of 89155 (max. 10000000)
 

@@ -1,0 +1,22 @@
+@startuml
+|Controller/SSSF|
+start
+: sample data;
+:wmb := instance of WCommBlock
+wmb.timestamp <- current millisecs|
+: increment (wmb.seq);
+(A)
+' ( wmb )
+detach
+: hello;
+' ( wmb )
+' wmb.seq.rem++|
+' if (wmb.seq.rem >= size(q)) then
+' :wmb.seq.rem <- 0
+' wmb.seq.quot++|
+' endif
+' end
+|SSSFs|
+(A)
+:recv_seq[wmb.sid] <- max(wmb.seq,recv_seq[wmb.sid])|
+@enduml
