@@ -59,6 +59,14 @@ Mathias Johanson, Lennart Karlsson, and Tore Risch.
 \newblock In {\em 2009 {Fourth} {International} {Conference} on {Systems} and
   {Networks} {Communications}}, pages 1--5, 2009.
 
+\bibitem{kaiser_implementing_1999}
+J.~Kaiser and M.~Mock.
+\newblock Implementing the real-time publisher/subscriber model on the
+  controller area network ({CAN}).
+\newblock In {\em Proceedings 2nd {IEEE} {International} {Symposium} on
+  {Object}-{Oriented} {Real}-{Time} {Distributed} {Computing} ({ISORC}'99)
+  ({Cat}. {No}.99-61702)}, pages 172--181, 1999.
+
 \bibitem{tagarev_automotive_2021}
 Shahid Mahmood, Hoang~Nga Nguyen, and Siraj~A. Shaikh.
 \newblock Automotive {Cybersecurity} {Testing}: {Survey} of {Testbeds} and
