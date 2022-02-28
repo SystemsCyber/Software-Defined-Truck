@@ -21,23 +21,27 @@ void NetworkStats::update(uint16_t i, int packetSize, uint64_t timestamp, uint32
 {
     int64_t _now = timeClient->getEpochTimeMS();
     int delay = _now - int64_t(timestamp);
-    // Serial.print("Controller Send: ");
-    // Serial.print(timestamp);
-    // Serial.print(" SSSF Recv: ");
-    // Serial.print(_now);
-    // Serial.print(" Diff: ");
-    // Serial.println(delay);
-    float ellapsedSeconds = (_now - Basics[i].lastMessageTime) / 1000.0;
+    // if these numbers are 0 this is the first message we've received
+    if ((Basics[i].lastMessageTime != 0) && (Basics[i].lastSequenceNumber != 0))
+    {
+        // Serial.print("Controller Send: ");
+        // Serial.print(timestamp);
+        // Serial.print(" SSSF Recv: ");
+        // Serial.print(_now);
+        // Serial.print(" Diff: ");
+        // Serial.println(delay);
+        float ellapsedSeconds = (_now - Basics[i].lastMessageTime) / 1000.0;
 
-    calculate(HealthReport[i].latency, abs(delay));
-    calculate(HealthReport[i].jitter, HealthReport[i].latency.variance);
-    // If no packet loss then sequence number = last sequence number + 1
-    int32_t packetsLost = int64_t(sequenceNumber) - (Basics[i].lastSequenceNumber + 1);
-    // If packetsLost is negative then this usually indicates duplicate or
-    // out of order frame. Etherway not a lost packet.
-    HealthReport[i].packetLoss += (packetsLost > 0) ? packetsLost : 0;
+        calculate(HealthReport[i].latency, abs(delay));
+        calculate(HealthReport[i].jitter, HealthReport[i].latency.variance);
+        // If no packet loss then sequence number = last sequence number + 1
+        int32_t packetsLost = int64_t(sequenceNumber) - (Basics[i].lastSequenceNumber + 1);
+        // If packetsLost is negative then this usually indicates duplicate or
+        // out of order frame. Etherway not a lost packet.
+        HealthReport[i].packetLoss += (packetsLost > 0) ? packetsLost : 0;
 
-    calculate(HealthReport[i].goodput, (packetSize * 8) / ellapsedSeconds);
+        calculate(HealthReport[i].goodput, (packetSize * 8) / ellapsedSeconds);
+    }
     
     Basics[i].lastMessageTime = _now;
     Basics[i].lastSequenceNumber = int64_t(sequenceNumber);

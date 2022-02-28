@@ -24,6 +24,9 @@ private:
     int comBlockSize = 0;
     int comHeadSize = 0;
 
+    unsigned int sendInterval = 12;
+    unsigned int lastSend = 0;
+
 public:
     struct COMMBlock
     {

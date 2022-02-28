@@ -143,16 +143,16 @@ void TimeClient::setPollingInterval()
         }
         else
         {
-            if (pollingInterval < 6)
+            if (pollingInterval < 7)
             {
                 if (logging)
                     logger->notice("Increasing NTP polling interval to: ");
                     logger->noticeln("%ds.", int(pow(2, pollingInterval)));
                 pollingInterval++;
             }
-            else if (pollingInterval > 6)
+            else if (pollingInterval > 7)
             {
-                pollingInterval = 6;
+                pollingInterval = 7;
             }
         }
     }

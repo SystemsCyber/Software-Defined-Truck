@@ -27,8 +27,8 @@ protected:
     int canSize = 0;
     int canFDSize = 0;
 
-    uint32_t can0BaudRate;
-    uint32_t can1BaudRate;
+    uint32_t can0BaudRate = 0;
+    uint32_t can1BaudRate = 0;
     FlexCAN_T4<CAN0, RX_SIZE_256, TX_SIZE_16> can0;
     FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> can1;
 

@@ -67,6 +67,16 @@ void SSSF::forwardingLoop(bool print)
     pollServer();
     if (sessionStatus == Active)
     {
+        if (millis() - lastSend >= sendInterval)
+        {
+            lastSend = millis();
+            struct CAN_message_t canFrame;
+            canFrame.mb = 0;
+            canFrame.id = 0x1FFFFFFF;
+            canFrame.len = 8;
+            canFrame.flags.extended = true;
+            write(canFrame);
+        }
         struct COMMBlock msg = {0};
         struct CAN_message_t canFrame;
         pollCANNetwork(canFrame);
@@ -85,9 +95,16 @@ void SSSF::forwardingLoop(bool print)
             {
                 networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
-                // For testing
-                // canFrame = {0};
-                // write(canFrame);
+                // Apply transformation
+                canFrame.mb = 0;
+                canFrame.id = 0x18F00300 ^ 0x1FFFFFFF;
+                canFrame.len = 8;
+                canFrame.flags.extended = true;
+                uint8_t throttle = uint8_t((msg.sensorFrame.signals[0] * 100.0) / 0.4);
+                canFrame.buf[1] = throttle;
+                write(canFrame);
+                // can0.write(canFrame);
+                // if (can1BaudRate) can1.write(canFrame);
                 // -----------
             }
             else if (msg.type == 3)

@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import glob
 import os
+
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 import sys
 
 try:
@@ -30,6 +32,7 @@ import pygame
 import Text
 from Controller import Controller
 from Environment import LogListener
+from HealthReport import NetworkMatrix
 from HUD import HUD
 from KeyboardControl import KeyboardControl
 from World import World
@@ -125,6 +128,19 @@ def init_argparser() -> argparse.ArgumentParser:
             'been received by at least one other device in the group. '
             'IMPORTANT: mark as few PGNs as important as possible. Marking '
             'all PGNs as important would effectively double the network load.'
+        ))
+    arg_controller.add_argument(
+        '--network_matrix',
+        metavar='MODE',
+        default='grouped',
+        dest='display_mode',
+        type=str,
+        choices=["individual", "vertical", "horizontal", "grouped"],
+        help=(
+            'The display mode of the network matrix. Individual allows the user'
+            'to pick which metric they would like to look at. Vertical and'
+            'horizontal stack then next to each other in their respective'
+            'directions. Grouped creates a matrix of the matrices.'
         ))
 
     argparser.add_argument(
@@ -229,6 +245,7 @@ def main():
     log_level = logging.DEBUG if args.debug else logging.INFO
     frame_rate = 60
 
+    health_queue = mp.Queue()
     log_queue = mp.Queue()
     listen_for_logs = mp.Event()
     listen_for_logs.set()
@@ -249,20 +266,28 @@ def main():
         _frame_rate=frame_rate,
         _server_ip=args.server
     )
+    matrix = NetworkMatrix()
     port = choose_ipc_port()
     running = mp.Event()
     running.set()
+    matrix_thread = mp.Process(
+        target=matrix.animate, args=(health_queue, args.display_mode), daemon=True)
     ctrl_thread = mp.Process(
-        target=ctrl.start, args=(port, running, log_queue, log_level))
+        target=ctrl.start, args=(port, running, log_queue, health_queue, log_level))
     listener = Listener(('localhost', port), authkey=ctrl_thread.authkey)
 
     ctrl_thread.start()
+    matrix_thread.start()
     conn = setup_loop(listener)
     game_loop(conn, frame_rate, args)
 
     running.clear()
     listener.close()
-    ctrl_thread.join(1)
+    health_queue.close()
+    health_queue.join_thread()
+    ctrl_thread.join(2)
+    matrix_thread.join(1)
+    ctrl_thread.terminate()
     ctrl_thread.close()
     
     listen_for_logs.clear()
