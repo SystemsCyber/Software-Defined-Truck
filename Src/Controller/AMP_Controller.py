@@ -129,8 +129,10 @@ def init_argparser() -> argparse.ArgumentParser:
             'IMPORTANT: mark as few PGNs as important as possible. Marking '
             'all PGNs as important would effectively double the network load.'
         ))
-    arg_controller.add_argument(
-        '--network_matrix',
+
+    arg_network_matrix = argparser.add_argument_group("Network Matrix")
+    arg_network_matrix.add_argument(
+        '--display_mode',
         metavar='MODE',
         default='grouped',
         dest='display_mode',
@@ -141,6 +143,15 @@ def init_argparser() -> argparse.ArgumentParser:
             'to pick which metric they would like to look at. Vertical and'
             'horizontal stack then next to each other in their respective'
             'directions. Grouped creates a matrix of the matrices.'
+        ))
+    arg_network_matrix.add_argument(
+        '--display_totals',
+        default=False,
+        action='store_true',
+        dest='display_totals',
+        help=(
+            'Displays the total number of packets sent and lost in the session'
+            ' so far. (Default: OFF)'
         ))
 
     argparser.add_argument(
@@ -271,7 +282,10 @@ def main():
     running = mp.Event()
     running.set()
     matrix_thread = mp.Process(
-        target=matrix.animate, args=(health_queue, args.display_mode), daemon=True)
+        target=matrix.animate,
+        args=(health_queue, args.display_mode, args.display_totals),
+        daemon=True
+        )
     ctrl_thread = mp.Process(
         target=ctrl.start, args=(port, running, log_queue, health_queue, log_level))
     listener = Listener(('localhost', port), authkey=ctrl_thread.authkey)

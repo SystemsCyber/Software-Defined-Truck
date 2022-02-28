@@ -74,7 +74,6 @@ class NetworkMatrix:
 
     def __update_matrix(self, data, axes, cmap: str, title: str):
         axes[0].cla()
-        axes[1].cla()
         axes[0].set_title(title, fontdict={
             'fontsize': 14, 'fontweight': 'bold'})
         return sns.heatmap(
@@ -117,8 +116,11 @@ class NetworkMatrix:
             r.jitter["mean"], (self.ax2, self.cbar_ax2), "rocket_r", "Jitter (msec)")
         ax3 = self.__update_matrix(
             r.goodput["mean"]/1000.0, (self.ax3, self.cbar_ax3), "rocket", "Goodput (Mb/s)")
-        ax4 = self.__update_totals(r, self.ax4)
-        return (ax, ax1, ax2, ax3, ax4)
+        if self.display_totals:
+            ax4 = self.__update_totals(r, self.ax4)
+            return (ax, ax1, ax2, ax3, ax4)
+        else:
+            return (ax, ax1, ax2, ax3)
 
     def __update(self, frame):
         report = self._last_report
@@ -162,63 +164,99 @@ class NetworkMatrix:
         self.fig.add_axes(cbar_ax)
         return cbar_ax
 
-    def __animate(self, queue: mp.Queue, display_mode="grouped"):
+    def __animate_individual(self):
+        self.fig, ax = plt.subplots()
+        self.ax, self.cbar_ax = (ax, self.__create_cbar_ax(ax))
+        screen_shift = 5
+        num_buttons = 5 if self.display_totals else 4
+        start = (100//num_buttons)
+        if self.display_totals:
+            start -= int(2*screen_shift)
+        else:
+            start -= int(1.2 * screen_shift)
+        stop = (100 - start) if (start % 2 == 1) else 100
+        ax_start = [(i/100) for i in range(start, stop, 15)]
+        ax_other = (0.025, 0.15, 0.04)
+
+        self.packetLoss_button = self.__create_button(
+            (ax_start[0], *ax_other), "Packet Loss", self.__display_packet_loss)
+        self.latency_button = self.__create_button(
+            (ax_start[1], *ax_other), "Latency", self.__display_latency)
+        self.jitter_button = self.__create_button(
+            (ax_start[2], *ax_other), "Jitter", self.__display_jitter)
+        self.goodput_button = self.__create_button(
+            (ax_start[3], *ax_other), "Goodput", self.__display_goodput)
+        if self.display_totals:
+            self.totals_button = self.__create_button(
+                (ax_start[4], *ax_other), "Totals", self.__display_totals)
+        plt.subplots_adjust(left=screen_shift/100, bottom=0.25)
+
+    def __animate_vertical(self):
+        b = 0 if self.display_totals else 0.05
+        grid_kws = {'hspace': 0.4}
+        rows_cols = (5, 1) if self.display_totals else (4, 1)
+        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws)
+        self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
+        self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
+        self.ax2, self.cbar_ax2 = (axes[2], self.__create_cbar_ax(axes[2]))
+        self.ax3, self.cbar_ax3 = (axes[3], self.__create_cbar_ax(axes[3]))
+        if self.display_totals:
+            self.ax4 = axes[4]
+        plt.subplots_adjust(left=0.05, right=0.98, bottom=b, top=0.96)
+
+    def __animate_horizontal(self):
+        r = 0.98 if self.display_totals else 0.95
+        grid_kws = {'wspace': 0.5}
+        rows_cols = (1, 5) if self.display_totals else (1, 4)
+        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws)
+        self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
+        self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
+        self.ax2, self.cbar_ax2 = (axes[2], self.__create_cbar_ax(axes[2]))
+        self.ax3, self.cbar_ax3 = (axes[3], self.__create_cbar_ax(axes[3]))
+        if self.display_totals:
+            self.ax4 = axes[4]
+        plt.subplots_adjust(left=0.05, right=r, bottom=0.05, top=1)
+
+    def __animate_grouped(self):
+        hspace = 0.1 if self.display_totals else 0.3
+        rt = 0.98 if self.display_totals else 0.94
+        lb = 0.05 if self.display_totals else 0.09
+        grid_kws = {'wspace': 0.4, 'hspace': hspace}
+        rows_cols = (2, 3) if self.display_totals else (2, 2)
+        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws)
+        self.ax, self.cbar_ax = (axes[0][0], self.__create_cbar_ax(axes[0][0]))
+        self.ax1, self.cbar_ax1 = (axes[0][1], self.__create_cbar_ax(axes[0][1]))
+        self.ax2, self.cbar_ax2 = (axes[1][0], self.__create_cbar_ax(axes[1][0]))
+        self.ax3, self.cbar_ax3 = (axes[1][1], self.__create_cbar_ax(axes[1][1]))
+        if self.display_totals:
+            self.ax4 = axes[0][2]
+            axes[1][2].set_axis_off()
+        plt.subplots_adjust(left=lb, right=rt, bottom=lb, top=rt)
+
+    def __animate(self, queue: mp.Queue, display_mode="grouped", display_totals=False):
         self._queue = queue
         self.display_mode = display_mode
+        self.display_totals = display_totals
         sns.set(font_scale=1.2)
         sns.set_style('white')
         if display_mode == "individual":
-            self.fig, ax = plt.subplots()
-            self.ax, self.cbar_ax = (ax, self.__create_cbar_ax(ax))
-            self.packetLoss_button = self.__create_button(
-                (0.15, 0.025, 0.15, 0.04), "Packet Loss", self.__display_packet_loss)
-            self.latency_button = self.__create_button(
-                (0.3, 0.025, 0.15, 0.04), "Latency", self.__display_latency)
-            self.jitter_button = self.__create_button(
-                (0.45, 0.025, 0.15, 0.04), "Jitter", self.__display_jitter)
-            self.goodput_button = self.__create_button(
-                (0.6, 0.025, 0.15, 0.04), "Goodput", self.__display_goodput)
-            self.totals_button = self.__create_button(
-                (0.75, 0.025, 0.15, 0.04), "Totals", self.__display_totals)
-            plt.subplots_adjust(left=0.05, bottom=0.25)
+            self.__animate_individual()
         elif display_mode == "vertical":
-            grid_kws = {'hspace': 0.4}
-            self.fig, axes = plt.subplots(5, 1, gridspec_kw=grid_kws)
-            self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
-            self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
-            self.ax2, self.cbar_ax2 = (axes[2], self.__create_cbar_ax(axes[2]))
-            self.ax3, self.cbar_ax3 = (axes[3], self.__create_cbar_ax(axes[3]))
-            self.ax4 = axes[4]
-            plt.subplots_adjust(left=0.05, right=0.98, bottom=0, top=0.96)
+            self.__animate_vertical()
         elif display_mode == "horizontal":
-            grid_kws = {'wspace': 0.4}
-            self.fig, axes = plt.subplots(1, 5, gridspec_kw=grid_kws)
-            self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
-            self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
-            self.ax2, self.cbar_ax2 = (axes[2], self.__create_cbar_ax(axes[2]))
-            self.ax3, self.cbar_ax3 = (axes[3], self.__create_cbar_ax(axes[3]))
-            self.ax4 = axes[4]
-            plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, top=1)
+            self.__animate_horizontal()
         elif display_mode == "grouped":
-            grid_kws = {'wspace': 0.4, 'hspace': 0.1}
-            self.fig, axes = plt.subplots(2, 3, gridspec_kw=grid_kws)
-            self.ax, self.cbar_ax = (axes[0][0], self.__create_cbar_ax(axes[0][0]))
-            self.ax1, self.cbar_ax1 = (axes[0][1], self.__create_cbar_ax(axes[0][1]))
-            self.ax2, self.cbar_ax2 = (axes[1][0], self.__create_cbar_ax(axes[1][0]))
-            self.ax3, self.cbar_ax3 = (axes[1][1], self.__create_cbar_ax(axes[1][1]))
-            self.ax4 = axes[0][2]
-            axes[1][2].set_axis_off()
-            plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, top=0.98)
+            self.__animate_grouped()
 
         self.anim = animation.FuncAnimation(
-            self.fig, self.__update, blit=True, repeat=False)
+            self.fig, self.__update, frames=None, interval=1000, blit=True, repeat=False)
         mng = plt.get_current_fig_manager()
         mng.set_window_title("Network Statistics")
         plt.show()
 
-    def animate(self, queue: mp.Queue, display_mode="grouped"):
+    def animate(self, queue: mp.Queue, display_mode="grouped", display_totals=False):
         try:
-            self.__animate(queue, display_mode)
+            self.__animate(queue, display_mode, display_totals)
         except (OSError, ValueError):
             self.anim.event_source.stop()
             plt.close(self.fig)
@@ -227,20 +265,20 @@ class NetworkMatrix:
 
 # def create_random_values(report):
 #     report.packet_loss.iloc[0, 0] = 0.0
-#     report.packet_loss.iloc[0, 1] = np.random.random() * 10
-#     report.packet_loss.iloc[1, 0] = np.random.random() * 10
+#     report.packet_loss.iloc[0, 1] = np.random.randint(0,2)
+#     report.packet_loss.iloc[1, 0] = np.random.randint(0,2)
 #     report.packet_loss.iloc[1, 1] = 0.0
 #     report.latency["mean"].iloc[0, 0] = 0.0
-#     report.latency["mean"].iloc[0, 1] = np.random.random() * 10
-#     report.latency["mean"].iloc[1, 0] = np.random.random() * 10
+#     report.latency["mean"].iloc[0, 1] = np.random.random()
+#     report.latency["mean"].iloc[1, 0] = np.random.random()
 #     report.latency["mean"].iloc[1, 1] = 0.0
 #     report.jitter["mean"].iloc[0, 0] = 0.0
-#     report.jitter["mean"].iloc[0, 1] = np.random.random() * 10
-#     report.jitter["mean"].iloc[1, 0] = np.random.random() * 10
+#     report.jitter["mean"].iloc[0, 1] = np.random.random()
+#     report.jitter["mean"].iloc[1, 0] = np.random.random()
 #     report.jitter["mean"].iloc[1, 1] = 0.0
 #     report.goodput["mean"].iloc[0, 0] = 0.0
-#     report.goodput["mean"].iloc[0, 1] = np.random.random() * 50
-#     report.goodput["mean"].iloc[1, 0] = np.random.random() * 50
+#     report.goodput["mean"].iloc[0, 1] = np.random.randint(50000, 60000)
+#     report.goodput["mean"].iloc[1, 0] = np.random.randint(40000, 50000)
 #     report.goodput["mean"].iloc[1, 1] = 0.0
 #     return SimpleNamespace(
 #         sim_frames=report.sim_frames,
@@ -259,7 +297,7 @@ class NetworkMatrix:
 #     health_report = HealthReport(2)
 #     matrix = NetworkMatrix()
 #     matrix_thread = mp.Process(
-#         target=matrix.animate, args=(health_queue, "individual"), daemon=True)
+#         target=matrix.animate, args=(health_queue, "grouped", False), daemon=True)
 #     matrix_thread.start()
 #     while True:
 #         try:
