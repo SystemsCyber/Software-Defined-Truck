@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  27 FEB 2022 23:09
+This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  28 FEB 2022 08:58
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -8,8 +8,8 @@ entering extended mode
 LaTeX2e <2021-11-15> patch level 1
 L3 programming layer <2022-02-05> (c:/texlive/2021/texmf-dist/tex/latex/base/article.cls
 Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
-(c:/texlive/2021/texmf-dist/tex/latex/base/size12.clo
-File: size12.clo 2021/10/04 v1.4n Standard LaTeX file (size option)
+(c:/texlive/2021/texmf-dist/tex/latex/base/size10.clo
+File: size10.clo 2021/10/04 v1.4n Standard LaTeX file (size option)
 )
 \c@part=\count185
 \c@section=\count186
@@ -640,27 +640,25 @@ LaTeX Font Info:    Trying to load font information for OMX+psycm on input line 
  (c:/texlive/2021/texmf-dist/tex/latex/psnfss/omxpsycm.fd
 File: omxpsycm.fd 2000/01/03 Fontinst v1.801 font definitions for OMX/psycm.
 )
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <14.4> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10.95> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 29.
 
 
 LaTeX Warning: No \author given.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 43.
 Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `pcr' (encoding: T1).
@@ -668,7 +666,7 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             See the microtype manual for details.
 
 Underfull \hbox (badness 10000) in paragraph at lines 43--43
-[][][][][]$\T1/pcr/m/n/10 https : / / www . statista . com / statistics / 551403 /
+[][][][][]$\T1/pcr/m/n/8 https : / / www . statista . com / statistics / 551403 /
  []
 
 <images/design_goal.drawio.png, id=75, 360.34625pt x 193.72375pt>
@@ -676,7 +674,10 @@ File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
 Package pdftex.def Info: images/design_goal.drawio.png  used on input line 48.
 (pdftex.def)             Requested size: 241.02039pt x 129.57253pt.
-[1{c:/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+
+Underfull \vbox (badness 1565) has occurred while \output is active []
+
+ [1{c:/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
  <./images/design_goal.drawio.png>]
@@ -684,133 +685,161 @@ LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 61
  (c:/texlive/2021/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
-<images/system_design.drawio.png, id=103, 520.94624pt x 298.11375pt>
+<images/system_design.drawio.png, id=106, 520.94624pt x 298.11375pt>
 File: images/system_design.drawio.png Graphic file (type png)
 <use images/system_design.drawio.png>
 Package pdftex.def Info: images/system_design.drawio.png  used on input line 81.
 (pdftex.def)             Requested size: 505.89pt x 289.4975pt.
- [2]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [3 <./images/system_design.drawio.png>] [4]
-<out/images/connection_setup/connection_setup.png, id=129, 707.64375pt x 556.0775pt>
+ [2] [3 <./images/system_design.drawio.png>]
+<out/images/connection_setup/connection_setup.png, id=125, 707.64375pt x 556.0775pt>
 File: out/images/connection_setup/connection_setup.png Graphic file (type png)
 <use out/images/connection_setup/connection_setup.png>
-Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 153.
+Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 148.
 (pdftex.def)             Requested size: 505.89pt x 397.54149pt.
 
 
-LaTeX Warning: Command \textbackslash invalid in math mode on input line 160.
+LaTeX Warning: Command \textbackslash invalid in math mode on input line 155.
 
 
-LaTeX Warning: Command \textbackslash invalid in math mode on input line 160.
+LaTeX Warning: Command \textbackslash invalid in math mode on input line 155.
 
-<out/images/data_structures/data_structures.png, id=131, 366.36874pt x 250.9375pt>
+<out/images/data_structures/data_structures.png, id=127, 366.36874pt x 250.9375pt>
 File: out/images/data_structures/data_structures.png Graphic file (type png)
 <use out/images/data_structures/data_structures.png>
-Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 181.
+Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 176.
 (pdftex.def)             Requested size: 241.02039pt x 165.08319pt.
-<out/images/signal_control/signal_control.png, id=132, 497.86pt x 568.1225pt>
+<out/images/signal_control/signal_control.png, id=128, 497.86pt x 568.1225pt>
 File: out/images/signal_control/signal_control.png Graphic file (type png)
 <use out/images/signal_control/signal_control.png>
-Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 187.
+Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 182.
 (pdftex.def)             Requested size: 241.02039pt x 275.03627pt.
-<out/images/can_exchange/can_exchange.png, id=134, 446.66875pt x 507.8975pt>
+<out/images/can_exchange/can_exchange.png, id=130, 446.66875pt x 507.8975pt>
 File: out/images/can_exchange/can_exchange.png Graphic file (type png)
 <use out/images/can_exchange/can_exchange.png>
-Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 199.
+Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 194.
 (pdftex.def)             Requested size: 357.33548pt x 406.31856pt.
-[5]
-Underfull \vbox (badness 10000) has occurred while \output is active []
+[4]
+Underfull \hbox (badness 10000) in paragraph at lines 231--243
+\T1/ptm/m/n/10 (+20) msg.sequenceNumber);  networkHealth->update(msg);
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 231--243
+\T1/ptm/m/n/10 (+20) if (can0BaudRate) can0.write(msg.canFrame.can); if
+ []
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [6 <./out/images/connection_setup/connection_setup.png (PNG copy)>]
-Underfull \vbox (badness 1867) has occurred while \output is active []
-
- [7 <./out/images/data_structures/data_structures.png (PNG copy)> <./out/images/signal_control/signal_control.png>]
-<out/images/network_health/network_health.png, id=159, 343.2825pt x 288.07625pt>
+ [5 <./out/images/connection_setup/connection_setup.png (PNG copy)>]
+<out/images/network_health/network_health.png, id=151, 343.2825pt x 288.07625pt>
 File: out/images/network_health/network_health.png Graphic file (type png)
 <use out/images/network_health/network_health.png>
-Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 252.
+Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 247.
 (pdftex.def)             Requested size: 241.02039pt x 202.25859pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [8 <./out/images/can_exchange/can_exchange.png (PNG copy)>]
-Underfull \hbox (badness 1931) in paragraph at lines 260--261
-[]\T1/ptm/m/n/12 (+20) The next im-por-tant met-ric in-cluded in the
+
+Underfull \vbox (badness 1527) has occurred while \output is active []
+
+ [6 <./out/images/data_structures/data_structures.png (PNG copy)> <./out/images/signal_control/signal_control.png>]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Overfull \hbox (94.558pt too wide) in paragraph at lines 293--293
+[]\T1/pcr/m/n/10 NetworkStats::update(index, packetSize, timestamp, sequenceNumber)[] 
+ []
+
+[7 <./out/images/can_exchange/can_exchange.png (PNG copy)>]
+Overfull \hbox (139.94778pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 ellapsedSeconds = (now - HealthBasics[index].lastMessageTime) / 1000.0;[] 
  []
 
 
-Underfull \vbox (badness 2744) has occurred while \output is active []
+Overfull \hbox (37.94827pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].latency, abs(delay));[] 
+ []
 
- [9 <./out/images/network_health/network_health.png (PNG copy)>]
-<images/usability.png, id=170, 1445.4pt x 760.34062pt>
+
+Overfull \hbox (165.44766pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].jitter, HealthReport[index].latency.variance);[] 
+ []
+
+
+Overfull \hbox (125.92786pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 // If no packet loss then sequence number = last sequence number + 1[] 
+ []
+
+
+Overfull \hbox (134.84781pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 packetsLost = sequenceNumber - (Basics[index].lastSequenceNumber + 1);[] 
+ []
+
+
+Overfull \hbox (194.0075pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 // If packetsLost is negative then this indicates duplicate or out of order frame.[] 
+ []
+
+
+Overfull \hbox (134.84781pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 HealthReport[index].packetLoss += (packetsLost > 0) ? packetsLost : 0;[] 
+ []
+
+
+Overfull \hbox (160.34769pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 calculate(HealthReport[index].goodput, (packetSize * 8) / ellapsedSeconds);[] 
+ []
+
+
+Overfull \hbox (63.44815pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 HealthBasics[index].lastSequenceNumber = sequenceNumber;[] 
+ []
+
+
+Overfull \hbox (277.13713pt too wide) in paragraph at lines 293--293
+[]\T1/pcr/m/n/10 {// From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm[] 
+ []
+
+
+Overfull \hbox (17.54837pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 edge.sumOfSquaredDifferences += delta * delta2;[] 
+ []
+
+
+Overfull \hbox (73.6481pt too wide) in paragraph at lines 293--293
+[]    \T1/pcr/m/n/10 edge.variance = edge.sumOfSquaredDifferences / edge.count;[] 
+ []
+
+<images/usability.png, id=163, 1445.4pt x 760.34062pt>
 File: images/usability.png Graphic file (type png)
 <use images/usability.png>
-Package pdftex.def Info: images/usability.png  used on input line 270.
+Package pdftex.def Info: images/usability.png  used on input line 299.
 (pdftex.def)             Requested size: 505.89pt x 266.1116pt.
- (./escar.bbl [10]
-Underfull \hbox (badness 10000) in paragraph at lines 28--32
-[]\T1/ptm/m/n/12 (+20) Michael Do-er-ing and Marco Wag-ner.
+(./escar.bbl [8 <./out/images/network_health/network_health.png (PNG copy)>]
+Underfull \hbox (badness 2126) in paragraph at lines 48--54
+\T1/ptm/m/n/10 (+20) CAN: Prob-a-bilis-tic Data Struc-tures for Software-
  []
 
-
-Underfull \hbox (badness 3536) in paragraph at lines 28--32
-\T1/ptm/m/n/12 (+20) Retrofitting SDN to clas-si-cal in-vehicle
- []
-
-
-Underfull \hbox (badness 2229) in paragraph at lines 34--39
-[]\T1/ptm/m/n/12 (+20) Alexey Doso-vit-skiy, Ger-man Ros, Fe-lipe
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
-\T1/ptm/m/n/12 (+20) Codev-illa, An-to-nio Lopez, and Vladlen
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 48--54
-[]\T1/ptm/m/n/12 (+20) Dennis Grewe, Naresh Nayak, Dee-ban
- []
-
-
-Underfull \hbox (badness 2818) in paragraph at lines 48--54
-\T1/ptm/m/n/12 (+20) tic Data Struc-tures for Software-defined
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 48--54
-\T1/ptm/m/it/12 (+20) 94th Ve-hic-u-lar Tech-nol-ogy Con-fer-ence
- []
-
-[11 <./images/usability.png>]
-Underfull \hbox (badness 2689) in paragraph at lines 93--99
-\T1/ptm/m/n/12 (+20) Re-quire-ments Anal-y-sis and Per-for-mance
- []
-
-) [12
+[9 <./images/usability.png>]) [10
 
 ] (./escar.aux)
 Package rerunfilecheck Info: File `escar.out' has not changed.
 (rerunfilecheck)             Checksum: EF4825A92735CBBE7E4AA286DC8EC6D5;2769.
  ) 
 Here is how much of TeX's memory you used:
- 22838 strings out of 478278
- 423718 string characters out of 5850546
- 717398 words of memory out of 5000000
- 40277 multiletter control sequences out of 15000+600000
- 537570 words of font info for 289 fonts, out of 8000000 for 9000
+ 22801 strings out of 478278
+ 423172 string characters out of 5850546
+ 720280 words of memory out of 5000000
+ 40264 multiletter control sequences out of 15000+600000
+ 531465 words of font info for 268 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 100i,9n,104p,1689b,464s stack positions out of 5000i,500n,10000p,200000b,80000s
-{c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}<c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on escar.pdf (12 pages, 1674733 bytes).
+ 100i,9n,104p,1689b,493s stack positions out of 5000i,500n,10000p,200000b,80000s
+{c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}<c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on escar.pdf (10 pages, 1695082 bytes).
 PDF statistics:
- 230 PDF objects out of 1000 (max. 8388607)
+ 232 PDF objects out of 1000 (max. 8388607)
  192 compressed objects within 2 object streams
- 52 named destinations out of 1000 (max. 500000)
- 81581 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 50 named destinations out of 1000 (max. 500000)
+ 76973 words of extra memory for PDF output out of 89155 (max. 10000000)
 

@@ -1,4 +1,4 @@
-\documentclass[letterpaper,twocolumn,12pt]{article}
+\documentclass[letterpaper,twocolumn,10pt]{article}
 \usepackage{usenix-2020-09}
 \usepackage{tikz}
 \usepackage{amsmath}
@@ -104,16 +104,10 @@ The Controller is the user's interface to the CANLay system and enables vehicle 
 It does so by communicating with the central Server over hypertext transfer protocol secure (HTTPS). 
 Once the experiment setup is completed the Controller transitions to acting as a gateway for a graphical vehicle simulator to communicate bi-directionally with the CANLay system. It forwards simulator outputs to the publish/subscribe (pub/sub) endpoint and listens for CAN messages from the same.
 
-Add some implementation details - like python, thread etc.
-The real-time clock on the Controller is synchronized through the network time protocol (NTP).
-
 The Controller is a multi-threaded graphical application built using python. It is in charge of managing three main subcomponents: the vehicle simulator, the Network Designer, and the Network Health Monitor. The Controller manages the execution of the Vehicle Simulator so that it stay "in-step" with the flow of signals the Vehicle Simulator produces. The Controller ensures that it stays "in-step" with the Vehicle Simulator by managing all its Inter-Process Communication sockets with Selectors. Selectors enable the Controller to immediately know once the Vehicle Simulator has sent a new set of signals. By managing all the various sockets the Controller uses with Selectors its able to multiplex the streams of information effectively. In addition, the Controller manages the Network Designer and the associated request of the user. To do so the Controller maintains a persistent TCP connection with the Server. Using the same Selectors as mentioned before its able to efficiently relay network design requests to the Server and displaying the Server's responses. Also, the Contoller is in charge of maintaining the overall network health report for the system and displaying the statistics to the user. The Controller implements NTP to ensure that timestamps used for network analysis are accurate among the other devices in the session. In turn this ensures that the network statistics collected are accurate as well. Unlike the other devices in the session the Controller is in charge of aggregating the network reports from every device in a session and presenting them to the user.
 
 \subsubsection{Server}
 The Server helps in setting up the publishers and subscribers for an experiment. Each device opens and must maintain a persistent transmission control protocol (TCP) connection with the Server while they participate in the CANLay system. Once the TCP connection is established the devices communicate with the Server through HTTP application programming interfaces (API). The Server can monitor the health of the devices and take actions if a device is malfunctioning or goes offline. This also allows the Server to keep track of free devices and free pub/sub endpoints, so it can validate new experiment requests and allocate the requested devices and endpoints without running into race conditions or double use issues that may arise if each Controller was in charge of allocating its own experiment. Finally, the Server keeps track of ongoing experiments and ensures the proper closure of a experiment in the event a device is experiencing issues.
-
-Add some implementation details - like python, thread etc. Sockets.
-The Server accepts HTTP API calls. API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it.
 
 The Server is a single-threaded session broker than multiplexes the handling of HTTP API calls through the use of Selectors. HTTP API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it. The devices perform all necessary setup and teardown actions such as registering, deregistering, starting and stoping a session, by sending HTTP requests to different API endpoints. The Server responds to these requests using standard HTTP response messages and codes which can be easily interpreted by both the devices and users.
 
@@ -141,6 +135,7 @@ CANLay provides two front-end components: network designer and network health mo
 %TODO Provide a snapshot of the network design input UI
 Caption for the network designer UI: Currently the network designer is controlled through the command line but in the future a GUI will be added that performs the same function.
 %TODO Provide a snapshot of the network health monitor
+
 Due to the broadcast nature of CAN, the Network Designer consists only of a Catalog of available devices and the ability to select the requested devices. Upon start up the Controller contacts the Server and requests the lastest set of avaialble devices. The Controller then presents these options to the user and allows them to select the request devices.
 
 The Network Health monitor shows real time network statistics that describe the current state of the network. These statistics are presented using heat matrices. Each cell in the matric represents a direct edge of the network. The heat matrix colors in the cells depending on their values. For packet loss, latency, and jitter the lower the number the better and the lighter the color will be. For goodput the higher the number the better and the lighter the color will be. The contrast between the light and dark colors allows the user to quickly spot parts of the network that are underperforming.
@@ -207,7 +202,7 @@ Before we can transform graphical vehicle simulator signals into CAN messages, t
 Once an active session has been established the Controller will begin forwarding sensor frames to the multicast endpoint. Before sending out the sensor frame the Controller will add a frame number to the message and increment it by 1. When SSSFs send out CAN messages they’ll include the last frame number they saw in the message. This creates an acknowledgment feedback loop which enables the Controller to tell which devices have received a frame and when a frame has been completely lost without having to send any extra messages.
 
 Before starting the session the Controller lets the user select the maximum number of retransmissions which is then used to calculate the timeout value of a Sensor frame. The timeout value is calculated as follows: %idk how to do math in Latex yet
- 1/\(simulator_frame_rate * max_retransmitions\).
+ $1/(simulator\_frame\_rate * max\_retransmitions)$.
 Once the controller has detected that the last frame has timed out, it’ll repeat the process until it either receives a CAN message where the message frame number is equal to the current frame number or it reaches the maximum number of retransmissions. In the later case, the frame is considered to be lost and the number of lost simulator frames is incremented by 1.
 
 On the SSSF side, when it receives a frame it first sets its last seen frame number to the message frame number. Next the SSSF will apply any necessary transformations to the Sensor frame before sending it on to the CAN network. For the purposes of this paper the transformations served mainly as a proof of concept and were kept simple, often sending just the raw sensor value in with the close matching PGN CAN frame.
@@ -262,6 +257,40 @@ The next important metric included in the COMMBlock messages is a timestamp. Tim
 Overall, these indicators enable each device to calculate four network statistics for every other device on the network namely packet loss, latency, jitter, and goodput. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes for a message to go from the sender to its receiver. Jitter is the variance in latency. There are many different types of network jitter but we use the simplest form which is often called packet jitter or constant jitter which is defined as “packet jitter or packet delay variation (PDV) is the variation in latency as measured in the variability over time of the end-to-end delay across a network” (cite https://networkencyclopedia.com/jitter/). Goodput is the measurement of application level throughput. In our case it is calculated in bytes per second.
 
 Every second the Controller sends out a type 3 message which requests the health report from each device. After each device has sent their health report to the Controller they reset their statistics, keeping only the last message timestamp and the last seen sequence number. This effectively creates a measurement period of 1 second. As the Controller receives the health reports, it updates the network statistic data structure and displays the new results to the user. By collecting health reports from each network node we are able to get the statistics about a network edge from devices on each side of that network edge (how do I explain the importance of the network stats matrix better?).
+
+\begin{verbatim}
+NetworkStats::update(index, packetSize, timestamp, sequenceNumber)
+{
+    now = timeClient->getEpochTimeMS();
+    delay = now - timestamp;
+    ellapsedSeconds = (now - HealthBasics[index].lastMessageTime) / 1000.0;
+
+    calculate(HealthReport[index].latency, abs(delay));
+    calculate(HealthReport[index].jitter, HealthReport[index].latency.variance);
+
+    // If no packet loss then sequence number = last sequence number + 1
+    packetsLost = sequenceNumber - (Basics[index].lastSequenceNumber + 1);
+    // If packetsLost is negative then this indicates duplicate or out of order frame.
+    HealthReport[index].packetLoss += (packetsLost > 0) ? packetsLost : 0;
+
+    calculate(HealthReport[index].goodput, (packetSize * 8) / ellapsedSeconds);
+    
+    HealthBasics[index].lastMessageTime = now;
+    HealthBasics[index].lastSequenceNumber = sequenceNumber;
+}
+
+NetworkStats::calculate(HealthCore &edge, n)
+{// From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+    edge.min = min(edge.min, n);
+    edge.max = max(edge.max, n);
+    edge.count++;
+    delta = n - edge.mean;
+    edge.mean += delta / edge.count;
+    delta2 = n - edge.mean;
+    edge.sumOfSquaredDifferences += delta * delta2;
+    edge.variance = edge.sumOfSquaredDifferences / edge.count;
+}
+\end{verbatim}
 
 
 \section{Usage Example}\label{sec:usage}
