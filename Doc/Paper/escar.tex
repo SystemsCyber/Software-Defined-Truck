@@ -107,11 +107,15 @@ Once the experiment setup is completed the Controller transitions to acting as a
 Add some implementation details - like python, thread etc.
 The real-time clock on the Controller is synchronized through the network time protocol (NTP).
 
+The Controller is a multi-threaded graphical application built using python. It is in charge of managing three main subcomponents: the vehicle simulator, the Network Designer, and the Network Health Monitor. The Controller manages the execution of the Vehicle Simulator so that it stay "in-step" with the flow of signals the Vehicle Simulator produces. The Controller ensures that it stays "in-step" with the Vehicle Simulator by managing all its Inter-Process Communication sockets with Selectors. Selectors enable the Controller to immediately know once the Vehicle Simulator has sent a new set of signals. By managing all the various sockets the Controller uses with Selectors its able to multiplex the streams of information effectively. In addition, the Controller manages the Network Designer and the associated request of the user. To do so the Controller maintains a persistent TCP connection with the Server. Using the same Selectors as mentioned before its able to efficiently relay network design requests to the Server and displaying the Server's responses. Also, the Contoller is in charge of maintaining the overall network health report for the system and displaying the statistics to the user. The Controller implements NTP to ensure that timestamps used for network analysis are accurate among the other devices in the session. In turn this ensures that the network statistics collected are accurate as well. Unlike the other devices in the session the Controller is in charge of aggregating the network reports from every device in a session and presenting them to the user.
+
 \subsubsection{Server}
 The Server helps in setting up the publishers and subscribers for an experiment. Each device opens and must maintain a persistent transmission control protocol (TCP) connection with the Server while they participate in the CANLay system. Once the TCP connection is established the devices communicate with the Server through HTTP application programming interfaces (API). The Server can monitor the health of the devices and take actions if a device is malfunctioning or goes offline. This also allows the Server to keep track of free devices and free pub/sub endpoints, so it can validate new experiment requests and allocate the requested devices and endpoints without running into race conditions or double use issues that may arise if each Controller was in charge of allocating its own experiment. Finally, the Server keeps track of ongoing experiments and ensures the proper closure of a experiment in the event a device is experiencing issues.
 
 Add some implementation details - like python, thread etc. Sockets.
 The Server accepts HTTP API calls. API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it.
+
+The Server is a single-threaded session broker than multiplexes the handling of HTTP API calls through the use of Selectors. HTTP API calls were chosen because they clearly define the object to invoke and the manner in which to invoke it. The devices perform all necessary setup and teardown actions such as registering, deregistering, starting and stoping a session, by sending HTTP requests to different API endpoints. The Server responds to these requests using standard HTTP response messages and codes which can be easily interpreted by both the devices and users.
 
 % \subsubsection{Vehicle Simulator}
 % In theory, the Vehicle Simulator can be any software that provides the user with the ability to control a vehicle in a digital world. To be compatible with CANLay, the Vehicle Simulator must expose its operating signals in some manner. For the purpose of this paper, we chose the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
@@ -135,7 +139,11 @@ At this time we have chosen UDP multicasting as a suitable pub/sub mechanism as 
 \subsubsection{Front-End Components}
 CANLay provides two front-end components: network designer and network health monitor. Figures -- and -- show the snapshots of each ofn these components. 
 %TODO Provide a snapshot of the network design input UI
+Caption for the network designer UI: Currently the network designer is controlled through the command line but in the future a GUI will be added that performs the same function.
 %TODO Provide a snapshot of the network health monitor
+Due to the broadcast nature of CAN, the Network Designer consists only of a Catalog of available devices and the ability to select the requested devices. Upon start up the Controller contacts the Server and requests the lastest set of avaialble devices. The Controller then presents these options to the user and allows them to select the request devices.
+
+The Network Health monitor shows real time network statistics that describe the current state of the network. These statistics are presented using heat matrices. Each cell in the matric represents a direct edge of the network. The heat matrix colors in the cells depending on their values. For packet loss, latency, and jitter the lower the number the better and the lighter the color will be. For goodput the higher the number the better and the lighter the color will be. The contrast between the light and dark colors allows the user to quickly spot parts of the network that are underperforming.
 % A large drawback of connecting devices over a shared/multipurpose network is the increase of networking delays. When a user creates a virtual test bed using CARLay they are logically forming a virtual network for that experiment, but physically each device is still connected to the same network as before. As a result, communication between devices in a virtual test bed could suffer from network delays that are out of the user’s control. 
 % The Network Health Monitor provides the user with useful information about the current status of the network so they can ensure that the current network conditions are not affecting their results. 
 % The network information is gathered from the perspective of all devices in a experiment rather than collecting it from just the perspective of the Controller. This provides a more full view of the current state of the network.
@@ -151,19 +159,14 @@ CANLay provides two front-end components: network designer and network health mo
 While the Server is up and running SSSFs connect to it. SSSFs perform a setup(the) procedure by reading their inbuilt SD card. The type, year, make, model and a serial number of the connected ECUs are required to be included in a predefined file stored on the SD card. 
 Next, the SSSF gathers its MAC address and list of attached devices into a JSON and sends it to the Server via a POST to the HTTP API endpoint $\textbackslash$ \textit{SSSF} $\textbackslash$ \textit{Register}. 
 % The Server will parse and validate the registration. If the registration is satisfactory, it will reply with a code 202 indicating to the SSSF that it has successfully registered with the Server. 
-% If the registration data contains invalid data such as a  attached device, or invalid JSON the Server will respond with the appropriate error code and drop the connection. 
-If the registration fails, the Server responds with an HTTP 202 error code. Otherwise, the SSSF waits for further instructions from the Server on its TCP/HTTPS port. 
+% If the registration data contains invalid data such as a  attached device, or invalid JSON the Server will respond with the appropriate error code and drop the connection.
+If the registration fails, the Server responds with a HTTP 4XX error code which indicates to the device why its registration failed. Otherwise, the Server responses with a HTTP 202 code indicating the SSSF was accepted. Once successfully registered the SSSF waits for further instructions from the Server on its TCP/HTTPS port. 
 
 The Controller begins by registering with the Server in a similar manner to the SSSF except that the Controller has no attached devices so it only sends its MAC address to the Server.
 % The Server will once again pars/e and validate the registration and respond with the appropriate code. If the Controller successfully registered then it proceeds to make a “GET” to the HTTP API endpoint “\\SSSF”. 
-It asks the Server for a list of all of the available SSSF devices. Please note that if a SSSF device is currently being used in another experiment it is not considered available. After the Controller has received the list of available devices it presents the available ECUs to the user. Notice that while the Server deals with the SSSF devices a user will typically only be interested in the ECUs that the SSSF is acting as a gateway for. After the user finalizes their selection the Controller sends the selected devices via HTTP POST.
+Once successfully registered the controller asks the Server for a list of all of the available SSSF devices. Please note that if a SSSF device is currently being used in another experiment it is not considered available. After the Controller has received the list of available devices it presents the available ECUs to the user via the Network Designer described above. Notice that while the Server deals with the SSSF devices a user will typically only be interested in the ECUs that the SSSF is acting as a gateway for. After the user finalizes their selection the Controller sends the selected devices to the Server via a HTTP POST.
 
-When the Server receives a experiment request it first checks to make sure that the request is coming from a registered Controller. 
-Next the Server confirms that the devices are still available. 
-If any of the devices are no longer available or become unavailable during the experiment setup process, the Server responds to the Controller with the error code 409 indicating there's a conflict in the selection. 
-If the Controller receives this message it starts the experiment selection processes over again. 
-If all of the devices are still available the Server then selects an available pub/sub endpoint for the experiment and assigns an index to each device. The index is used in the collection of network statistics which will be explained later on. 
-At this time the Server sends the connection data to the Controller and selected SSSFs. Connection data contains the unique ID and index of the device, a multicast IP address and port acting as the pub/sub endpoint, and a list containing the ID and attached devices of other nodes in the experiment.
+When the Server receives an experiment request it first checks to make sure that the request is coming from a registered Controller. Next the Server confirms that the devices are still available. If any of the devices are no longer available or become unavailable during the experiment setup process, the Server responds to the Controller with the error code 409 indicating there's a conflict in the selection. If the Controller receives this message it starts the experiment selection processes over again. If all of the devices are still available the Server then selects an available pub/sub endpoint for the experiment and assigns an index to each device. The index is used in the collection of network statistics which will be explained later on. At this time the Server sends the connection data to the Controller and selected SSSFs. Connection data contains the unique ID and index of the device, a multicast IP address and port acting as the pub/sub endpoint, and a list containing the ID and attached devices of other nodes in the experiment.
 
 Once endpoints receives the multicast IP addresses they resync with NTP, allocate space for the required data structures, and begin listening for and forwarding messages to and from the pub/sub endpoint. At this point the experiment setup is completed.
 
@@ -187,12 +190,28 @@ Once endpoints receives the multicast IP addresses they resync with NTP, allocat
 \end{figure}
 \subsubsection{Signal Transmission (ref. \ref{fig:sig_x})} \label{sec:sig_x}
 
+
+
+
+
 \begin{figure*}[t!]
     \centering
     \includegraphics[scale=0.8]{out/images/can_exchange/can_exchange.png}
     \caption{CAN Communication Activity}
     \label{fig:can_x}
 \end{figure*}
+
+The CANLay framework lays the foundation for X-in-the-loop simulation and testing.
+Before we can transform graphical vehicle simulator signals into CAN messages, there must first be a way for the in-game signals to reach the SSSF simulator and the CANLay framework achieves just that. 
+
+Once an active session has been established the Controller will begin forwarding sensor frames to the multicast endpoint. Before sending out the sensor frame the Controller will add a frame number to the message and increment it by 1. When SSSFs send out CAN messages they’ll include the last frame number they saw in the message. This creates an acknowledgment feedback loop which enables the Controller to tell which devices have received a frame and when a frame has been completely lost without having to send any extra messages.
+
+Before starting the session the Controller lets the user select the maximum number of retransmissions which is then used to calculate the timeout value of a Sensor frame. The timeout value is calculated as follows: %idk how to do math in Latex yet
+ 1/\(simulator_frame_rate * max_retransmitions\).
+Once the controller has detected that the last frame has timed out, it’ll repeat the process until it either receives a CAN message where the message frame number is equal to the current frame number or it reaches the maximum number of retransmissions. In the later case, the frame is considered to be lost and the number of lost simulator frames is incremented by 1.
+
+On the SSSF side, when it receives a frame it first sets its last seen frame number to the message frame number. Next the SSSF will apply any necessary transformations to the Sensor frame before sending it on to the CAN network. For the purposes of this paper the transformations served mainly as a proof of concept and were kept simple, often sending just the raw sensor value in with the close matching PGN CAN frame.
+
 \subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
 % In order to create the simulated CAN network of ECUs, the devices must be able to communicate with each other with minimum per
 % as if they were talking via a CAN bus. 
