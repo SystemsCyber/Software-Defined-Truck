@@ -1,0 +1,45 @@
+@startuml
+' skinparam maxmessagesize 15
+collections SSSFs
+SSSFs -> SSSFs: setup()
+SSSFs ->> Server: Connect()
+Controller -> Server: Register()
+loop
+Server -> Controller: Available ECU descriptions
+Controller -> Server: Desired network configuration
+alt request_evaluation()
+hnote over Server: break
+end
+end
+Server -> Controller: Connection data
+par
+loop for each selected SSSF
+Server -> SSSFs: Connection data
+hnote over SSSFs: Transmit CAN frames
+end
+else
+hnote over Controller
+Configure and launch simulator
+Wait for first simulator signal
+endhnote
+end
+@enduml
+
+' @startuml
+' collections SSSFs
+' SSSFs ->> Server: Connect
+' Controller -> Server: Connect
+' Server -> Controller: Available\nECU\ndescriptions
+' Controller -> Server: Desired\nnetwork\nconfiguration
+' Server -> Server: request_\nevaluation()
+' Server -> Controller: Multicast\nendpoint(s)
+' par
+' loop for each selected SSSF
+' Server -> SSSFs: Multicast\nendpoint(s)
+' hnote over SSSFs: Transmit\nCAN frames
+' end
+' else
+' Controller -> Controller: Configure\nand\nlaunch\nsimulator
+' Controller -> Controller: Wait\nfor first\nsimulator\nsignal
+' end
+' @enduml
