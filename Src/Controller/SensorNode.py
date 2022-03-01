@@ -60,6 +60,7 @@ class Member_Node():
         self.id = _id
         self.devices = _devices
         self.last_received_frame = 1
+        self.last_seq_num = 1
         self.health_report = None
 
 
@@ -82,7 +83,6 @@ class SensorNode(CANNode):
         self.frame_number = 0
         self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
         self._signal_offset = self.comm_head_size + 4
-
         self.times_retrans = 0
 
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
@@ -108,7 +108,6 @@ class SensorNode(CANNode):
         self.frame_number += 1
         msg = COMMBlock(self.index, self.frame_number, self.time_client.time_ms(), 2,
                         WCOMMFrame(WCANBlock(), WSenseBlock(l, signals)))
-        # print(f"Packed Frame: {self.frame_number} at: {time()}")
         return bytes(msg)[:self._signal_offset] + struct.pack(f"<{l}f", *signals)
 
     def write(self, *msg: bytes) -> int:
@@ -125,9 +124,10 @@ class SensorNode(CANNode):
             if buffer and len(buffer) >= sizeof(COMMBlock):
                 msg = COMMBlock.from_buffer_copy(buffer)
                 self.members[msg.index].last_received_frame = msg.frame_number
+                if msg.type == 1:
+                    self.members[msg.index].last_seq_num = msg.frame.canFrame.sequence_number
                 if msg.frame_number == self.frame_number:
                     self._timeout = None
-                # print(f"recvd frame: {msg.frame_number} current: {self.frame_number} at: {time()}")
                 return msg, buffer
             else:
                 return (None, None)
@@ -137,10 +137,7 @@ class SensorNode(CANNode):
             return (None, None)
 
     def __recvd_frame(self, member: Member_Node, now: float) -> bool:
-        not_recvd = member.last_received_frame != self.frame_number
-        # print(f"member.last_recv_frame: {member.last_received_frame} current frame_number: {self.frame_number}")
-        # print(f"Retrans. Last: {member.last_received_frame} Current: {self.frame_number} at: {time()}")
-        if not_recvd:
+        if member.last_received_frame != self.frame_number:
             if self._attempts <= self._max_retransmissions:
                 self.times_retrans += 1
                 self._timeout = now + self.timeout_additive

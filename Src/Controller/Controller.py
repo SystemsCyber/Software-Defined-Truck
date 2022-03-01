@@ -19,24 +19,26 @@ class Controller(SensorNode, HTTPClient):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._last_request = time()
-        self.number_of_dropped_carla_frames = 0
-        self.number_of_dropped_can_frames = 0
-        self.total_can_frames = 0
+        self._just_packed_frame = False
 
     def __request_health(self, now: float) -> None:
         if (now - self._last_request) >= 1.0:
             self._last_request = now
             msg = COMMBlock(self.index, self.frame_number,
                             int(now * 1000), 3, WCOMMFrame())
-            print("Controller Health Report: ")
-            for i in range(len(self.members)):
-                print(self.network_stats.health_report[i])
-            if (self.network_stats.health_report[1].packetLoss > 0) and (self.network_stats.health_report[1].packetLoss < 100):
-                self.number_of_dropped_can_frames += self.network_stats.health_report[1].packetLoss
-            if (self.network_stats.health_report[1].latency.count > 0) and (self.network_stats.health_report[1].latency.count < 1000):
-                self.total_can_frames += self.network_stats.health_report[1].latency.count
             self.health_report.update(
-                self.index, self.network_stats.health_report)
+                self.index, self.network_stats.health_report, self.frame_number)
+            self._health_queue.put(
+                SimpleNamespace(
+                    sim_frames=self.health_report.sim_frames,
+                    can_frames=self.health_report.can_frames,
+                    dropped_sim_frames=self.health_report.dropped_sim_frames,
+                    dropped_can_frames=self.health_report.dropped_can_frames,
+                    packet_loss=self.health_report.packet_loss,
+                    latency=self.health_report.latency,
+                    jitter=self.health_report.jitter,
+                    goodput=self.health_report.goodput
+                ))
             self.network_stats.reset()
             self.can_key.data.callback = self.write
             self.can_key.data.message = bytes(msg)
@@ -71,10 +73,13 @@ class Controller(SensorNode, HTTPClient):
             for key, mask in connection_events:
                 callback = key.data.callback
                 callback(key)
-            now = time()
-            self.check_members(now)
-            self.__request_health(now)
-            self.time_client.update(now)
+            if self._just_packed_frame:
+                self._just_packed_frame = False
+            else:
+                now = time()
+                self.check_members(now)
+                self.__request_health(now)
+                self.time_client.update(now)
 
     def __request_devices(self, req: list, devices: list, conn: Connection) -> List[int]:
         if self.request_devices(req, devices):
@@ -111,7 +116,7 @@ class Controller(SensorNode, HTTPClient):
                 "One or more numbers entered do not correspond"
                 " with the available devices."
             ), tw.red)
-            return self.__request_user_input(available)
+            return self.__request_user_input(available, conn)
 
     def __request_available_devices(self, conn: Connection) -> List[int]:
         available_devices = self.get_devices()
@@ -139,10 +144,18 @@ class Controller(SensorNode, HTTPClient):
         else:
             tw.write("Exiting", tw.red)
 
-    def start(self, port: int, running: Event, log_queue: Queue, log_level=logging.DEBUG) -> None:
+    def start(
+            self,
+            port: int,
+            running: Event,
+            log_queue: Queue,
+            health_queue: Queue,
+            log_level=logging.DEBUG
+            ) -> None:
         root = logging.getLogger()
         root.addHandler(QueueHandler(log_queue))
         root.setLevel(log_level)
+        self._health_queue = health_queue
         authkey = current_process().authkey
         conn = Client(('localhost', port), authkey=authkey)
         data = SimpleNamespace(callback=self.__write_signals)
@@ -159,7 +172,7 @@ class Controller(SensorNode, HTTPClient):
                 pprint(request_data)
                 self.start_session(ip, port, request_data)
                 self.network_stats = NetworkStats(len(self.members), self.time_client)
-                self.health_report = HealthReport(len(self.members))
+                self.health_report = HealthReport(self.members)
                 self._last_request = time() + 10  # Time to sync with NTP server
                 tw.write("Starting the session!", tw.yellow)
             else:
@@ -176,7 +189,6 @@ class Controller(SensorNode, HTTPClient):
     def write(self, *key) -> None:
         if isinstance(key[0], sel.SelectorKey):
             super().write(key[0].data.message)
-            # print(f"Sent frame: {self.frame_number} at: {time()}")
             key[0].data.callback = self.read
             self.sel.modify(key[0].fileobj, sel.EVENT_READ, key[0].data)
         elif self.session_status == self.SessionStatus.Active:
@@ -184,36 +196,39 @@ class Controller(SensorNode, HTTPClient):
             self.can_key.data.message = self.packSensorData(*key)
             self.sel.modify(self.can_key.fileobj,
                             sel.EVENT_WRITE, self.can_key.data)
+            self._just_packed_frame = True
+
+    def __read_type_1(self, msg: COMMBlock, buffer: bytes) -> None:
+        self.network_stats.update(
+            msg.index,
+            len(buffer),
+            msg.timestamp,
+            msg.frame.canFrame.sequence_number
+        )
+        if int(msg.frame.canFrame.frame.can.can_id) == int(0x18F00300 ^ 0x1FFFFFFF):
+            print(f"CAN ID: {hex(msg.frame.canFrame.frame.can.can_id ^ 0x1FFFFFFF)}", end=" ")
+            for i in range(msg.frame.canFrame.frame.can.len):
+                end = "\n" if i == 7 else " "
+                print(msg.frame.canFrame.frame.can.buf[i], end=end)
+
+    def __read_type_4(self, msg: COMMBlock, buffer: bytes) -> None:
+        report = self.health_report.report.from_buffer_copy(
+            buffer, self.comm_head_size)
+        self.health_report.update(
+            msg.index,
+            report,
+            self.members[msg.index].last_seq_num
+            )
 
     def read(self, key: sel.SelectorKey) -> None:
         msg, buffer = super().read()
-        if msg:
-            if msg.type == 1:
-                self.network_stats.update(
-                    msg.index,
-                    len(buffer),
-                    msg.timestamp,
-                    msg.frame.canFrame.sequence_number
-                )
-                # print(msg)
-                # print(f'Frame Number: {msg.frame_number} Count: {self.network_stats.health_report[1].latency.count} SeqNum: {msg.frame.canFrame.sequence_number}')
-            elif msg.type == 4:
-                report = self.health_report.report.from_buffer_copy(
-                    buffer, self.comm_head_size
-                )
-                print("Received Health Report: ")
-                for i in range(len(self.members)):
-                    print(report[i])
-                if (report[0].packetLoss > 0) and (report[0].packetLoss < 100):
-                    self.number_of_dropped_carla_frames += report[0].packetLoss
-                self.health_report.update(msg.index, report)
+        if msg and msg.type == 1:
+            self.__read_type_1(msg, buffer)
+        elif msg and msg.type == 4:
+            self.__read_type_4(msg, buffer)
 
     def stop(self, ipc_conn=None, notify_server=True):
-        print(f"Dropped Carla Frames: {self.number_of_dropped_carla_frames}")
-        print(f"Dropped Can Frames: {self.number_of_dropped_can_frames}")
-        print(f"Times Carla Frames Retransmitted: {self.times_retrans}")
-        print(f"Total Carla Frames: {self.frame_number}")
-        print(f"Total Can Frames: {self.total_can_frames}")
+        logging.info(f"Simulator Frame Retransmissions: {self.times_retrans}")
         if ipc_conn:
             self.sel.unregister(ipc_conn)
         self.do_DELETE()

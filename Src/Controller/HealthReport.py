@@ -1,12 +1,13 @@
 import copy
 from ctypes import Structure, c_float, c_uint32
 from dataclasses import dataclass
-from time import time
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from pandas import DataFrame
 
+from SensorNode import Member_Node
 from Time_Client import Time_Client
+
 
 @dataclass
 class HealthBasics:
@@ -66,22 +67,25 @@ class NetworkStats:
     def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
         now = self.time_client.time_ms()
         delay = now - timestamp
-        # print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
-        ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000.0
-        if ellapsedSeconds == 0.0:
-            ellapsedSeconds = 0.0001  # Retransmission
+        # if these numbers are zero then this is the first messages we've received
+        if (self.basics[i].last_message_time != 0) and (self.basics[i].last_sequence_number != 0):
+            # print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
+            ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000.0
+            if ellapsedSeconds == 0.0:
+                ellapsedSeconds = 0.0001  # Retransmission
 
-        self.calculate(self.health_report[i].latency, abs(delay))
-        self.calculate(
-            self.health_report[i].jitter, self.health_report[i].latency.variance)
-        # If no packet loss then sequence number = last sequence number + 1
-        packetsLost = sequence_number - (self.basics[i].last_sequence_number + 1)
-        # If packetsLost is negative then this usually indicates duplicate or
-        # out of order frame.
-        self.health_report[i].packetLoss += packetsLost if packetsLost > 0 else 0
-        
-        self.calculate(
-            self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
+            self.calculate(self.health_report[i].latency, abs(delay))
+            self.calculate(
+                self.health_report[i].jitter, self.health_report[i].latency.variance)
+            # If no packet loss then sequence number = last sequence number + 1
+            packetsLost = sequence_number - \
+                (self.basics[i].last_sequence_number + 1)
+            # If packetsLost is negative then this usually indicates duplicate or
+            # out of order frame.
+            self.health_report[i].packetLoss += packetsLost if packetsLost > 0 else 0
+
+            self.calculate(
+                self.health_report[i].goodput, (packet_size * 8) / ellapsedSeconds)
 
         self.basics[i].last_message_time = now
         self.basics[i].last_sequence_number = sequence_number
@@ -108,12 +112,16 @@ class NetworkStats:
 
 
 class HealthReport:
-    def __init__(self, _num_members: int) -> None:
+    def __init__(self, _members: List[Member_Node]) -> None:
+        _num_members = len(_members)
+        self._members = _members
         self.report = NodeReport * _num_members
-        self._members = range(_num_members)
         zero_matrix = [[0.0] * _num_members] * _num_members
         base_frame = DataFrame(
-            zero_matrix, columns=self._members, index=self._members)
+            zero_matrix,
+            columns=self.__create_axis_names(),
+            index=self.__create_axis_names()
+        )
         base_dict = {
             "count": base_frame.copy(deep=True),
             "min": base_frame.copy(deep=True),
@@ -122,23 +130,67 @@ class HealthReport:
             "variance": base_frame.copy(deep=True),
             "sumOfSquaredDifferences": base_frame.copy(deep=True)
         }
+        self.can_frames_per_device = [0] * _num_members
+        self.sim_frames = 0
+        self.can_frames = 0
+        self.dropped_sim_frames = 0
+        self.dropped_can_frames = 0
         self.packet_loss = base_frame.copy(deep=True)
         self.latency = copy.deepcopy(base_dict)
         self.jitter = copy.deepcopy(base_dict)
         self.goodput = copy.deepcopy(base_dict)
 
-    def __update(self, measure: Dict[str, DataFrame], index: Tuple[int, int], reported: HealthCore) -> None:
-        measure["count"].loc[index[0], index[1]] = reported.count
-        measure["min"].loc[index[0], index[1]] = reported.min
-        measure["max"].loc[index[0], index[1]] = reported.max
-        measure["mean"].loc[index[0], index[1]] = reported.mean
-        measure["variance"].loc[index[0], index[1]] = reported.variance
-        measure["sumOfSquaredDifferences"].loc[index[0],
-                                               index[1]] = reported.sumOfSquaredDifferences
+    # From:
+    # https://stackoverflow.com/questions/2837409/how-to-append-count-numbers-to-duplicates-in-a-list-in-python
+    def __rename_duplicates(self, old):
+        seen = {}
+        for x in old:
+            if x in seen:
+                seen[x] += 1
+                yield f"{x}{seen[x]}"
+            else:
+                seen[x] = 0
+                yield x
 
-    def update(self, index: int, report):
+    def __create_axis_names(self) -> list:
+        axis_names = []
         for i in self._members:
-            self.packet_loss.loc[index, i] = report[i].packetLoss
+            combined_device_name = ""
+            if isinstance(i.devices[0], dict):
+                for j in i.devices:
+                    if j == i.devices[-1]:
+                        combined_device_name += j["Type"][0]
+                    else:
+                        combined_device_name += f"{j['Type'][0]}_"
+            else:
+                combined_device_name += i.devices[0]
+            axis_names.append(combined_device_name)
+        axis_names = list(self.__rename_duplicates(axis_names))
+        return axis_names
+
+    def __update(self, measure: Dict[str, DataFrame], index: Tuple[int, int], reported: HealthCore) -> None:
+        measure["count"].iloc[index[0], index[1]] = reported.count
+        measure["min"].iloc[index[0], index[1]] = reported.min
+        measure["max"].iloc[index[0], index[1]] = reported.max
+        measure["mean"].iloc[index[0], index[1]] = reported.mean
+        measure["variance"].iloc[index[0], index[1]] = reported.variance
+        measure["sumOfSquaredDifferences"].iloc[index[0],
+                                                index[1]] = reported.sumOfSquaredDifferences
+
+    def update(self, index: int, report, last_msg_num: int):
+        if index == 0:
+            self.sim_frames = last_msg_num
+        else:
+            self.can_frames -= self.can_frames_per_device[index]
+            self.can_frames += last_msg_num
+            self.can_frames_per_device[index] = last_msg_num
+
+        for i in range(len(self._members)):
+            self.packet_loss.iloc[index, i] = report[i].packetLoss
             self.__update(self.latency, (index, i), report[i].latency)
             self.__update(self.jitter, (index, i), report[i].jitter)
             self.__update(self.goodput, (index, i), report[i].goodput)
+            if i == 0:
+                self.dropped_sim_frames += report[i].packetLoss
+            else:
+                self.dropped_can_frames += report[i].packetLoss
