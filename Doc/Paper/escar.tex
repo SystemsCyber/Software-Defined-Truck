@@ -45,7 +45,7 @@
 %-------------------------------------------------------------------------------
 \begin{abstract}
 %-------------------------------------------------------------------------------
-Controller Area Network ...
+This paper presents the design of CANLay, the networking backbone of the Software Defined Truck \cite{mukherjee_towards_2021}, a network virtualized testbed for in-vehicle network security testing. CANLay, is responsible for carrying controller area network data as well as sensor signals emanating from the vehicle. As such, CANLay acts as a communication media between a vehicle simulator and real-world electronic control units located on different network segments. Towards the end of the paper, we present a discussion on CANLay's appication in a real-world usage scnerio.
 \end{abstract}
 
 \section{Introduction and Background}
@@ -54,7 +54,7 @@ In recent years security of the Controller Area Network (CAN) has been a much ta
 Security researchers have shown \cite{checkoway_comprehensive_2011, mukherjee_practical_2016,burakova_truck_2016} that remote interfaces on modern vehicles can be used to intrude into internal CAN networks and inject messages to control and/or disrupt the operations of the vehicle. At the same time, the development of security solutions can be pursued to detect and/or prevent this scenario from occurring.
 
 To evaluate the effectiveness of their proposed techniques, researchers have typically experimented on real-vehicles or homegrown testbed setups that mimic real vehicles. 
-While most households in the United States have at least one passenger car\footnote{\url{https://www.statista.com/statistics/551403/number-of-vehicles-per-household-in-the-united}\\\url{-states/}}, this is not the same for medium and heavy-duty (MHD) vehicles. 
+While most households in the United States have at least one passenger car \cite{mathilde_carlier_number_2021}, this is not the same for medium and heavy-duty (MHD) vehicles. 
 Moreover, creating homegrown testbeds is both logistically and economically challenging. To that end, the need for a publicly accessible testbench is imminent. This is where the concept of the Software Define Truck (SDT) \cite{mukherjee_towards_2021} is critical to the in-vehicle networking community. It aims to provide a distributed network virtualized platform on which in-vehicle security experiments can be performed. Although proposed primarily for the heavy-trucks, SDT can easily be adapted for lightweight passenger vehicles. SDT's information exchange goal is shown in figure \ref{fig:goal}. CAN frames and physical signals need to be exchanged between ECUs and vehicle simulators located in different subnetworks around the globe. CANLay is the networking backbone of the SDT and aims to provide the necessary infrastructure to enable this service.
 
 \begin{figure}[]
@@ -187,7 +187,7 @@ Once endpoints receive the connection data they resync with NTP, allocate space 
     \caption{Signal Tranmission Activity}
     \label{fig:sig_x}
 \end{figure*}
-\subsubsection{sensor Signal Communication (ref. figure \ref{fig:sig_x})} \label{sec:sig_x}
+\subsubsection{Sensor Signal Communication (ref. figure \ref{fig:sig_x})} \label{sec:sig_x}
 
 
 Once an active session has been established the Controller begins forwarding sensor signals to the pub/sub endpoint. Before sending out the sensor signals the Controller wraps them in a WsensorBlock and then a COMMBlock. There are several additional pieces of information the COMMBlock requires, but we'll focus on type and frame number for now. The type indicates the subclass that the COMMBlock is carrying. In this case the type will be 2, indicating that it is carrying a WsensorBlock. The frame number is added to the COMMBlock and is incremented by 1 every time the Controller forwards a sensor message to the CANLay network. When SSSFs send out CAN messages they’ll set their outgoing COMMBlock's frame number to the last received frame number from the Controller. When the Controller receives CAN messages, it'll read the frame number field and know the last sensor message that the SSSF received. This creates an acknowledgment feedback loop enabling the Controller to tell which devices have received a frame and when a frame has been lost. This acknowledge feedback loop is possible because CAN messages are sent at a higher rate than the sensor message are. This enables an acknowledgment mechanism that does not require any additional messages.
@@ -313,11 +313,14 @@ On the top right is the network health monitoring window. It shows four matrices
 four different metrics to estimate network health: packet loss, latency, jitter, and goodput. The significance of each of these metrics and their calculation methods were already described in the previous section. In this case, the experiment is performed over a gigabit local area network with a layer 3 switch in between an SSSF and a Controller. The figure shows no packets were lost while the latency in the last cycle of health report collection was about 4 milliseconds between the endpoints. Although CANLay does not explicitly perform any latency reducing functions, the general latency of 4 milliseconds is considered to be sustainable for seamless CARLA emulation at standard frame rates. In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparison to the latency. The goodput, i.e. the application data rate is understandably higher for the Controller as it sends WSignalBlock frames that are slightly larger than the WCANBlock frames. 
 
 \section{Conclusion and Future Work}
-In this paper, we described the concepts behind the design of CANLay, the networking backbone for the Software Defined Truck. SDT is a virtualization based experimentation framework for CAN-based security experiments and CANLay is the carrier of physical control and CAN data over long distance networks. Essentially CANLay enables network virtualization for SDT. CAN is a reliable and low-latency network. CANLay does not explicitly ensure reliability and low latency, but provides a health monitoring service that provides real-time measures of network parameters to the user. This allows the user to make critical decisions about the state of the experiment they are in.
+In this paper, we described the concepts behind the design of CANLay, the networking backbone for the Software-Defined Truck. 
+SDT is a virtualization-based experimentation framework for CAN-based security experiments and CANLay is the carrier of physical control and CAN data over long-distance networks. Essentially CANLay enables network virtualization for SDT. CAN is a reliable and low-latency network. CANLay does not explicitly ensure reliability and low latency but provides a health monitoring service that provides real-time measures of network parameters to the user. This allows the user to make critical decisions about the state of the experiment they are in.
 
-We believe more than one additional works can still be done on CANLay. 
-Need response
-Dynamic buffer adjustment
+We have identified at least three enhancements to CANLay's design that are to be pursued next. 
+Firstly, we want to enable routing of actuation signals from the ECU to the vehicle simulator such that the effect ECU actuation can be visualized. We believe that the main challenge in implementing this functionality will be to enable retransmissions. Recall that at this time, CANLay piggybacks acknowledgments on CAN frames and relies on the fact that CAN frames are transmitted by the recipient ECU at a faster rate than which signals are produced by the simulator. The recipient for the actuation signals will be the Controller, but it may not transmit periodic CAN frames at a reasonably high rate. 
+Secondly, we aim to enable a selective acknowledgment scheme for CAN frames. That is, enforce acknowledgment for some frames identified critical by the user, such as a frame requesting engine control in real-time. 
+Finally, we aim to introduce a dynamic buffer adjustment scheme when accumulating CAN frames in a WCANBlock. This is to make optimal use of the available bandwidth while supporting high CAN busloads.
+
  
 %-------------------------------------------------------------------------------
 \bibliographystyle{plain}

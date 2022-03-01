@@ -1,14 +1,14 @@
 # Fdb version 3
-["bibtex escar"] 1646136047 "escar.aux" "escar.bbl" "escar" 1646154740
+["bibtex escar"] 1646159420 "escar.aux" "escar.bbl" "escar" 1646159498
   "/usr/local/texlive/2021/texmf-dist/bibtex/bst/base/plain.bst" 1292289607 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
-  "bib.bib" 1645702377 5582 4d1ca93380bec2d4ad225106520ccb6b ""
-  "escar.aux" 1646154738 6658 35fdb107c88faa47317c010cce94279f "pdflatex"
+  "bib.bib" 1646156952 5930 2489a9294fa07237492ea47d7b418fcd ""
+  "escar.aux" 1646159468 6775 9b17cec3e19d5e4785aec8399532d744 "pdflatex"
   (generated)
-  "escar.blg"
   "escar.bbl"
-["pdflatex"] 1646154735 "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex" "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf" "escar" 1646154740
-  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux" 1646154738 6658 35fdb107c88faa47317c010cce94279f ""
-  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex" 1646154734 34312 e4d53ee1df69469fa1db51d2d9900221 ""
+  "escar.blg"
+["pdflatex"] 1646159465 "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex" "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf" "escar" 1646159498
+  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux" 1646159468 6775 9b17cec3e19d5e4785aec8399532d744 ""
+  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.tex" 1646159498 35782 19b7d3f88ce5b646d3ba637b621f8150 ""
   "/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2021/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2021/texmf-dist/fonts/tfm/adobe/symbol/psyr.tfm" 1136768653 1408 5937f58aa508ea2cea4901c07d10f5fe ""
@@ -188,10 +188,10 @@
   "/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1616695603 5169178 a2ce6e2d73f603b690db6777d06dbccb ""
   "/usr/local/texlive/2021/texmf-var/web2c/pdftex/pdflatex.fmt" 1644124039 2724736 3d0f2609279743e04f593a20f76e9ad9 ""
   "/usr/local/texlive/2021/texmf.cnf" 1616695596 577 4c1911a7228e554c6032256d3cf5567d ""
-  "escar.aux" 1646154738 6658 35fdb107c88faa47317c010cce94279f "pdflatex"
-  "escar.bbl" 1646136047 4487 946f9177e7f7b9b4d2a38ff581f189af "bibtex escar"
-  "escar.out" 1646154738 2951 03d80ea7822a4c539ff6f89b9cc7d1d7 "pdflatex"
-  "escar.tex" 1646154734 34312 e4d53ee1df69469fa1db51d2d9900221 ""
+  "escar.aux" 1646159468 6775 9b17cec3e19d5e4785aec8399532d744 "pdflatex"
+  "escar.bbl" 1646159420 4649 cf3affbf002e7316d60ad057db8299b2 "bibtex escar"
+  "escar.out" 1646159468 2951 c7882fea120d7f3566f78f17816351dc "pdflatex"
+  "escar.tex" 1646159498 35782 19b7d3f88ce5b646d3ba637b621f8150 ""
   "images/design_goal.drawio.png" 1645697657 919766 b827cdf18379d0bfa5a863d4bac440ea ""
   "images/network_designer.png" 1646115803 37011 205179063659eb2142eeeebb83a2e2b2 ""
   "images/network_matrix.png" 1646115803 55572 6b4b3f40282795fda80b7bf98f16cb10 ""
@@ -204,9 +204,9 @@
   "out/images/signal_control/signal_control.png" 1646123251 37078 a013dffdde483285eba65fa0bb90b9e5 ""
   "usenix-2020-09.sty" 1645247740 3795 62775b94e6f3aaf4bda0ce3e06335b5f ""
   (generated)
-  "escar.out"
   "escar.log"
-  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf"
+  "escar.aux"
   "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.log"
   "escar.pdf"
-  "escar.aux"
+  "escar.out"
+  "/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf"

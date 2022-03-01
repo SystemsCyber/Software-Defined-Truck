@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  1 MAR 2022 22:42
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.2.6)  2 MAR 2022 00:01
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -663,27 +663,6 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
 
 LaTeX Warning: No \author given.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 57.
-Package microtype Info: Loading generic protrusion settings for font family
-(microtype)             `pcr' (encoding: T1).
-(microtype)             For optimal results, create family-specific settings.
-(microtype)             See the microtype manual for details.
-
-Underfull \hbox (badness 10000) in paragraph at lines 57--57
-[][][][][]$\T1/pcr/m/n/10 https : / / www . statista . com / statistics / 551403 /
- []
-
 
 Underfull \hbox (badness 2600) in paragraph at lines 56--59
 []\T1/ptm/m/n/12 (+20) To eval-u-ate the ef-fec-tive-ness of their pro-
@@ -693,15 +672,20 @@ Underfull \hbox (badness 2600) in paragraph at lines 56--59
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 60.
 
-<images/design_goal.drawio.png, id=75, 360.34625pt x 193.72375pt>
+<images/design_goal.drawio.png, id=74, 360.34625pt x 193.72375pt>
 File: images/design_goal.drawio.png Graphic file (type png)
 <use images/design_goal.drawio.png>
 Package pdftex.def Info: images/design_goal.drawio.png  used on input line 62.
 (pdftex.def)             Requested size: 241.02039pt x 129.57253pt.
-[1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [1{/usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
- </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>]
+]
+Underfull \vbox (badness 2875) has occurred while \output is active []
+
 LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 75.
  (/usr/local/texlive/2021/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
@@ -710,17 +694,20 @@ File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 83.
 
-<images/system_design.drawio.png, id=103, 520.94624pt x 298.11375pt>
+<images/system_design.drawio.png, id=99, 520.94624pt x 298.11375pt>
 File: images/system_design.drawio.png Graphic file (type png)
 <use images/system_design.drawio.png>
 Package pdftex.def Info: images/system_design.drawio.png  used on input line 85.
 (pdftex.def)             Requested size: 505.89pt x 289.4975pt.
-[2] [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png>]
+[2 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/design_goal.drawio.png>]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [3 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/system_design.drawio.png>]
 
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 128.
 
-<images/network_matrix.png, id=124, 601.24625pt x 472.76625pt>
+<images/network_matrix.png, id=121, 601.24625pt x 472.76625pt>
 File: images/network_matrix.png Graphic file (type png)
 <use images/network_matrix.png>
 Package pdftex.def Info: images/network_matrix.png  used on input line 130.
@@ -729,17 +716,33 @@ Package pdftex.def Info: images/network_matrix.png  used on input line 130.
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 134.
 
-<images/network_designer.png, id=125, 508.14844pt x 266.49562pt>
+<images/network_designer.png, id=122, 508.14844pt x 266.49562pt>
 File: images/network_designer.png Graphic file (type png)
 <use images/network_designer.png>
 Package pdftex.def Info: images/network_designer.png  used on input line 136.
 (pdftex.def)             Requested size: 505.89pt x 265.31976pt.
-[4 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/network_matrix.png>]
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 137.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 137.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 137.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [4 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/network_matrix.png>]
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 144.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 144.
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 144.
+
 
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 151.
 
-<out/images/connection_setup/connection_setup.png, id=139, 589.20125pt x 573.14125pt>
+<out/images/connection_setup/connection_setup.png, id=134, 589.20125pt x 573.14125pt>
 File: out/images/connection_setup/connection_setup.png Graphic file (type png)
 <use out/images/connection_setup/connection_setup.png>
 Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 153.
@@ -749,7 +752,7 @@ Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used 
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 177.
 
-<out/images/data_structures/data_structures.png, id=153, 328.22626pt x 256.96pt>
+<out/images/data_structures/data_structures.png, id=149, 328.22626pt x 256.96pt>
 File: out/images/data_structures/data_structures.png Graphic file (type png)
 <use out/images/data_structures/data_structures.png>
 Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 179.
@@ -758,20 +761,24 @@ Package pdftex.def Info: out/images/data_structures/data_structures.png  used on
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 184.
 
-<out/images/signal_control/signal_control.png, id=154, 514.92375pt x 681.54625pt>
+<out/images/signal_control/signal_control.png, id=150, 514.92375pt x 681.54625pt>
 File: out/images/signal_control/signal_control.png Graphic file (type png)
 <use out/images/signal_control/signal_control.png>
 Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 186.
 (pdftex.def)             Requested size: 411.93954pt x 545.23775pt.
 
-Underfull \vbox (badness 5119) has occurred while \output is active []
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
+Package microtype Info: Loading generic protrusion settings for font family
+(microtype)             `pcr' (encoding: T1).
+(microtype)             For optimal results, create family-specific settings.
+(microtype)             See the microtype manual for details.
  [7 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/data_structures/data_structures.png (PNG copy)>] [8 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/signal_control/signal_control.png (PNG copy)>]
 
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 202.
 
-<out/images/can_exchange/can_exchange.png, id=172, 446.66875pt x 507.8975pt>
+<out/images/can_exchange/can_exchange.png, id=166, 446.66875pt x 507.8975pt>
 File: out/images/can_exchange/can_exchange.png Graphic file (type png)
 <use out/images/can_exchange/can_exchange.png>
 Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 204.
@@ -781,7 +788,7 @@ Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on in
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 271.
 
-<out/images/network_health/network_health.png, id=174, 343.2825pt x 288.07625pt>
+<out/images/network_health/network_health.png, id=168, 343.2825pt x 288.07625pt>
 File: out/images/network_health/network_health.png Graphic file (type png)
 <use out/images/network_health/network_health.png>
 Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 273.
@@ -791,12 +798,20 @@ Package pdftex.def Info: out/images/network_health/network_health.png  used on i
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 303.
 
-<images/usability.png, id=211, 1445.4pt x 760.34062pt>
+<images/usability.png, id=209, 1445.4pt x 760.34062pt>
 File: images/usability.png Graphic file (type png)
 <use images/usability.png>
 Package pdftex.def Info: images/usability.png  used on input line 305.
 (pdftex.def)             Requested size: 505.89pt x 266.1116pt.
-[11 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl [12 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/usability.png>]
+[11 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/out/images/network_health/network_health.png (PNG copy)>]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Underfull \hbox (badness 1360) in paragraph at lines 316--318
+\T1/ptm/m/n/12 (+20) the de-sign of CAN-Lay, the net-work-ing back-
+ []
+
+[12 </Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/images/usability.png>] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 28--32
 []\T1/ptm/m/n/12 (+20) Michael Do-er-ing and Marco Wag-ner.
  []
@@ -831,28 +846,30 @@ Underfull \hbox (badness 10000) in paragraph at lines 48--54
 \T1/ptm/m/it/12 (+20) 94th Ve-hic-u-lar Tech-nol-ogy Con-fer-ence
  []
 
-
-Underfull \hbox (badness 2689) in paragraph at lines 93--99
+[13]
+Underfull \hbox (badness 2689) in paragraph at lines 98--104
 \T1/ptm/m/n/12 (+20) Re-quire-ments Anal-y-sis and Per-for-mance
  []
 
-) [13] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
+) [14
+
+] (/Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.aux)
 Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: 03D80EA7822A4C539FF6F89B9CC7D1D7;2951.
+(rerunfilecheck)             Checksum: C7882FEA120D7F3566F78F17816351DC;2951.
  ) 
 Here is how much of TeX's memory you used:
- 23506 strings out of 478994
- 419822 string characters out of 5858185
- 1079718 words of memory out of 5000000
- 40150 multiletter control sequences out of 15000+600000
+ 23508 strings out of 478994
+ 419881 string characters out of 5858185
+ 1078715 words of memory out of 5000000
+ 40151 multiletter control sequences out of 15000+600000
  480070 words of font info for 312 fonts, out of 8000000 for 9000
  1142 hyphenation exceptions out of 8191
  113i,9n,116p,1356b,1385s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/local/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (13 pages, 1752544 bytes).
+Output written on /Users/subhojeet/Desktop/Projects/Software-Defined-Truck/Doc/Paper/escar.pdf (14 pages, 1752721 bytes).
 PDF statistics:
- 282 PDF objects out of 1000 (max. 8388607)
- 242 compressed objects within 3 object streams
- 79 named destinations out of 1000 (max. 500000)
+ 284 PDF objects out of 1000 (max. 8388607)
+ 243 compressed objects within 3 object streams
+ 80 named destinations out of 1000 (max. 500000)
  91831 words of extra memory for PDF output out of 106986 (max. 10000000)
 
