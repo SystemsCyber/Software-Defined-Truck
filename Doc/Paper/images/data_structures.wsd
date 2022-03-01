@@ -1,7 +1,7 @@
 @startuml
  hide methods
  hide circle
-     ' title <u>Communication Data Structures</u>
+    '  title <u>Communication Data Structures</u>
 
     '  class WCommBlock <<metaclass>>{
     '     uint8_t type
@@ -41,48 +41,78 @@
     ' WCommBlock <.d. WASigBlock: <<instantiate>>
     ' WCommBlock <. WCANBlock: <<instantiate>>
 
-    ' class Sequence{
-    '     uint32_t quot
-    '     uint32_t rem
-    ' }
-    abstract class WCommBlock{
+    abstract class COMMBLOCK{
+        uint32_t index
+        uint32_t frameNumber
+        uint64_t timestamp
         {abstract} #uint8_t type
-        uint8_t sid
-        uint32_t seq[2]
-        uint32_t timestamp
-        uint32_t num_items := 
-        \tuser/application \n\tdetermined
-        ' Element items[1 .. \n               num_items]
-     }
-    ' WCommBlock -> "seq" Sequence
-    class WSSigBlock{
-        type = 0
-        float items[num_items]
     }
 
-    note as N1
-    NC := number of 
-        can transmitters
-    end note
-    class WASigBlock{
-        type = 1
-        float items[num_items]
-    }
-
-    class WCANBlock{
+    class WSignalBlock{
         type = 2
-        uint32_t acks[][NC]
-        ' uint32_t tx_ack
-        ' uint32_t rx_ack
+        uint8_t num_signals
+        float* signals
     }
-    WCANBlock *-d-"1..num_items\nitems"WCANFrame 
+    COMMBLOCK <|-d- WSignalBlock
+
     class WCANFrame{
         uint32_t id
         uint8_t dlc
         uint64_t data
         char[4] iface
     }
-    WCommBlock <|-u- WSSigBlock
-    WCommBlock <|-d- WASigBlock
-    WCommBlock <|- WCANBlock
+    ' WCANFrame .|> FlexCAN.CAN_message_t
+    ' WCANFrame .|> FlexCAN.CANFD_message_t
+    class WCANBlock{
+        type = 1
+        uint32_t sequenceNumber
+        uint8_t num_items
+    }
+
+    COMMBLOCK <|-r- WCANBlock
+    WCANBlock *-d-"1..num_items"WCANFrame  
+    ' class Sequence{
+    '     uint32_t quot
+    '     uint32_t rem
+    ' }
+    ' abstract class WCommBlock{
+    '     {abstract} #uint8_t type
+    '     uint8_t sid
+    '     uint32_t seq[2]
+    '     uint32_t timestamp
+    '     uint32_t num_items := 
+    '     \tuser/application \n\tdetermined
+    '     ' Element items[1 .. \n               num_items]
+    '  }
+    ' ' WCommBlock -> "seq" Sequence
+    ' class WSSigBlock{
+    '     type = 0
+    '     float items[num_items]
+    ' }
+
+    ' note as N1
+    ' NC := number of 
+    '     can transmitters
+    ' end note
+    ' class WASigBlock{
+    '     type = 1
+    '     float items[num_items]
+    ' }
+
+    ' class WCANBlock{
+    '     type = 2
+    '     uint32_t acks[][NC]
+    '     ' uint32_t tx_ack
+    '     ' uint32_t rx_ack
+    ' }
+    ' WCANBlock *-d-"1..num_items\nitems"WCANFrame 
+    ' class WCANFrame{
+    '     uint32_t id
+    '     uint8_t dlc
+    '     uint64_t data
+    '     char[4] iface
+    ' }
+    ' WCommBlock <|-u- WSSigBlock
+    ' WCommBlock <|-d- WASigBlock
+    ' WCommBlock <|- WCANBlock
 @enduml

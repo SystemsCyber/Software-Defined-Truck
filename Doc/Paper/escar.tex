@@ -66,7 +66,7 @@ At this time, CANLay provides the following features:
 In the rest of this paper, we describe the design of CANLay (section \ref{sec:design}), provide a discussion on its usage in an example scenario (\ref{sec:usage}), and finish with conclusive remarks and future works.
 
 \section{Design and Current Development}\label{sec:design}
-\begin{figure*}[t!]
+\begin{figure*}[]
     \centering
     \includegraphics[width=\linewidth]{images/system_design.drawio.png}
     \caption{Proposed System}
@@ -121,7 +121,7 @@ At this time we have chosen UDP multicasting as a suitable pub/sub mechanism as 
 
 
 \subsubsection{Front-End Components}
-\begin{figure*}[t!]
+\begin{figure*}[]
     \centering
     \includegraphics[width=\linewidth]{images/network_designer.png}
     \caption[]{Network Designer displaying available ECUs\protect\footnotemark}
@@ -132,7 +132,7 @@ The Network Designer consists of a catalog of available devices and the ability 
 
 \footnotetext{Currently the network designer is controlled through the command line but in the future a GUI will be added that performs the same function.}
 
-\begin{figure}[t!]
+\begin{figure}[]
     \centering
     \includegraphics[width=\linewidth]{images/network_matrix.png}
     \caption[]{Network Matrices showing packet loss, latency, jitter, and goodput.}
@@ -146,7 +146,7 @@ The Network Health Monitor shows real time network statistics that describe the 
 % The Network Health Monitor provides the user with useful information about the current status of the network so they can ensure that the current network conditions are not affecting their results. 
 % The network information is gathered from the perspective of all devices in a experiment rather than collecting it from just the perspective of the Controller. This provides a more full view of the current state of the network.
 
-\begin{figure*}[t!]
+\begin{figure*}[]
     \centering
     \includegraphics[width=\linewidth]{out/images/connection_setup/connection_setup.png}
     \caption{Setup Activity}
@@ -302,7 +302,7 @@ Welford's_online_algorithm
 
 
 \section{Current Implementation}\label{sec:usage}
-\begin{figure*}[t!]
+\begin{figure*}[]
     \centering
     \includegraphics[width=\linewidth]{images/usability.png}
     \caption{CANLay at work in the Software Defined Truck}
