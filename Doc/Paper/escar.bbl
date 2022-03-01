@@ -1,0 +1,104 @@
+\begin{thebibliography}{10}
+
+\bibitem{appel_safety_2020}
+Matthew Appel, Pradeep~Sharma Oruganti, Qadeer Ahmed, Jaxon Wilkerson, and
+  Rubanraj Sekar.
+\newblock A {Safety} and {Security} {Testbed} for {Assured} {Autonomy} in
+  {Vehicles}.
+\newblock In {\em Proceedings of the {WCX} {SAE} {World} {Congress}
+  {Experience}}, page~8, 2020.
+
+\bibitem{burakova_truck_2016}
+Yelizaveta Burakova, Bill Hass, Leif Millar, and Andre Weimerskirch.
+\newblock Truck {Hacking}: {An} {Experimental} {Analysis} of the {SAE} {J1939}
+  {Standard}.
+\newblock In {\em Proceedings of the 10th {USENIX} {Conference} on {Offensive}
+  {Technologies}}, pages 211--220, Austin, TX, USA, 2016. USENIX Association.
+
+\bibitem{checkoway_comprehensive_2011}
+Stephen Checkoway, Damon McCoy, Brian Kantor, Danny Anderson, Hovav Shacham,
+  Stefan Savage, Karl Koscher, Alexei Czeskis, Franziska Roesner, and Tadayoshi
+  Kohno.
+\newblock Comprehensive {Experimental} {Analyses} of {Automotive} {Attack}
+  {Surfaces}.
+\newblock In {\em {USENIX} {Security} {Symposium}}, volume~4, pages 447--462,
+  San Francisco, CA, USA, 2011. USENIX Association.
+
+\bibitem{doering_retrofitting_nodate}
+Michael Doering and Marco Wagner.
+\newblock Retrofitting {SDN} to classical in-vehicle networks:.
+\newblock Technical report, Universit\{{\textbackslash}"a\}t
+  T\{{\textbackslash}"u\}binge.
+
+\bibitem{Dosovitskiy17}
+Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen
+  Koltun.
+\newblock {CARLA}: {An} open urban driving simulator.
+\newblock In {\em Proceedings of the 1st Annual Conference on Robot Learning},
+  pages 1--16, 2017.
+
+\bibitem{florian_polzlbauer_experience_2019}
+{Florian Polzlbauer} and {Allan Tengg}.
+\newblock Experience {Report}: {Lightweight} {Implementation} of a {Controller}
+  {Area} {Network} to {Ethernet} {Gateway}.
+\newblock In {\em Proceedings of the {Brief} {Presentation} {Track} of the
+  {RTAS}'19 {Conference}}, MONTREAL, CANADA, 2019. IEEE.
+
+\bibitem{grewe_bloomycan_2021}
+Dennis Grewe, Naresh Nayak, Deeban Babu, Wenwen Chen, Sebastian Schildt, and
+  Clemens Schroff.
+\newblock {BloomyCAN}: {Probabilistic} {Data} {Structures} for
+  {Software}-defined {Controller} {Area} {Networks}.
+\newblock In {\em 2021 {IEEE} 94th {Vehicular} {Technology} {Conference}
+  ({VTC2021}-{Fall})}, pages 1--6, 2021.
+
+\bibitem{johanson_relaying_2009}
+Mathias Johanson, Lennart Karlsson, and Tore Risch.
+\newblock Relaying {Controller} {Area} {Network} {Frames} over {Wireless}
+  {Internetworks} for {Automotive} {Testing} {Applications}.
+\newblock In {\em 2009 {Fourth} {International} {Conference} on {Systems} and
+  {Networks} {Communications}}, pages 1--5, 2009.
+
+\bibitem{kaiser_implementing_1999}
+J.~Kaiser and M.~Mock.
+\newblock Implementing the real-time publisher/subscriber model on the
+  controller area network ({CAN}).
+\newblock In {\em Proceedings 2nd {IEEE} {International} {Symposium} on
+  {Object}-{Oriented} {Real}-{Time} {Distributed} {Computing} ({ISORC}'99)
+  ({Cat}. {No}.99-61702)}, pages 172--181, 1999.
+
+\bibitem{tagarev_automotive_2021}
+Shahid Mahmood, Hoang~Nga Nguyen, and Siraj~A. Shaikh.
+\newblock Automotive {Cybersecurity} {Testing}: {Survey} of {Testbeds} and
+  {Methods}.
+\newblock In {\em Digital {Transformation}, {Cyber} {Security} and {Resilience}
+  of {Modern} {Societies}}, volume~84, pages 219--243. Springer International
+  Publishing, Cham, 2021.
+
+\bibitem{mukherjee_towards_2021}
+Subhojeet Mukherjee and Jeremy Daily.
+\newblock Towards a {Software} {Defined} {Truck}.
+\newblock In {\em Proceedings of the 31st {Annual} {INCOSE} {International}
+  {Symposium}}, page~16, Online, 2021. INCOSE.
+
+\bibitem{mukherjee_practical_2016}
+Subhojeet Mukherjee, Hossein Shirazi, Indrakshi Ray, Jeremy Daily, and Rose
+  Gamble.
+\newblock Practical {DoS} {Attacks} on {Embedded} {Networks} in {Commercial}
+  {Vehicles}.
+\newblock In {\em International {Conference} on {Information} {Systems}
+  {Security}}, pages 23--42, Jaipur, Rajasthan, India, 2016. Springer.
+
+\bibitem{rotermund_requirements_2020}
+Randolf Rotermund, Timo Häckel, Philipp Meyer, Franz Korf, and Thomas~C.
+  Schmidt.
+\newblock Requirements {Analysis} and {Performance} {Evaluation} of {SDN}
+  {Controllers} for {Automotive} {Use} {Cases}.
+\newblock In {\em 2020 {IEEE} {Vehicular} {Networking} {Conference} ({VNC})},
+  pages 1--8, 2020.
+
+\bibitem{society_of_automotive_engineers_sae_nodate}
+{Society of Automotive Engineers}.
+\newblock {SAE} {J1939} {Standards} {Collection}.
+
+\end{thebibliography}
