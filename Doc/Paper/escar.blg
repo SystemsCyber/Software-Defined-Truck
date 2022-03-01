@@ -1,0 +1,49 @@
+This is BibTeX, Version 0.99d (TeX Live 2021)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: escar.aux
+The style file: plain.bst
+Database file #1: bib.bib
+Warning--empty institution in doering_retrofitting_nodate
+Warning--empty year in doering_retrofitting_nodate
+You've used 14 entries,
+            2118 wiz_defined-function locations,
+            584 strings with 7660 characters,
+and the built_in function-call counts, 6071 in all, are:
+= -- 592
+> -- 316
+< -- 13
++ -- 125
+- -- 110
+* -- 406
+:= -- 949
+add.period$ -- 47
+call.type$ -- 14
+change.case$ -- 98
+chr.to.int$ -- 0
+cite$ -- 16
+duplicate$ -- 255
+empty$ -- 460
+format.name$ -- 110
+if$ -- 1331
+int.to.chr$ -- 0
+int.to.str$ -- 14
+missing$ -- 12
+newline$ -- 72
+num.names$ -- 28
+pop$ -- 133
+preamble$ -- 1
+purify$ -- 83
+quote$ -- 0
+skip$ -- 190
+stack$ -- 0
+substring$ -- 296
+swap$ -- 92
+text.length$ -- 13
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 56
+warning$ -- 2
+while$ -- 57
+width$ -- 16
+write$ -- 164
+(There were 2 warnings)
