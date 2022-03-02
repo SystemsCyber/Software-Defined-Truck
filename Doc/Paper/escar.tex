@@ -218,7 +218,7 @@ Once endpoints receive the connection data, they resync with NTP, allocate space
 
 \begin{figure*}[]
     \centering
-    \includegraphics[scale=0.9]{out/images/signal_control/signal_control.png}
+    \includegraphics[scale=0.8]{out/images/signal_control/signal_control.png}
     \caption{Signal Tranmission Activity}
     \label{fig:sig_x}
 \end{figure*}
@@ -313,7 +313,7 @@ These indicators enable each device to calculate four network statistics for eve
 Functions for calculating the network statistics are shown through the code listings \ref{code:calc} and \ref{code:update}, the latter being called upon receipt of every COMMBLOCK. 
 Associated data structures are shown in figure \ref{fig:network_health_ds}. The algorithm shown in listing \ref{code:calc} 
 is based on Welford's Online Algorithm \cite{welford_62}, a numerically stable algorithm.
-Such an algorithm is required when computing the running mean and variance so floating-point errors do not grow without a bound. The latency is calculated on line 5 of listing \ref{code:update} using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency we can calculate jitter using the variance in the latency as shown on line 6. Next packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. If \texttt{pcktsLost} is negative it indicates a duplicate or an out-of-order frame. In that case we neglect it.
+Such an algorithm is required when computing the running mean and variance so floating-point errors do not grow without bound. We chose to calculate the mean and variance in one pass to keep the time required for calculation within several microseconds. Storing each message's metrics and looping through the previous metrics to recalculate the mean and variance would take too long. The latency is calculated on line 5 of listing \ref{code:update} using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency, we can calculate jitter using the variance in the latency as shown on line 6. Next, packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. If \texttt{pcktsLost} is negative, it indicates a duplicate or an out-of-order frame. In that case, we neglect it.
 Afterward, we calculate goodput using the size of the packet received and the number of seconds that have elapsed since that last message.  
 %TODO a little more of the listing description could have been good. Lets wait for Dr. Daily review on this
 
@@ -334,7 +334,7 @@ On the top right is the network health monitoring window. It shows four matrices
 four different metrics to estimate network health: packet loss, latency, jitter, and goodput. The significance of each of these metrics and their calculation methods were already described in the previous section. In this case, the experiment is performed over a gigabit local area network with a Layer 3 switch in between an SSSF and a Controller. Each WCANBlock wraps exactly one CAN frame. The figure shows no packets were lost while the latency in the last cycle of health report collection was less than a milliseconds between the endpoints. 
 Although CANLay does not explicitly perform any latency-reducing functions, during this and other test scenarios, we noticed that the SSF and Controller forward information in the sub-milliseconds. Researchers before us have observed the same when designing CAN-to-ethernet gateways \cite{florian_polzlbauer_experience_2019}. In that light, the delay is purely due to transmission in the overlay. 
 A latency of less than a millisecond is considered to be sustainable for seamless CARLA emulation at standard frame rates. 
-In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparison to the latency. The goodput, i.e. the application data rate, is understandably higher for the Controller as it sends WSignalBlock frames that are slightly larger than the WCANBlock frames. 
+In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparison to the latency. The goodput, i.e. the application data rate, is understandably higher for the ECM as it sends many more frames compared to the Controller. 
 
 
 \section{Conclusion and Future Work}

@@ -34,6 +34,7 @@ class Controller(SensorNode, HTTPClient):
                     can_frames=self.health_report.can_frames,
                     dropped_sim_frames=self.health_report.dropped_sim_frames,
                     dropped_can_frames=self.health_report.dropped_can_frames,
+                    sim_retrans=self.times_retrans,
                     packet_loss=self.health_report.packet_loss,
                     latency=self.health_report.latency,
                     jitter=self.health_report.jitter,
@@ -228,7 +229,6 @@ class Controller(SensorNode, HTTPClient):
             self.__read_type_4(msg, buffer)
 
     def stop(self, ipc_conn=None, notify_server=True):
-        logging.info(f"Simulator Frame Retransmissions: {self.times_retrans}")
         if ipc_conn:
             self.sel.unregister(ipc_conn)
         self.do_DELETE()

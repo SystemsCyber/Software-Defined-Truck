@@ -67,16 +67,18 @@ void SSSF::forwardingLoop(bool print)
     pollServer();
     if (sessionStatus == Active)
     {
-        if (millis() - lastSend >= sendInterval)
-        {
-            lastSend = millis();
-            struct CAN_message_t canFrame;
-            canFrame.mb = 0;
-            canFrame.id = 0x1FFFFFFF;
-            canFrame.len = 8;
-            canFrame.flags.extended = true;
-            write(canFrame);
-        }
+        // For testing
+        // if (millis() - lastSend >= sendInterval)
+        // {
+        //     lastSend = millis();
+        //     struct CAN_message_t canFrame;
+        //     canFrame.mb = 0;
+        //     canFrame.id = 0x1FFFFFFF;
+        //     canFrame.len = 8;
+        //     canFrame.flags.extended = true;
+        //     write(canFrame);
+        // }
+        // -----------
         struct COMMBlock msg = {0};
         struct CAN_message_t canFrame;
         pollCANNetwork(canFrame);
@@ -86,23 +88,22 @@ void SSSF::forwardingLoop(bool print)
             if (print) Serial.println(dumpCOMMBlock(msg));
             if (msg.type == 1)
             {
-                //adding 28 for UDP header
-                networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.canFrame.sequenceNumber);
+                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.canFrame.sequenceNumber);
                 can0.write(msg.canFrame.can);
                 if (can1BaudRate) can1.write(msg.canFrame.can);
             }
             else if (msg.type == 2)
             {
-                networkHealth->update(msg.index, packetSize + 28, msg.timestamp, msg.frameNumber);
+                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
                 // Apply transformation
-                canFrame.mb = 0;
-                canFrame.id = 0x18F00300 ^ 0x1FFFFFFF;
-                canFrame.len = 8;
-                canFrame.flags.extended = true;
-                uint8_t throttle = uint8_t((msg.sensorFrame.signals[0] * 100.0) / 0.4);
-                canFrame.buf[1] = throttle;
-                write(canFrame);
+                // canFrame.mb = 0;
+                // canFrame.id = 0x18F00300 ^ 0x1FFFFFFF;
+                // canFrame.len = 8;
+                // canFrame.flags.extended = true;
+                // uint8_t throttle = uint8_t((msg.sensorFrame.signals[0] * 100.0) / 0.4);
+                // canFrame.buf[1] = throttle;
+                // write(canFrame);
                 // can0.write(canFrame);
                 // if (can1BaudRate) can1.write(canFrame);
                 // -----------

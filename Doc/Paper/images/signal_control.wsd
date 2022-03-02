@@ -11,6 +11,7 @@ endhnote
 loop retransmits < max_retransmits and \n sent_frame_number != recv_frame_number
 Controller --> SSSF: w_signal_block
 SSSF ->> SSSF: process_signal()
+SSSF -> SSSF: update_health(...)
 Controller -> Controller: Wait for (1000/ (carla_frame_rate * max_retransmits)) milliseconds
 end
 hnote over Controller

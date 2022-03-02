@@ -38,6 +38,7 @@ class NetworkMatrix:
             can_frames=0,
             dropped_sim_frames=0,
             dropped_can_frames=0,
+            sim_retrans=0,
             packet_loss=self._base_frame.copy(deep=True),
             latency=copy.deepcopy(base_dict),
             jitter=copy.deepcopy(base_dict),
@@ -52,24 +53,26 @@ class NetworkMatrix:
         return axis_names
 
     def __update_totals(self, r, ax):
-        fs = 14
+        fs = 12
         ax.cla()
         ax.set_title("Totals", fontdict={
             'fontsize': 14, 'fontweight': 'bold'})
         ax.set(xlim=(0, 1), ylim=(0, 1), xticklabels=[], yticklabels=[], xlabel=None, ylabel=None, aspect=1)
         ax.set_axis_off()
 
-        ax.text(0, .85, "Simulator", fontsize=fs)
-        ax.text(.1, .7, "Count:", fontsize=fs)
-        ax.text(1, .7, f"{r.sim_frames}", ha='right', fontsize=fs)
-        ax.text(.1, .55, "Dropped:", fontsize=fs)
-        ax.text(1, .55, f"{r.dropped_sim_frames}", ha='right', fontsize=fs)
+        ax.text(0, .9, "Simulator", fontsize=fs, fontweight="bold")
+        ax.text(.1, .79, "Count:", fontsize=fs)
+        ax.text(1, .79, f"{r.sim_frames}", ha='right', fontsize=fs)
+        ax.text(.1, .68, "Dropped:", fontsize=fs)
+        ax.text(1, .68, f"{r.dropped_sim_frames}", ha='right', fontsize=fs)
+        ax.text(.1, .57, "Retrans:", fontsize=fs)
+        ax.text(1, .57, f"{r.sim_retrans}", ha='right', fontsize=fs)
 
-        ax.text(0, .35, "CAN", fontsize=fs)
-        ax.text(.1, .2, "Count:", fontsize=fs)
-        ax.text(1, .2, f"{r.can_frames}", ha='right', fontsize=fs)
-        ax.text(.1, .05, "Dropped:", fontsize=fs)
-        ax.text(1, .05, f"{r.dropped_can_frames}", ha='right', fontsize=fs)
+        ax.text(0, .35, "CAN", fontsize=fs, fontweight="bold")
+        ax.text(.1, .24, "Count:", fontsize=fs)
+        ax.text(1, .24, f"{r.can_frames}", ha='right', fontsize=fs)
+        ax.text(.1, .13, "Dropped:", fontsize=fs)
+        ax.text(1, .13, f"{r.dropped_can_frames}", ha='right', fontsize=fs)
         return ax
 
     def __update_matrix(self, data, axes, cmap: str, title: str):
@@ -283,6 +286,7 @@ class NetworkMatrix:
 #     return SimpleNamespace(
 #         sim_frames=report.sim_frames,
 #         can_frames=report.can_frames,
+#         sim_retrans=np.random.randint(50, 70),
 #         dropped_sim_frames=report.dropped_sim_frames,
 #         dropped_can_frames=report.dropped_can_frames,
 #         packet_loss=report.packet_loss,
@@ -297,7 +301,7 @@ class NetworkMatrix:
 #     health_report = HealthReport(2)
 #     matrix = NetworkMatrix()
 #     matrix_thread = mp.Process(
-#         target=matrix.animate, args=(health_queue, "grouped", False), daemon=True)
+#         target=matrix.animate, args=(health_queue, "grouped", True), daemon=True)
 #     matrix_thread.start()
 #     while True:
 #         try:

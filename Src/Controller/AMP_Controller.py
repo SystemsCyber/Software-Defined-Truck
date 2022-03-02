@@ -133,7 +133,6 @@ def init_argparser() -> argparse.ArgumentParser:
     arg_network_matrix = argparser.add_argument_group("Network Matrix")
     arg_network_matrix.add_argument(
         '--display_mode',
-        metavar='MODE',
         default='grouped',
         dest='display_mode',
         type=str,
