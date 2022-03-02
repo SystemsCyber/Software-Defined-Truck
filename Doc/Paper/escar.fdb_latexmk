@@ -1,13 +1,13 @@
 # Fdb version 3
-["bibtex escar"] 1646196845 "escar.aux" "escar.bbl" "escar" 1646205415
+["bibtex escar"] 1646206027 "escar.aux" "escar.bbl" "escar" 1646206030
   "bib.bib" 1646162478 6092 2489a9294fa07237492ea47d7b418fcd ""
   "c:/texlive/2021/texmf-dist/bibtex/bst/base/plain.bst" 1645378953 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
-  "escar.aux" 1646205415 6825 5d2b4c7301f6551d17e16dfa09b9e18c "pdflatex"
+  "escar.aux" 1646206030 6825 01373090846dd5c31d4d4d3d7611082f "pdflatex"
   (generated)
   "escar.bbl"
   "escar.blg"
-["pdflatex"] 1646205413 "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646205415
-  "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" 1646205412 40691 4854b5aab750c4c410880bb86c29d9bc ""
+["pdflatex"] 1646206028 "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646206030
+  "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" 1646206022 40713 ba7889cf26687737758fea92cc18f6e4 ""
   "c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc" 1645379872 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "c:/texlive/2021/texmf-dist/fonts/map/fontname/texfonts.map" 1645380377 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "c:/texlive/2021/texmf-dist/fonts/tfm/adobe/symbol/psyr.tfm" 1645383524 1408 5937f58aa508ea2cea4901c07d10f5fe ""
@@ -188,10 +188,10 @@
   "c:/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1645384539 4422994 d6fc1c83c919dc5940022c50ba2a8cfc ""
   "c:/texlive/2021/texmf-var/web2c/pdftex/pdflatex.fmt" 1645384681 2797292 5ea1d62c0ddf55cf7605559c8bb81f03 ""
   "c:/texlive/2021/texmf.cnf" 1645384520 713 e69b156964470283e0530f5060668171 ""
-  "escar.aux" 1646205415 6825 5d2b4c7301f6551d17e16dfa09b9e18c "pdflatex"
-  "escar.bbl" 1646196845 4649 cf3affbf002e7316d60ad057db8299b2 "bibtex escar"
-  "escar.out" 1646205415 2951 c7882fea120d7f3566f78f17816351dc "pdflatex"
-  "escar.tex" 1646205412 40691 4854b5aab750c4c410880bb86c29d9bc ""
+  "escar.aux" 1646206030 6825 01373090846dd5c31d4d4d3d7611082f "pdflatex"
+  "escar.bbl" 1646206028 4649 cf3affbf002e7316d60ad057db8299b2 "bibtex escar"
+  "escar.out" 1646206030 2951 c7882fea120d7f3566f78f17816351dc "pdflatex"
+  "escar.tex" 1646206022 40713 ba7889cf26687737758fea92cc18f6e4 ""
   "images/design_goal.drawio.png" 1646069018 919766 d45a010f3dc78b0bcede127d46c5a339 ""
   "images/network_designer.png" 1646100549 37011 49b493a0fb938337d512652308aabd63 ""
   "images/network_matrix.png" 1646100549 55572 c2b348622332cb4476c3c5384362bee6 ""

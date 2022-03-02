@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  2 MAR 2022 00:16
+This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  2 MAR 2022 00:27
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -810,22 +810,25 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 348.
+               Default added (so using `tbp') on input line 356.
 
-<images/usability.png, id=207, 1445.4pt x 760.34062pt>
+<images/usability.png, id=208, 1445.4pt x 760.34062pt>
 File: images/usability.png Graphic file (type png)
 <use images/usability.png>
-Package pdftex.def Info: images/usability.png  used on input line 350.
+Package pdftex.def Info: images/usability.png  used on input line 358.
 (pdftex.def)             Requested size: 505.89pt x 266.1116pt.
 [11 <./out/images/network_health/network_health.png (PNG copy)>]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-Underfull \hbox (badness 1360) in paragraph at lines 361--363
+Underfull \hbox (badness 1360) in paragraph at lines 369--371
 \T1/ptm/m/n/12 (+20) the de-sign of CAN-Lay, the net-work-ing back-
  []
 
-[12 <./images/usability.png>] (./escar.bbl
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [12 <./images/usability.png>] (./escar.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 28--32
 []\T1/ptm/m/n/12 (+20) Michael Do-er-ing and Marco Wag-ner.
  []
@@ -865,9 +868,7 @@ Underfull \hbox (badness 2689) in paragraph at lines 98--104
 \T1/ptm/m/n/12 (+20) Re-quire-ments Anal-y-sis and Per-for-mance
  []
 
-) [14
-
-] (./escar.aux)
+) [14] (./escar.aux)
 Package rerunfilecheck Info: File `escar.out' has not changed.
 (rerunfilecheck)             Checksum: C7882FEA120D7F3566F78F17816351DC;2951.
  ) 
@@ -878,12 +879,12 @@ Here is how much of TeX's memory you used:
  42080 multiletter control sequences out of 15000+600000
  546124 words of font info for 315 fonts, out of 8000000 for 9000
  1142 hyphenation exceptions out of 8191
- 100i,9n,104p,1314b,1390s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 100i,9n,104p,1280b,1390s stack positions out of 5000i,500n,10000p,200000b,80000s
 {c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}<c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on escar.pdf (14 pages, 1756638 bytes).
+Output written on escar.pdf (14 pages, 1757577 bytes).
 PDF statistics:
- 289 PDF objects out of 1000 (max. 8388607)
- 241 compressed objects within 3 object streams
+ 290 PDF objects out of 1000 (max. 8388607)
+ 242 compressed objects within 3 object streams
  80 named destinations out of 1000 (max. 500000)
  91831 words of extra memory for PDF output out of 106986 (max. 10000000)
 
