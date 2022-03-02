@@ -16,7 +16,7 @@ end
 hnote over Controller
 retransmits = 0
 if sent_frame_number != recv_frame_num: 
-    lost_CARLA_frames++
+    lost_simulator_frames++
 sent_frame_number = recv_frame_num
 endhnote
 else
