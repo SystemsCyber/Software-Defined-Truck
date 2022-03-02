@@ -174,7 +174,6 @@ At this time, we have chosen UDP multicasting as a suitable pub/sub mechanism as
     \caption[]{Network Designer displaying available ECUs\protect\footnotemark}
     \label{fig:network_designer}
 \end{figure*}
-%TODO refer to the figures whenever required using the \ref{} directive. In the \ref{} we put the label of the figure. For examples, see the paragraphs I have below
 
 As seen in figure \ref{fig:network_designer}, the Network Designer consists of a catalog of available devices and the ability to select the requested devices. Upon startup, the Controller contacts the Server and solicits the set of available devices. The Controller then presents these options to the user and allows them to select the requested devices from the catalog of available ECUs.
 
@@ -219,7 +218,7 @@ Once endpoints receive the connection data, they resync with NTP, allocate space
 
 \begin{figure*}[]
     \centering
-    \includegraphics[scale=0.8]{out/images/signal_control/signal_control.png}
+    \includegraphics[scale=0.9]{out/images/signal_control/signal_control.png}
     \caption{Signal Tranmission Activity}
     \label{fig:sig_x}
 \end{figure*}
@@ -233,10 +232,9 @@ The benefit of this acknowledgment mechanism is that it does not require additio
 Before starting the session, the Controller lets the user select the maximum number of retransmissions. This number gets factored into the timeout value of a sensor frame. 
 % Before starting the session, the Controller lets the user select the maximum number of retransmissions which is then used to calculate the timeout value of a sensor frame. 
 The timeout value is calculated as follows: $1/(simulator\_frame\_rate * max\_retransmitions)$. When the Controller detects that the last frame has timed out, it first checks if it has reached its maximum number of retransmissions. If not, it will resend the sensor message, increment the number of retransmissions it performed, and reset the timeout timer. It will repeat this process until it receives a CAN message with a frame number equal to the Controller's current frame number or the Controller reaches the maximum number of retransmissions. In the latter case, the frame is considered lost, and a counter \texttt{lost\_simulator\_frames} is updated to later show to the user.
-%TODO change the carla_frame_rate in the figure to simulator_frame_rate
 
 As mentioned before, when an SSSF receives a sensor frame, it first sets its last seen frame number equal to the message's frame number. Next, the SSSF applies any necessary transformations to the sensor frame before forwarding it onto its device's CAN network(s). For this paper, the transformations served mainly as a proof of concept and were kept simple, often sending just the raw sensor value in with the closest matching PGN CAN frame.
-%TODO update the figure.. it is not in sync with the writting in this section
+%TODO update the figure.. it is not in sync with the writting in this section .e.g. you are not using the update_health for just frames
 
 \subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
 \begin{figure*}[]
@@ -261,26 +259,12 @@ The packet loss mechanism described later depends on this sequence number.
 % It is included to detect pack loss, a mechanism that is described later. 
 % The acknowledgement mechanism for CAN messages works differently compared to the acknowledgement mechanism described before. Whereas every sensor message is implicitly acknowledged, CAN messages are explicitly acknowledged when \textit{needs\_response} is set to true. The field \textit{needs\_response} is set to true if its CAN frame’s PGN matches a list received from the user during setup.
 
-%TODO install the grammarly extension and try to eliminate the blue and red underlines
 After the SSSF finishes checking for CAN messages from the CAN network, it checks for messages from the pub/sub network.
 % Again, CAN messages sent to the pub/sub endpoint are considered type 1 messages. 
 % So if an SSSF device receives a type 1 message it first checks if the message requires a response. If so, it replies to the pub/sub endpoint with a type 5 message with the frame number equal to the sequence number of the message it just received. 
 Upon receiving a CAN message wrapped in the \texttt{w\_can\_block}, the SSSF updates its network statistics, extracts the WCANFrame, and writes it onto its available CAN networks.
-%TODO again, the figure is not in sync still
-% \begin{verbatim}
-% if (msg.type == 1)
-% {
-%     if (msg.needsResponse)
-%     {
-%         writeToMcastEndpoint(5. msg.seqNum);
-%     }
-%     networkHealth->update(msg);
-%     if (can0BaudRate) can0.write(msg.canFrame);
-%     if (can1BaudRate) can1.write(msg.canFrame);
-% }
-% \end{verbatim}
 
-\subsubsection{Network health monitoring}\label{sec:nethealth}
+\subsubsection{Network health monitoring (ref. listings \ref{code:calc} and \ref{code:update})}\label{sec:nethealth}
 
 \begin{lstlisting}[caption={calculate\_health(HealthCore \&networkEdge, n)}, label=code:calc, float=t]
 networkEdge.min = min(networkEdge.min, n);
@@ -306,7 +290,6 @@ calculate(HealthReport[ind].goodput,(packetsz * 8)/ellapsedSeconds);
 HealthBasics[i].lastMessageTime = now;
 HealthBasics[i].lastSequenceNumber = seq;
 \end{lstlisting}
-%TODO the code should be self contained, i.e. the reader should not need any other piece of information other than this to under stand the code... what is Report? Basics? lastseqnum... no need to shorten tose,,, we ahve enough space. Make sure any info in here is covered in this, the other listing i.e. calculate and the network health datastructures figure
 
 \begin{figure}[]
     \centering
@@ -316,7 +299,7 @@ HealthBasics[i].lastSequenceNumber = seq;
 \end{figure}
 
 Monitoring the health of the network is key to ensuring that unnecessary delay and packet loss are not affecting the output of the experiment. 
-Each message structure from \ref{fig:ds} gets loaded with additional information enabling the devices to collect network statistics during an active experiment. 
+Each message structure from figure \ref{fig:ds} gets loaded with additional information enabling the devices to collect network statistics during an active experiment. 
 % To enable the devices to collect network statistics during an active experiment, each message structure from figure \ref{fig:ds} is loaded with additional information. 
 The first piece of additional information is a frame or sequence number. When other devices spot gaps in these numbers greater than 1, they know that a message was lost.
 % The next important metric included in the COMMBlock messages is a timestamp. 
@@ -325,31 +308,16 @@ Next, the timestamp gets included to allow devices to calculate the latency alon
 % The timestamp is included with each message that is sent so that network health metrics can be calculated without interrupting the testing. 
 The latency is calculated by subtracting the time at which the message was sent from the time at which the message was received. To ensure accuracy every device on the CANLay network implements NTP to synchronize their clocks.
 
-These indicators enable each device to calculate four network statistics for every other device on the network. Currently, these statistics include \emph{packet loss}, \emph{latency}, \emph{jitter}, and \emph{goodput}. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes a message to travel from the sender to the receiver. Jitter is the variance in latency. There are different types of network jitter measures, but we use the simplest form, which is often called packet jitter or constant jitter, which is “the variation in latency as measured in the variability over time of the end-to-end delay across a network”\footnote{\url{https://networkencyclopedia.com/jitter/}}. Finally, goodput is the measurement of application-level throughput. In our case, it is calculated as megabits per second.
+These indicators enable each device to calculate four network statistics for every other device on the network. Currently, these statistics include \emph{packet loss}, \emph{latency}, \emph{jitter}, and \emph{goodput}. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes a message to travel from the sender to the receiver. Jitter is the variance in latency. There are different types of network jitter measures, but we use the simplest form, which is often called packet jitter or constant jitter, which is “the variation in latency as measured in the variability over time of the end-to-end delay across a network”\footnote{\url{https://networkencyclopedia.com/jitter/}}. Finally, goodput is the measurement of application-level throughput. In our case, it is calculated in megabits per second.
 
-The process of calculating the statisics is shown through the code listings 
-% \ref{code:calc}, \ref{code:update}
-. Associated data structures are shown in figure \ref{fig:network_health_ds}. The algorithm shown in 
-% \ref{code:calc} 
-is based on Welford's Online Algorithm 
-% (ref https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm) 
-which is described as a "Numerically stable algorithm for computing the running mean and variance" 
-% (ref https://nullbuffer.com/articles/welford_algorithm.html)
-. A numerically stable algorithm is required when computing the running mean and varience using a computer so floating point errors do not grow without bound. The latency is calculated on line five using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency we can calculate jitter using variance in the latency as shown on line 6. Next packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. Afterwards, we calculate goodput using the size of the packet received and the number of seconds that have ellapsed since that last message.  
-%TODO DESCRIBE HERE the code and ds in high level.. keep things in sync..if required changed the code slightly... some violations of coding syntax is fine.. refer to line numbers whenever you can but do not describe every line..for example, The process of calculatig the packet loss is shown in lines 11-18 of listing \ref{code:update}. Here we ..... 
+Functions for calculating the network statistics are shown through the code listings \ref{code:calc} and \ref{code:update}, the latter being called upon receipt of every COMMBLOCK. 
+Associated data structures are shown in figure \ref{fig:network_health_ds}. The algorithm shown in listing \ref{code:calc} 
+is based on Welford's Online Algorithm \cite{welford_62}, a numerically stable algorithm.
+Such an algorithm is required when computing the running mean and variance so floating-point errors do not grow without a bound. The latency is calculated on line 5 of listing \ref{code:update} using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency we can calculate jitter using the variance in the latency as shown on line 6. Next packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. If \texttt{pcktsLost} is negative it indicates a duplicate or an out-of-order frame. In that case we neglect it.
+Afterward, we calculate goodput using the size of the packet received and the number of seconds that have elapsed since that last message.  
+%TODO a little more of the listing description could have been good. Lets wait for Dr. Daily review on this
 
-    % // If no packet loss then sequence number
-    % // is equal to last sequence number + 1
-
-    % // If pcktsLost is negative then this
-    % // indicates duplicate or out of 
-    % // order frame.
-
-    % // From: https://en.wikipedia.org/wiki/
-    % Algorithms_for_calculating_variance#
-    % Welford's_online_algorithm
-
-To display these captured statistics to the user, the Controller needs to aggregate the health reports from every device. The Controller does so every second by sending out a \textit{health request} message to the pub/sub endpoint. Each device responds to the request if they receive it. After responding, each device resets its local state variables, keeping only the last message timestamp and the latest seen sequence number. This technique creates a measurement period of one second. As the Controller receives the health reports, it updates its internal memory and displays the results to the user through the network monitoring window.
+To display these captured statistics to the user, the Controller needs to aggregate the health reports from every device. The Controller does so every second by sending out a \textit{health request} message to the pub/sub endpoint. Each device responds to the request if they receive it. After responding, they reset their local state variables, keeping only the last message timestamp and the latest seen sequence number. This technique creates a measurement period of one second. As the Controller receives the health reports, it updates its internal memory and displays the results to the user through the network monitoring window.
 
 \section{Exemplary Usage Scenario}\label{sec:usage}
 %TODO include the total number of signal frames lost and retransmitted
@@ -363,7 +331,11 @@ Figure \ref{fig:usabiity} shows CANLay at work. The windows in the figure displa
 Although the Carla project mainly focuses on autonomous driving research, it exposes its in-game signals through an easy-to-use python API and pays close attention to the scientific details represented in its simulator. While this is not required, the more realistic and accurate the signals are, the easier it will be to transform them into CAN messages. In this case, a specific CAN frame is printed as they are broadcasted on the overlay for this particular experiment. The ID of this frame is defined by the SAE-J1939 standards \cite{society_of_automotive_engineers_sae_nodate} and identifies engine parameters transmitted by an engine control module (ECM). The data bytes carried in the CAN frame are shown next. Of these, the third byte is shown to be changing. This particular byte carries the percentage throttle demanded by the driver. The value is also non-zero on the simulator frontend provided by the CARLA simulator.
 
 On the top right is the network health monitoring window. It shows four matrices showing
-four different metrics to estimate network health: packet loss, latency, jitter, and goodput. The significance of each of these metrics and their calculation methods were already described in the previous section. In this case, the experiment is performed over a gigabit local area network with a Layer 3 switch in between an SSSF and a Controller. The figure shows no packets were lost while the latency in the last cycle of health report collection was about 4 milliseconds between the endpoints. Although CANLay does not explicitly perform any latency-reducing functions, the general latency of 4 milliseconds is considered to be sustainable for seamless CARLA emulation at standard frame rates. In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparison to the latency. The goodput, i.e. the application data rate, is understandably higher for the Controller as it sends WSignalBlock frames that are slightly larger than the WCANBlock frames. 
+four different metrics to estimate network health: packet loss, latency, jitter, and goodput. The significance of each of these metrics and their calculation methods were already described in the previous section. In this case, the experiment is performed over a gigabit local area network with a Layer 3 switch in between an SSSF and a Controller. Each WCANBlock wraps exactly one CAN frame. The figure shows no packets were lost while the latency in the last cycle of health report collection was less than a milliseconds between the endpoints. 
+Although CANLay does not explicitly perform any latency-reducing functions, during this and other test scenarios, we noticed that the SSF and Controller forward information in the sub-milliseconds. Researchers before us have observed the same when designing CAN-to-ethernet gateways \cite{florian_polzlbauer_experience_2019}. In that light, the delay is purely due to transmission in the overlay. 
+A latency of less than a millisecond is considered to be sustainable for seamless CARLA emulation at standard frame rates. 
+In this particular example, the CARLA emulation frame rate was chosen to be 60 frames per second. The jitter is also fairly low in comparison to the latency. The goodput, i.e. the application data rate, is understandably higher for the Controller as it sends WSignalBlock frames that are slightly larger than the WCANBlock frames. 
+
 
 \section{Conclusion and Future Work}
 In this paper, we described the concepts behind the design of CANLay, the networking backbone for the Software-Defined Truck. 

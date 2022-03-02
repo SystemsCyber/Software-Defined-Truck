@@ -106,4 +106,10 @@ Randolf Rotermund, Timo Häckel, Philipp Meyer, Franz Korf, and Thomas~C.
 {Society of Automotive Engineers}.
 \newblock {SAE} {J1939} {Standards} {Collection}.
 
+\bibitem{welford_62}
+B.~P. Welford.
+\newblock Note on a method for calculating corrected sums of squares and
+  products.
+\newblock {\em Technometrics}, 4(3):419--420, 1962.
+
 \end{thebibliography}
