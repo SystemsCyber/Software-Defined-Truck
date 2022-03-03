@@ -14,7 +14,6 @@ hnote over SSSF
 w_can_block.sequence_number++
 w_can_block.timestamp = current milliseconds
 w_can_block.frame_number = recv_frame_number
-w_can_block.need_response = false
 endnote
 SSSF --> pbs: w_can_block
 end

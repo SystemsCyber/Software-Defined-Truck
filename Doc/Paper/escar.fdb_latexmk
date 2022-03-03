@@ -1,13 +1,13 @@
 # Fdb version 3
-["bibtex escar"] 1646249951 "escar.aux" "escar.bbl" "escar" 1646250637
+["bibtex escar"] 1646249951 "escar.aux" "escar.bbl" "escar" 1646271167
   "bib.bib" 1646238061 6358 cda4e2467bf3d082cc3ab460af383f45 ""
   "c:/texlive/2021/texmf-dist/bibtex/bst/base/plain.bst" 1645378953 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
-  "escar.aux" 1646250636 7032 3108e083b3912530f6fc9e92a63c7407 "pdflatex"
+  "escar.aux" 1646271166 7032 3108e083b3912530f6fc9e92a63c7407 "pdflatex"
   (generated)
   "escar.bbl"
   "escar.blg"
-["pdflatex"] 1646250635 "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646250637
-  "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" 1646250633 39774 1d5e87a25f56dce970ce2d6cd4d32846 ""
+["pdflatex"] 1646271164 "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646271167
+  "c:/Users/jepso/Desktop/Code/Work/Software-Defined-Truck/Doc/Paper/escar.tex" 1646271163 39775 8f6124a0805a991b243c9d24debb3098 ""
   "c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc" 1645379872 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "c:/texlive/2021/texmf-dist/fonts/map/fontname/texfonts.map" 1645380377 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "c:/texlive/2021/texmf-dist/fonts/tfm/adobe/symbol/psyr.tfm" 1645383524 1408 5937f58aa508ea2cea4901c07d10f5fe ""
@@ -188,20 +188,20 @@
   "c:/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1645384539 4422994 d6fc1c83c919dc5940022c50ba2a8cfc ""
   "c:/texlive/2021/texmf-var/web2c/pdftex/pdflatex.fmt" 1645384681 2797292 5ea1d62c0ddf55cf7605559c8bb81f03 ""
   "c:/texlive/2021/texmf.cnf" 1645384520 713 e69b156964470283e0530f5060668171 ""
-  "escar.aux" 1646250636 7032 3108e083b3912530f6fc9e92a63c7407 "pdflatex"
+  "escar.aux" 1646271166 7032 3108e083b3912530f6fc9e92a63c7407 "pdflatex"
   "escar.bbl" 1646249952 4823 1c9df29d5f67dbc1be2a0fd3d1d7f0b3 "bibtex escar"
-  "escar.out" 1646250636 3092 3d9692b5ec0a80c504085a7c98a3fe7b "pdflatex"
-  "escar.tex" 1646250633 39774 1d5e87a25f56dce970ce2d6cd4d32846 ""
+  "escar.out" 1646271166 3092 3d9692b5ec0a80c504085a7c98a3fe7b "pdflatex"
+  "escar.tex" 1646271163 39775 8f6124a0805a991b243c9d24debb3098 ""
   "images/design_goal.drawio.png" 1646069018 919766 d45a010f3dc78b0bcede127d46c5a339 ""
   "images/network_designer.png" 1646100549 37011 49b493a0fb938337d512652308aabd63 ""
   "images/network_matrix.png" 1646100549 55572 c2b348622332cb4476c3c5384362bee6 ""
   "images/system_design.drawio.png" 1646069018 1893209 5dba6411522665957181dd3e468cf6bb ""
   "images/usability.png" 1646247659 1841860 867095d9f0a0880994e501cd500dd1f7 ""
-  "out/images/can_exchange/can_exchange.png" 1646248998 28170 813606b48218a761134fc569e82295e7 ""
+  "out/images/can_exchange/can_exchange.png" 1646268190 27098 dd791e7a8436232adadb55e2e1049959 ""
   "out/images/connection_setup/connection_setup.png" 1646156202 32122 705ae42732fd01b8ac99dcfa49e00cc8 ""
   "out/images/data_structures/data_structures.png" 1646119259 14802 b450456373c5d0e37e4e33b4c8511809 ""
   "out/images/network_health/network_health.png" 1646100395 14497 37dfe145a8e9fe512145185b48e1e18b ""
-  "out/images/signal_control/signal_control.png" 1646249011 37457 f92a26cdde2aecd37de97689c7451fd7 ""
+  "out/images/signal_control/signal_control.png" 1646268030 37949 55c8b109ff4c4cf56110d59a2987e869 ""
   "usenix-2020-09.sty" 1645381092 3923 62775b94e6f3aaf4bda0ce3e06335b5f ""
   (generated)
   "escar.aux"

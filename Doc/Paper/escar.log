@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  2 MAR 2022 12:50
+This is pdfTeX, Version 3.141592653-2.6-1.40.23 (TeX Live 2021/W32TeX) (preloaded format=pdflatex 2022.2.20)  2 MAR 2022 18:32
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -789,11 +789,11 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 240.
 
-<out/images/can_exchange/can_exchange.png, id=164, 446.66875pt x 507.8975pt>
+<out/images/can_exchange/can_exchange.png, id=164, 441.65pt x 491.8375pt>
 File: out/images/can_exchange/can_exchange.png Graphic file (type png)
 <use out/images/can_exchange/can_exchange.png>
 Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 242.
-(pdftex.def)             Requested size: 401.99815pt x 457.10353pt.
+(pdftex.def)             Requested size: 397.48132pt x 442.64964pt.
 Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on input line 269.
 
 LaTeX Warning: No positions in optional float specifier.
@@ -875,7 +875,7 @@ Here is how much of TeX's memory you used:
  1142 hyphenation exceptions out of 8191
  100i,9n,104p,1280b,1390s stack positions out of 5000i,500n,10000p,200000b,80000s
 {c:/texlive/2021/texmf-dist/fonts/enc/dvips/base/8r.enc}<c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmb8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmr8a.pfb><c:/texlive/2021/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on escar.pdf (14 pages, 1966298 bytes).
+Output written on escar.pdf (14 pages, 1965744 bytes).
 PDF statistics:
  299 PDF objects out of 1000 (max. 8388607)
  251 compressed objects within 3 object streams
