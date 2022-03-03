@@ -177,13 +177,15 @@ As seen in Figure \ref{fig:network_matrix}, the Network Health Monitor shows rea
 
 \subsection{Behavior Descriptions}
 
-\subsubsection{Network Setup (ref. figure \ref{fig:setup_activity})}
+\subsubsection{Network Setup}
 \begin{figure*}[]
     \centering
     \includegraphics[scale=0.8]{out/images/connection_setup/connection_setup.png}
     \caption{Network Setup Activity}
     \label{fig:setup_activity}
 \end{figure*}
+
+This section describes Figure \ref{fig:setup_activity}.
 While the Server is up and running, SSSFs connect to it. SSSFs perform a setup procedure by reading their inbuilt SD card. The type, year, make, model, and the serial number of the connected ECUs are read from a predefined file stored on the SD card. Next, the SSSF gathers its MAC address and list of attached devices into a JSON and sends it to the Server via a POST to the HTTP API endpoint /\textit{SSSF}/\textit{Register}. 
 If the registration fails, the Server responds with an HTTP 4XX error code indicating why the registration was unsuccessful. Otherwise, the Server responds with an HTTP 202 code indicating the SSSF was accepted. Once successfully registered, the SSSF waits for further instructions from the Server on its HTTPS port. 
 
@@ -210,12 +212,12 @@ Once endpoints receive the connection data, they resyncronize time with NTP, all
 \begin{figure*}[]
     \centering
     \includegraphics[scale=0.8]{out/images/signal_control/signal_control.png}
-    \caption{Signal Tranmission Activity}
+    \caption{Signal Transmission Activity}
     \label{fig:sig_x}
 \end{figure*}
-\subsubsection{Sensor Signal Communication (ref. figure \ref{fig:sig_x})} \label{sec:sig_x}
+\subsubsection{Sensor Signal Communication \label{sec:sig_x}}
 
-
+This section describes the contents of Figure \ref{fig:sig_x}.
 Once the Controller establishes an active session, it begins forwarding sensor signals to the pub/sub endpoint. Before sending out the sensor signals, the Controller wraps them in a WsensorBlock and then a COMMBlock. There are several additional pieces of information the COMMBlock requires, but we will focus on type and frame number for now. The type indicates the subclass that the COMMBlock is carrying. In this case, the type will be 2, implying that it is transporting a WsensorBlock. The frame number is added to the COMMBlock and incremented by one every time the Controller forwards a sensor message to the CANLay network. When SSSFs send out CAN messages, they will set their outgoing COMMBlock's frame number to the last received frame number from the Controller. When the Controller receives a CAN message, it will read the frame number field and know the latest sensor message that the SSSF received. This technique creates an acknowledgment feedback loop enabling the Controller to tell which devices have received a frame and when a frame was lost. This acknowledgment feedback loop is possible because CAN messages get sent at a higher rate than the sensor message are. 
 The benefit of this acknowledgment mechanism is that it does not require additional replies from the receiver.
 % This enables an acknowledgment mechanism that does not require any additional messages.
@@ -228,7 +230,7 @@ As mentioned before, when an SSSF receives a sensor frame, it first sets its las
 
 %TODO update the figure.. it is not in sync with the writting in this section .e.g. you are not using the update_health for just frames
 
-\subsubsection{CAN Communication (ref. figure \ref{fig:can_x})}
+\subsubsection{CAN Communication}
 \begin{figure*}[]
     \centering
     \includegraphics[scale=0.9]{out/images/can_exchange/can_exchange.png}
@@ -240,7 +242,7 @@ As mentioned before, when an SSSF receives a sensor frame, it first sets its las
 % Most ECUs do not come with built in ethernet ports and the ability to broadcast CAN frames via Ethernet. So in order to connect an ECU to Ethernet we need a device that can interface with a CAN network and interface with an Ethernet Network. This is why 
 % the Smart sensor Simulator and Forwarder is necessary. It acts as a programmable gateway that can transfer messages between the CAN network and the Ethernet Network.
 
-When the SSSF is in an active experiment, it attempts to read a message from the CAN network. Upon doing so, it creates the COMMBlock data structure (ref. figure \ref{fig:ds}) that will get written to the CANLay network. 
+This section is in reference to Figure \ref{fig:can_x}. When the SSSF is in an active experiment, it attempts to read a message from the CAN network. Upon doing so, it creates the COMMBlock data structure  that will get written to the CANLay network, as seen in Figure \ref{fig:ds})
 Additional information is added to the COMMBlock before its written to the network. Several pieces of information are required, but we will focus on two right now, namely, type and sequence number.
 The type indicates the subclass that the COMMBlock is carrying. In this case, the type will be 1, implying that it is carrying a WCANBlock. 
 The sequence number is added to the WCANBlock and incremented every time a CAN message gets sent from the device. 
@@ -254,7 +256,7 @@ After the SSSF finishes checking for CAN messages from the CAN network, it check
 % So if an SSSF device receives a type 1 message it first checks if the message requires a response. If so, it replies to the pub/sub endpoint with a type 5 message with the frame number equal to the sequence number of the message it just received. 
 Upon receiving a CAN message wrapped in the \texttt{w\_can\_block}, the SSSF updates its network statistics, extracts the WCANFrame, and writes it onto its available CAN networks.
 
-\subsubsection{Network health monitoring (ref. listings \ref{code:calc} and \ref{code:update})}\label{sec:nethealth}
+\subsubsection{Network health monitoring \label{sec:nethealth}}
 
 \begin{lstlisting}[caption={calculate\_health(HealthCore \&networkEdge, n)}, label=code:calc, float=t]
 networkEdge.min = min(networkEdge.min, n);
@@ -288,9 +290,10 @@ HealthBasics[i].lastSequenceNumber = seq;
     \label{fig:network_health_ds}
 \end{figure}
 
-Monitoring the health of the network is key to ensuring that unnecessary delay and packet loss are not affecting the output of the experiment. 
+
+Monitoring the health of the network is key to ensuring that unnecessary delay and packet loss are not affecting the output of the experiment. The code listings to demonstrate this are found in Listings \ref{code:calc} and \ref{code:update}.
 Each message structure from figure \ref{fig:ds} gets loaded with additional information enabling the devices to collect network statistics during an active experiment. 
-% To enable the devices to collect network statistics during an active experiment, each message structure from figure \ref{fig:ds} is loaded with additional information. 
+% To enable the devices to collect network statistics during an active experiment, each message structure from Figure \ref{fig:ds} is loaded with additional information. 
 The first piece of additional information is a frame or sequence number. When other devices spot gaps in these numbers greater than 1, they know that a message was lost.
 % The next important metric included in the COMMBlock messages is a timestamp. 
 Next, the timestamp gets included to allow devices to calculate the latency along the network edge from the sending device to the receiving device without interrupting the testing.
@@ -300,10 +303,10 @@ The latency is calculated by subtracting the time at which the message was sent 
 
 These indicators enable each device to calculate four network statistics for every other device on the network. Currently, these statistics include \emph{packet loss}, \emph{latency}, \emph{jitter}, and \emph{goodput}. Packet loss is the number of packets determined to be lost along a network edge. Latency is the time it takes a message to travel from the sender to the receiver. Jitter is the variance in latency. There are different types of network jitter measures, but we use the simplest form, which is often called packet jitter or constant jitter, which is “the variation in latency as measured in the variability over time of the end-to-end delay across a network”\footnote{\url{https://networkencyclopedia.com/jitter/}}. Finally, goodput is the measurement of application-level throughput. In our case, it is calculated in megabits per second.
 
-Functions for calculating the network statistics are shown through the code listings \ref{code:calc} and \ref{code:update}, the latter being called upon receipt of every COMMBLOCK. 
-Associated data structures are shown in figure \ref{fig:network_health_ds}. The algorithm shown in listing \ref{code:calc} 
+Functions for calculating the network statistics are shown through the code Listings \ref{code:calc} and \ref{code:update}, the latter being called upon receipt of every COMMBLOCK. 
+Associated data structures are shown in Figure \ref{fig:network_health_ds}. The algorithm shown in Listing \ref{code:calc} 
 is based on Welford's Online Algorithm \cite{welford_62}, a numerically stable algorithm.
-Such an algorithm is required when computing the running mean and variance so floating-point errors do not grow without bound. We chose to calculate the mean and variance in one pass to keep the time required for calculation within several microseconds. Storing each message's metrics and looping through the previous metrics to recalculate the mean and variance would take too long. The latency is calculated on line 5 of listing \ref{code:update} using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency, we can calculate jitter using the variance in the latency as shown on line 6. Next, packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. If \texttt{pcktsLost} is negative, it indicates a duplicate or an out-of-order frame. In that case, we neglect it.
+Such an algorithm is required when computing the running mean and variance so floating-point errors do not grow without bound. We chose to calculate the mean and variance in one pass to keep the time required for calculation within several microseconds. Storing each message's metrics and looping through the previous metrics to recalculate the mean and variance would take too long. The latency is calculated on line 5 of Listing \ref{code:update} using the delay between when the message was sent and when the message was received. Once we've updated the statistics for latency, we can calculate jitter using the variance in the latency as shown on line 6. Next, packet loss is calculated on lines 7-8. A packet is considered lost if the gap between the new sequence number and the old sequence number is greater than one. If \texttt{pcktsLost} is negative, it indicates a duplicate or an out-of-order frame. In that case, we neglect it.
 Afterward, we calculate goodput using the size of the packet received and the number of seconds that have elapsed since that last message.  
 %TODO a little more of the listing description could have been good. Lets wait for Dr. Daily review on this
 
@@ -317,7 +320,7 @@ To display these captured statistics to the user, the Controller needs to aggreg
     \caption{CANLay at work in the Software Defined Truck}
     \label{fig:usabiity}
 \end{figure*}
-Figure \ref{fig:usabiity} shows CANLay at work. The windows in the figure display CAN frames on the left, the vehicle simulator on the bottom right, and CANLay's network health monitoring on the top right. Each of these components was already introduced in figure \ref{fig:system}. For the current purpose, we have been using the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
+Figure \ref{fig:usabiity} shows CANLay at work. The windows in the figure display CAN frames on the left, the vehicle simulator on the bottom right, and CANLay's network health monitoring on the top right. Each of these components was already introduced in Figure \ref{fig:system}. For the current purpose, we have been using the CARLA graphical vehicle simulator \cite{Dosovitskiy17}. 
 Although the Carla project mainly focuses on autonomous driving research, it exposes its in-game signals through an easy-to-use python API and pays close attention to the scientific details represented in its simulator. While this is not required, the more realistic and accurate the signals are, the easier it will be to transform them into CAN messages. In this case, a specific CAN frame is printed as they are broadcasted on the overlay for this particular experiment. The ID of this frame is defined by the SAE-J1939 standards \cite{society_of_automotive_engineers_sae_nodate} and identifies engine parameters transmitted by an engine control module (ECM). The data bytes carried in the CAN frame are shown next. Of these, the third byte is shown to be changing. This particular byte carries the percentage throttle demanded by the driver. The value is also non-zero on the simulator frontend provided by the CARLA simulator.
 
 On the top right is the network health monitoring window. It shows four matrices showing

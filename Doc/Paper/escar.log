@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 21.1) (preloaded format=pdflatex 2021.3.12)  2 MAR 2022 21:21
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 21.1) (preloaded format=pdflatex 2021.3.12)  2 MAR 2022 21:50
 entering extended mode
 **c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex
 (c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex
@@ -738,7 +738,7 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
 LaTeX Warning: No positions in optional float specifier.
                Default added (so using `tbp') on input line 181.
 
-<out/images/connection_setup/connection_setup.png, id=136, 589.20125pt x 573.14125pt>
+<out/images/connection_setup/connection_setup.png, id=135, 589.20125pt x 573.14125pt>
 File: out/images/connection_setup/connection_setup.png Graphic file (type png)
 <use out/images/connection_setup/connection_setup.png>
 Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used on input line 183.
@@ -746,21 +746,21 @@ Package pdftex.def Info: out/images/connection_setup/connection_setup.png  used 
 [5 <./images/network_matrix.png>]
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 203.
+               Default added (so using `tbp') on input line 205.
 
 <out/images/data_structures/data_structures.png, id=148, 328.22626pt x 256.96pt>
 File: out/images/data_structures/data_structures.png Graphic file (type png)
 <use out/images/data_structures/data_structures.png>
-Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 205.
+Package pdftex.def Info: out/images/data_structures/data_structures.png  used on input line 207.
 (pdftex.def)             Requested size: 241.02039pt x 188.68884pt.
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 210.
+               Default added (so using `tbp') on input line 212.
 
 <out/images/signal_control/signal_control.png, id=149, 500.87125pt x 753.81625pt>
 File: out/images/signal_control/signal_control.png Graphic file (type png)
 <use out/images/signal_control/signal_control.png>
-Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 212.
+Package pdftex.def Info: out/images/signal_control/signal_control.png  used on input line 214.
 (pdftex.def)             Requested size: 400.69753pt x 603.05383pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -771,44 +771,40 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-
-LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 232.
-
-<out/images/can_exchange/can_exchange.png, id=163, 441.65pt x 491.8375pt>
-File: out/images/can_exchange/can_exchange.png Graphic file (type png)
-<use out/images/can_exchange/can_exchange.png>
-Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 234.
-(pdftex.def)             Requested size: 397.48132pt x 442.64964pt.
-
 Underfull \vbox (badness 2158) has occurred while \output is active []
 
-Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on input line 259.
 
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 284.
+               Default added (so using `tbp') on input line 234.
 
-<out/images/network_health/network_health.png, id=167, 343.2825pt x 288.07625pt>
+<out/images/can_exchange/can_exchange.png, id=162, 441.65pt x 491.8375pt>
+File: out/images/can_exchange/can_exchange.png Graphic file (type png)
+<use out/images/can_exchange/can_exchange.png>
+Package pdftex.def Info: out/images/can_exchange/can_exchange.png  used on input line 236.
+(pdftex.def)             Requested size: 397.48132pt x 442.64964pt.
+Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on input line 261.
+
+LaTeX Warning: No positions in optional float specifier.
+               Default added (so using `tbp') on input line 286.
+
+<out/images/network_health/network_health.png, id=165, 343.2825pt x 288.07625pt>
 File: out/images/network_health/network_health.png Graphic file (type png)
 <use out/images/network_health/network_health.png>
-Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 286.
+Package pdftex.def Info: out/images/network_health/network_health.png  used on input line 288.
 (pdftex.def)             Requested size: 241.02039pt x 202.25859pt.
-[8 <./out/images/data_structures/data_structures.png (PNG copy)>] [9 <./out/images/signal_control/signal_control.png (PNG copy)>] [10 <./out/images/can_exchange/can_exchange.png (PNG copy)>]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [11 <./out/images/network_health/network_health.png (PNG copy)>]
+[8 <./out/images/data_structures/data_structures.png (PNG copy)>] [9 <./out/images/signal_control/signal_control.png (PNG copy)>] [10 <./out/images/can_exchange/can_exchange.png (PNG copy)>] [11 <./out/images/network_health/network_health.png (PNG copy)>]
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 314.
+               Default added (so using `tbp') on input line 317.
 
 <images/usability.png, id=223, 1445.4pt x 758.835pt>
 File: images/usability.png Graphic file (type png)
 <use images/usability.png>
-Package pdftex.def Info: images/usability.png  used on input line 316.
+Package pdftex.def Info: images/usability.png  used on input line 319.
 (pdftex.def)             Requested size: 505.89pt x 265.58466pt.
 
-Underfull \hbox (badness 1360) in paragraph at lines 331--333
+Underfull \hbox (badness 1360) in paragraph at lines 334--336
 \T1/ptm/m/n/12 (+20) the de-sign of CAN-Lay, the net-work-ing back-
  []
 
@@ -860,22 +856,24 @@ Underfull \hbox (badness 2689) in paragraph at lines 105--111
 \T1/ptm/m/n/12 (+20) Re-quire-ments Anal-y-sis and Per-for-mance
  []
 
-) [14] (escar.aux)
+[14]) [15
+
+] (escar.aux)
 Package rerunfilecheck Info: File `escar.out' has not changed.
-(rerunfilecheck)             Checksum: C5871328C946EF0D56026F4C9E4BFE15;3049.
+(rerunfilecheck)             Checksum: 0CDBCD06C1BA945300B76C95C4FD57B8;2639.
  ) 
 Here is how much of TeX's memory you used:
- 23547 strings out of 479616
- 416634 string characters out of 2874874
+ 23541 strings out of 479616
+ 416575 string characters out of 2874874
  1013714 words of memory out of 3000000
  39871 multiletter control sequences out of 15000+200000
- 480485 words of font info for 317 fonts, out of 3000000 for 9000
+ 480070 words of font info for 312 fonts, out of 3000000 for 9000
  1142 hyphenation exceptions out of 8191
  113i,9n,116p,1265b,1385s stack positions out of 5000i,500n,10000p,200000b,50000s
 {C:/Program Files/MiKTeX/fonts/enc/dvips/base/8r.enc}<C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Program Files/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Program Files/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Program Files/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on escar.pdf (14 pages, 1990240 bytes).
+Output written on escar.pdf (15 pages, 1989770 bytes).
 PDF statistics:
- 291 PDF objects out of 1000 (max. 8388607)
- 83 named destinations out of 1000 (max. 500000)
+ 295 PDF objects out of 1000 (max. 8388607)
+ 84 named destinations out of 1000 (max. 500000)
  91831 words of extra memory for PDF output out of 106986 (max. 10000000)
 
