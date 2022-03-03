@@ -26,9 +26,8 @@ Stephen Checkoway, Damon McCoy, Brian Kantor, Danny Anderson, Hovav Shacham,
 
 \bibitem{doering_retrofitting_nodate}
 Michael Doering and Marco Wagner.
-\newblock Retrofitting {SDN} to classical in-vehicle networks:.
-\newblock Technical report, Universit\{{\textbackslash}"a\}t
-  T\{{\textbackslash}"u\}binge.
+\newblock Retrofitting {SDN} to classical in-vehicle networks: {SDN4CAN}.
+\newblock Technical report, Universitat Tubinge.
 
 \bibitem{Dosovitskiy17}
 Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio Lopez, and Vladlen
@@ -93,6 +92,11 @@ Subhojeet Mukherjee, Hossein Shirazi, Indrakshi Ray, Jeremy Daily, and Rose
   {Vehicles}.
 \newblock In {\em International {Conference} on {Information} {Systems}
   {Security}}, pages 23--42, Jaipur, Rajasthan, India, 2016. Springer.
+
+\bibitem{RamRohitThesis}
+{Ram Rohit Gannavarapu}.
+\newblock Secure remote sensor simulator for heavy vehicle electronic control
+  units, December 2021.
 
 \bibitem{rotermund_requirements_2020}
 Randolf Rotermund, Timo Häckel, Philipp Meyer, Franz Korf, and Thomas~C.

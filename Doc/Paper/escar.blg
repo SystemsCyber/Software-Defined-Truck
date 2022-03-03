@@ -1,49 +1,52 @@
-This is BibTeX, Version 0.99d (TeX Live 2021/W32TeX)
+This is BibTeX, Version 0.99d
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: escar.aux
+Reallocating 'name_of_file' (item size: 1) to 6 items.
 The style file: plain.bst
+Reallocating 'name_of_file' (item size: 1) to 4 items.
 Database file #1: bib.bib
+Warning--I didn't find a database entry for "github_sss3"
 Warning--empty institution in doering_retrofitting_nodate
 Warning--empty year in doering_retrofitting_nodate
-You've used 16 entries,
+You've used 17 entries,
             2118 wiz_defined-function locations,
-            595 strings with 7923 characters,
-and the built_in function-call counts, 6557 in all, are:
-= -- 638
-> -- 330
+            601 strings with 8106 characters,
+and the built_in function-call counts, 6756 in all, are:
+= -- 655
+> -- 337
 < -- 13
-+ -- 131
-- -- 114
-* -- 435
-:= -- 1029
-add.period$ -- 52
-call.type$ -- 16
-change.case$ -- 106
++ -- 134
+- -- 116
+* -- 443
+:= -- 1061
+add.period$ -- 54
+call.type$ -- 17
+change.case$ -- 110
 chr.to.int$ -- 0
-cite$ -- 18
-duplicate$ -- 273
-empty$ -- 509
-format.name$ -- 114
-if$ -- 1435
+cite$ -- 19
+duplicate$ -- 280
+empty$ -- 531
+format.name$ -- 116
+if$ -- 1478
 int.to.chr$ -- 0
-int.to.str$ -- 16
+int.to.str$ -- 17
 missing$ -- 13
-newline$ -- 81
-num.names$ -- 32
-pop$ -- 144
+newline$ -- 85
+num.names$ -- 34
+pop$ -- 153
 preamble$ -- 1
-purify$ -- 89
+purify$ -- 92
 quote$ -- 0
-skip$ -- 205
+skip$ -- 213
 stack$ -- 0
-substring$ -- 327
-swap$ -- 94
+substring$ -- 332
+swap$ -- 95
 text.length$ -- 13
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 64
+type$ -- 68
 warning$ -- 2
-while$ -- 62
-width$ -- 18
-write$ -- 183
-(There were 2 warnings)
+while$ -- 64
+width$ -- 19
+write$ -- 191
+(There were 3 warnings)
