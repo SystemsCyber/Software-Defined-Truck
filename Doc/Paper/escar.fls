@@ -1052,7 +1052,6 @@ INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy10.tfm
 INPUT C:\Program Files\MiKTeX\fonts\tfm\adobe\zapfchan\pzcmi8r.tfm
 INPUT C:\Program Files\MiKTeX\fonts\vf\public\pslatex\pcrr8tn.vf
 INPUT C:\Program Files\MiKTeX\fonts\tfm\public\pslatex\pcrr8rn.tfm
-INPUT C:\Program Files\MiKTeX\fonts\tfm\public\pslatex\pcrr8tn.tfm
 INPUT C:\Program Files\MiKTeX\fonts\vf\adobe\times\ptmr8t.vf
 INPUT C:\Program Files\MiKTeX\fonts\tfm\adobe\times\ptmr8r.tfm
 INPUT C:\Program Files\MiKTeX\fonts\vf\adobe\times\ptmr8c.vf
@@ -1063,6 +1062,7 @@ INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi10.tfm
 INPUT C:\Program Files\MiKTeX\fonts\vf\adobe\times\zpzccmry.vf
 INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy10.tfm
 INPUT C:\Program Files\MiKTeX\fonts\tfm\adobe\zapfchan\pzcmi8r.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\pslatex\pcrr8tn.tfm
 INPUT C:\Program Files\MiKTeX\fonts\vf\public\pslatex\pcrr8tn.vf
 INPUT C:\Program Files\MiKTeX\fonts\tfm\public\pslatex\pcrr8rn.tfm
 INPUT .\images\usability.png

@@ -1,12 +1,12 @@
 # Fdb version 3
-["bibtex escar"] 1646280157 "escar.aux" "escar.bbl" "escar" 1646280162
+["bibtex escar"] 1646281301 "escar.aux" "escar.bbl" "escar" 1646281306
   "C:/Program Files/MiKTeX/bibtex/bst/bibtex/plain.bst" 1291864736 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
   "bib.bib" 1646280152 6825 0d969df26336a24c9769963fc85ef97a ""
-  "escar.aux" 1646280162 7064 6e323734fe90b4a571606de985e387d5 "pdflatex"
+  "escar.aux" 1646281305 7046 0a9e213d2c7afbf84ee51a6b8c254c24 "pdflatex"
   (generated)
   "escar.bbl"
   "escar.blg"
-["pdflatex"] 1646280158 "c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646280162
+["pdflatex"] 1646281302 "c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex" "escar.pdf" "escar" 1646281306
   "C:/Program Files/MiKTeX/fonts/enc/dvips/base/8r.enc" 1458473887 4993 1194fb36dfcb11d9ae9802f2b00b60a3 ""
   "C:/Program Files/MiKTeX/fonts/tfm/adobe/symbol/psyr.tfm" 1136797454 1408 5937f58aa508ea2cea4901c07d10f5fe ""
   "C:/Program Files/MiKTeX/fonts/tfm/adobe/times/ptmb7t.tfm" 1136797454 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -182,10 +182,10 @@
   "C:/Program Files/MiKTeX/tex/latex/xkeyval/xkeyval.sty" 1606298686 4902 efb3d66683a2da2a232f71e3a571a899 ""
   "C:/Users/jdaily/AppData/Local/MiKTeX/miktex/data/le/pdftex/pdflatex.fmt" 1615564734 9284301 b56895d9e7fdcb42b68d97a2517a782f ""
   "C:/Users/jdaily/AppData/Local/MiKTeX/pdftex/config/pdftex.map" 1615485422 80909 eab91d9745dd2edfd62a31d53cd5fe15 ""
-  "c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex" 1646280109 39658 502d09e94310b16fdd16b6bd1d468d3b ""
-  "escar.aux" 1646280162 7064 6e323734fe90b4a571606de985e387d5 "pdflatex"
-  "escar.bbl" 1646280158 5061 2954073f6f9d3e1f532ad0e5cbc0e34b "bibtex escar"
-  "escar.out" 1646280162 3049 c5871328c946ef0d56026f4c9e4bfe15 "pdflatex"
+  "c:/Users/jdaily/Documents/GitHub/Software-Defined-Truck/Doc/Paper/escar.tex" 1646281296 39177 9ef8700ddf8b21dbbb722a84db4c00dc ""
+  "escar.aux" 1646281305 7046 0a9e213d2c7afbf84ee51a6b8c254c24 "pdflatex"
+  "escar.bbl" 1646281301 5138 a0df67cc7a1ddec938278a7e0bb75626 "bibtex escar"
+  "escar.out" 1646281305 3049 c5871328c946ef0d56026f4c9e4bfe15 "pdflatex"
   "images/design_goal.drawio.png" 1646265117 919766 b827cdf18379d0bfa5a863d4bac440ea ""
   "images/network_designer.png" 1646265117 37011 205179063659eb2142eeeebb83a2e2b2 ""
   "images/network_matrix.png" 1646265117 55572 6b4b3f40282795fda80b7bf98f16cb10 ""

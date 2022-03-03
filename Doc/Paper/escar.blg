@@ -5,48 +5,48 @@ Reallocating 'name_of_file' (item size: 1) to 6 items.
 The style file: plain.bst
 Reallocating 'name_of_file' (item size: 1) to 4 items.
 Database file #1: bib.bib
-Warning--I didn't find a database entry for "github_sss3"
+Warning--to sort, need author or key in miniSSS3
 Warning--empty institution in doering_retrofitting_nodate
 Warning--empty year in doering_retrofitting_nodate
-You've used 17 entries,
+You've used 18 entries,
             2118 wiz_defined-function locations,
-            601 strings with 8106 characters,
-and the built_in function-call counts, 6756 in all, are:
-= -- 655
-> -- 337
+            603 strings with 8163 characters,
+and the built_in function-call counts, 6904 in all, are:
+= -- 667
+> -- 338
 < -- 13
-+ -- 134
++ -- 135
 - -- 116
-* -- 443
-:= -- 1061
-add.period$ -- 54
-call.type$ -- 17
-change.case$ -- 110
+* -- 448
+:= -- 1075
+add.period$ -- 55
+call.type$ -- 18
+change.case$ -- 113
 chr.to.int$ -- 0
-cite$ -- 19
-duplicate$ -- 280
-empty$ -- 531
+cite$ -- 21
+duplicate$ -- 287
+empty$ -- 554
 format.name$ -- 116
-if$ -- 1478
+if$ -- 1515
 int.to.chr$ -- 0
-int.to.str$ -- 17
+int.to.str$ -- 18
 missing$ -- 13
-newline$ -- 85
+newline$ -- 88
 num.names$ -- 34
-pop$ -- 153
+pop$ -- 161
 preamble$ -- 1
-purify$ -- 92
+purify$ -- 94
 quote$ -- 0
-skip$ -- 213
+skip$ -- 223
 stack$ -- 0
-substring$ -- 332
-swap$ -- 95
+substring$ -- 337
+swap$ -- 96
 text.length$ -- 13
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 68
-warning$ -- 2
+type$ -- 72
+warning$ -- 3
 while$ -- 64
-width$ -- 19
-write$ -- 191
+width$ -- 20
+write$ -- 196
 (There were 3 warnings)
