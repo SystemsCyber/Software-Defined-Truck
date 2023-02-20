@@ -15,7 +15,7 @@ Software-defined X-in-the-loop Testbench for Controller Area Network Experiments
 ```plantuml
 @startuml
 title <u> System Components</u>
-class "Smart Sensor Simulator 3" as SSSF
+class "Smart Sensor Simulator and Forwarder" as SSSF
 class Controller
 class HTTPClient
 class CANNode{

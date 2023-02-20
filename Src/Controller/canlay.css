@@ -1,0 +1,132 @@
+Screen {
+    background: $panel;
+    layers: base results commandline logs header footer;
+}
+
+Header {
+    layer: header;
+}
+
+Footer {
+    layer: footer;
+}
+
+Results {
+    width: 100vw;   
+    height: 100%;
+    /* padding: 0 1;     */
+    layer: results;
+    dock: left;
+    background: $background 50%;
+    border: tall $background;
+    transition: offset 400ms in_out_cubic;
+}
+
+Results:focus {
+    border: tall $accent;
+}
+
+Results.-in-session {
+    width: 50vw !important;
+}
+
+/* #results-container {
+    margin: 0 0 1 0;
+    height: 100%;
+    overflow: hidden auto;
+}
+
+#results-container:focus {
+    border: tall $accent;
+} */
+
+CommandLine {
+    /* width: 100%; */
+    height: auto;
+    dock: bottom;
+    margin: 1 0;
+    border: round $primary;
+    layer: commandline;
+    layout: grid;
+    grid-size: 2;
+    grid-rows: 1;
+    grid-columns: 3 1fr;
+}
+
+CommandLine Input {
+    background: $panel;
+    /* padding: 1 2; */
+    border: none;
+    /* height: 100%; */
+}
+
+CommandLine:focus {
+    border: round $accent;
+}
+
+CommandLine .label {
+    /* padding: 1 2; */
+    text-align: right;
+}
+
+#logViewer {
+    background: $surface;
+    color: $text;
+    height: 50vh;
+    dock: bottom;
+    layer: logs;
+    border-top: hkey $primary;
+    offset-y: 0;
+    transition: offset 400ms in_out_cubic;
+    padding: 0 1 1 1;
+}
+
+#logViewer:focus {
+    offset: 0 0 !important;
+}
+
+#logViewer.-hidden {
+    offset-y: 100%;
+}
+
+LiveView {
+    width: 50vw;   
+    height: 100%;
+    background: $panel;
+    dock: right;
+    layer: results;
+    transition: offset 400ms in_out_cubic;
+    offset-x: 0;
+    overflow-y: hidden;
+    layout: grid;
+    grid-size: 1 6;
+    margin-top: 1;
+    grid-rows: 1 3fr 1 2fr 1 18fr;
+}
+
+LiveView:focus {
+    border: tall $accent;
+}
+
+LiveView.-hidden {
+    offset-x: 50vw;
+}
+
+LiveView.liveViewLabel {
+    text-style: bold !important;
+}
+
+LiveView .totalStats {
+    border: tall $background;
+    background: $background 50% !important;
+}
+
+LiveView .simLogs {
+    border: tall $background;
+    background: $background 50% !important;
+}
+
+LiveView .canLogs {
+    border: tall $background;
+    background: $background 50% !important;
+}

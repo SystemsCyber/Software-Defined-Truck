@@ -13,3 +13,4 @@ Doc/Paper/escar.fls
 Doc/Paper/escar.log
 Doc/Paper/escar.pdf
 Doc/Paper/escar.synctex.gz
+Src/Controller/*.txt

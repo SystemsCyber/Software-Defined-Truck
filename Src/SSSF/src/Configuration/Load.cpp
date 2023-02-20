@@ -30,6 +30,8 @@ Load::Load():
     JsonArray ecus1 = exConfig.createNestedArray("AttachedDevices");
     ecus1.add(exECU1);
     ecus1.add(exECU2);
+
+    exConfig["SSSFDevice"] = "SSS3";
 };
 
 void Load::init()

@@ -41,9 +41,13 @@ bool HTTPClient::connect()
     client.setHttpResponseTimeout(3000);
     if (registration.length() == 0) createRegistration();
     connectionStatus = attemptConnection();
+    uint8_t statusLEDSwitch = LOW;
+    uint32_t lastLEDChange = millis();
+    uint32_t time = 0;
     while (connectionStatus != Connected)
     {
-        if (millis() - lastAttempt > retryInterval)
+        time = millis();
+        if (time - lastAttempt > retryInterval)
         {
             connectionStatus = attemptConnection();
             if (connectionStatus == Disconnected)
@@ -52,10 +56,18 @@ bool HTTPClient::connect()
             }
             else if (connectionStatus == Unreachable)
             {
+                digitalWrite(statusLED, LOW);
                 return false;
             }
         }
+        if (time - lastLEDChange > 500)
+        {
+            digitalWrite(statusLED, statusLEDSwitch);
+            statusLEDSwitch = !statusLEDSwitch;
+            lastLEDChange = millis();
+        }
     }
+    digitalWrite(statusLED, HIGH);
     return true;
 }
 

@@ -5,6 +5,10 @@
 #include <ArduinoLog.h>
 #include <FlexCAN_T4.h>
 #include <Dns.h>
+#include <SPI.h>
+#include <SD.h>
+
+LogStream ls;
 
 CANNode::CANNode():
     mac{0},
@@ -14,20 +18,22 @@ CANNode::CANNode():
     teensyMAC(mac);
 }
 
-CANNode::CANNode(uint32_t _can0Baudrate):
+CANNode::CANNode(uint32_t _can0Baudrate, String _SSSFDevice):
     can0BaudRate(_can0Baudrate),
     mac{0},
-    sessionStatus(Inactive)
+    sessionStatus(Inactive),
+    SSSFDevice(_SSSFDevice)
 {
     setupLogging();
     teensyMAC(mac);
 }
 
-CANNode::CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+CANNode::CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate, String _SSSFDevice):
     can0BaudRate(_can0Baudrate),
     can1BaudRate(_can1Baudrate),
     mac{0},
-    sessionStatus(Inactive)
+    sessionStatus(Inactive),
+    SSSFDevice(_SSSFDevice)
 {
     setupLogging();
     teensyMAC(mac);
@@ -40,6 +46,37 @@ int CANNode::init()
     canSize = sizeof(CAN_message_t);
     canFDSize = sizeof(CANFD_message_t);
     canHeadSize = canBlockSize - canFDSize;
+    if (SSSFDevice.compareTo("SSS3") == 0)
+    {
+        pinMode(SSS3GreenLED, OUTPUT);
+        digitalWrite(SSS3GreenLED, LOW);
+        pinMode(SSS3RedLED, OUTPUT);
+        digitalWrite(SSS3RedLED, LOW);
+        pinMode(SSS3Relay, OUTPUT);
+        statusLED = SSS3GreenLED;
+        rxCANLED = SSS3RedLED;
+        Log.noticeln("SSSF Device: %s", SSSFDevice.c_str());
+    }
+    else if (SSSFDevice.compareTo("CAN-to-Ethernet") == 0)
+    {
+        pinMode(CAN2EthLED1, OUTPUT);
+        digitalWrite(CAN2EthLED1, LOW);
+        pinMode(CAN2EthLED2, OUTPUT);
+        digitalWrite(CAN2EthLED2, LOW);
+        pinMode(CAN2EthSilentPin1, OUTPUT);
+        pinMode(CAN2EthSilentPin2, OUTPUT);
+        digitalWrite(CAN2EthSilentPin1, LOW);
+        digitalWrite(CAN2EthSilentPin2, LOW);
+        statusLED = CAN2EthLED1;
+        rxCANLED = CAN2EthLED2;
+        Log.noticeln("SSSF Device: %s", SSSFDevice.c_str());
+    }
+    else
+    {
+        Log.fatalln("Invalid SSSF Device. Must be either SSS3 or CAN-to-Ethernet.");
+        foreverFlashInError();
+        return 0;
+    }
     Log.noticeln("Setting up CAN Channel(s).");
     setupCANChannels();
     Log.noticeln("Setting up Ethernet:");
@@ -60,6 +97,7 @@ int CANNode::init()
     {
         checkHardware();
         Log.fatalln("\t***Failed to configure Ethernet using DHCP***");
+        foreverFlashInError();
         return 0;
     }
 }
@@ -77,6 +115,7 @@ bool CANNode::startSession(IPAddress _ip, uint16_t _port)
         Log.noticeln("Session Information: ");
         Log.noticeln("\tIP: %p", canIP);
         Log.noticeln("\tPort: %d", canPort);
+        ignitionOn();
         return true;
     }
     else
@@ -172,6 +211,7 @@ void CANNode::stopSession()
     canPort = 0;
     sequenceNumber = 1;
     sessionStatus = Inactive;
+    ignitionOff();
     Log.noticeln("Waiting for next session.");
 }
 
@@ -212,23 +252,161 @@ String CANNode::dumpCANBlock(struct WCANBlock &canBlock)
 
 void CANNode::setupLogging()
 {
+    ls.LogFile = initializeSD("SSSF.log");
     Log.setPrefix(printPrefix);
     Log.setSuffix(printSuffix);
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    Log.begin(LOG_LEVEL_VERBOSE, &ls);
     Log.setShowLevel(false);
 }
 
 void CANNode::setupCANChannels()
 {
-    Log.noticeln("Setting up can0 with a bitrate of %d", can0BaudRate);
     can0.begin();
-    can0.setBaudRate(can0BaudRate);
-    if (can1BaudRate)
+    if (can0BaudRate == 0)
     {
-        Log.noticeln("Setting up can1 with a bitrate of %d", can1BaudRate);
+        Log.noticeln("Baudrate of 0 was given. Using autobaud to determine the bitrate.");
+        ignitionOn();
+        can0BaudRate = getBaudRate(0);
+        ignitionOff();
+    }
+    Log.noticeln("Setting up can0 with a bitrate of %d", can0BaudRate);
+    can0.setBaudRate(can0BaudRate);
+    if (can1BaudRate >= 0)
+    {
         can1.begin();
+        if (can1BaudRate == 0)
+        {
+            Log.noticeln("Baudrate of 0 was given. Using autobaud to determine the bitrate.");
+            ignitionOn();
+            can1BaudRate = getBaudRate(1);
+            ignitionOff();
+        }
+        Log.noticeln("Setting up can1 with a bitrate of %d", can1BaudRate);
         can1.setBaudRate(can1BaudRate);
     }
+    // while(true) {
+    //     CAN_message_t msg;
+    //     if (can0.read(msg)) {
+    //         Log.noticeln("CAN0: %d %d %d %d %d %d %d %d", msg.buf[0], msg.buf[1], msg.buf[2], msg.buf[3], msg.buf[4], msg.buf[5], msg.buf[6], msg.buf[7]);
+    //     }
+    //     if (can1.read(msg)) {
+    //         Log.noticeln("CAN1: %d %d %d %d %d %d %d %d", msg.buf[0], msg.buf[1], msg.buf[2], msg.buf[3], msg.buf[4], msg.buf[5], msg.buf[6], msg.buf[7]);
+    //     }
+    // }
+}
+
+void CANNode::ignitionOn()
+{
+    if (SSSFDevice.compareTo("SSS3") == 0)
+    {
+        digitalWrite(SSS3Relay, HIGH);
+        delay(3000);
+    }
+}
+
+void CANNode::ignitionOff()
+{
+    if (SSSFDevice.compareTo("SSS3") == 0)
+    {
+        digitalWrite(SSS3Relay, LOW);
+        delay(3000);
+    }
+}
+
+uint32_t CANNode::getBaudRate(uint8_t channel)
+{
+    // Not clean code due to the limitation of the templated FLEXCAN library
+    if (channel == 0)
+    {
+        Log.infoln("Emptying the read buffer of old messages...");
+        CAN_message_t rxmsg;
+        while (can0.read(rxmsg));
+        Log.infoln("Starting autobaud routine...");
+        uint32_t routine_start_time = millis();
+        while((millis() - routine_start_time) < (AUTOBAUD_TIMEOUT_MS * NUM_BAUD_RATES))
+        {
+            Log.infoln("Trying baud rate %d", baudRates[baudRateIndex]);
+            can0.setBaudRate(baudRates[baudRateIndex]);
+            Log.infoln("Resetting the error counters.");
+            can0.FLEXCAN_EnterFreezeMode();
+            FLEXCANb_ECR(CAN0) = 0;
+            can0.FLEXCAN_ExitFreezeMode();
+            uint8_t previousRec = (FLEXCANb_ECR(CAN0) & 0x0000FF00) >> 8;
+            Log.infoln("Waiting for a message to arrive... (timeout: %d ms)", AUTOBAUD_TIMEOUT_MS);
+            uint32_t frameStartTime = millis();
+            while((millis() - frameStartTime) < AUTOBAUD_TIMEOUT_MS)
+            {
+                if (can0.read(rxmsg))
+                {
+                    Log.infoln("Message received. Baud rate is %d", baudRates[baudRateIndex]);
+                    return baudRates[baudRateIndex];
+                }
+                else
+                {
+                    uint8_t currentREC = (FLEXCANb_ECR(CAN0) & 0x0000FF00) >> 8;
+                    if ((currentREC - previousRec) > 0)
+                    {
+                        Log.infoln("Error counter increased. Trying next baud rate...");
+                        break;
+                    }
+                }
+            }
+            Log.infoln("No message received. Trying next baud rate...");
+            baudRateIndex++;
+            if (baudRateIndex > NUM_BAUD_RATES)
+            {
+                baudRateIndex = 0;
+            }
+        }
+        Log.fatalln("No baud rate found. Aborting.");
+        foreverFlashInError();
+    }
+    else if (channel == 1)
+    {
+        Log.infoln("Emptying the read buffer of old messages...");
+        CAN_message_t rxmsg;
+        while (can1.read(rxmsg));
+        Log.infoln("Starting autobaud routine...");
+        uint32_t routine_start_time = millis();
+        while((millis() - routine_start_time) < (AUTOBAUD_TIMEOUT_MS * NUM_BAUD_RATES))
+        {
+            Log.infoln("Trying baud rate %d", baudRates[baudRateIndex]);
+            can1.setBaudRate(baudRates[baudRateIndex]);
+            Log.infoln("Resetting the error counters.");
+            can1.FLEXCAN_EnterFreezeMode();
+            FLEXCANb_ECR(CAN1) = 0;
+            can1.FLEXCAN_ExitFreezeMode();
+            uint8_t previousRec = (FLEXCANb_ECR(CAN1) & 0x0000FF00) >> 8;
+            Log.infoln("Waiting for a message to arrive... (timeout: %d ms)", AUTOBAUD_TIMEOUT_MS);
+            uint32_t frameStartTime = millis();
+            while((millis() - frameStartTime) < AUTOBAUD_TIMEOUT_MS)
+            {
+                if (can1.read(rxmsg))
+                {
+                    Log.infoln("Message received. Baud rate is %d", baudRates[baudRateIndex]);
+                    return baudRates[baudRateIndex];
+                }
+                else
+                {
+                    uint8_t currentREC = (FLEXCANb_ECR(CAN1) & 0x0000FF00) >> 8;
+                    if ((currentREC - previousRec) > 0)
+                    {
+                        // Error detected, try next baud rate
+                        break;
+                    }
+                }
+            }
+            Log.infoln("No message received. Trying next baud rate...");
+            baudRateIndex++;
+            if (baudRateIndex > NUM_BAUD_RATES)
+            {
+                baudRateIndex = 0;
+            }
+        }
+        Log.fatalln("No baud rate found. Aborting.");
+        foreverFlashInError();
+    }
+    return baudRates[baudRateIndex];
 }
 
 void CANNode::checkHardware()
@@ -256,6 +434,20 @@ void CANNode::checkLink()
     else
     {
         Log.noticeln("\t\t***Ethernet cable is connected and a valid link was established.***");
+    }
+}
+
+void CANNode::foreverFlashInError()
+{
+    Log.fatalln("\t\t***The CANNode is in an error state and will now flash the LED.***");
+    while (1)
+    {
+        digitalWrite(statusLED, HIGH);
+        digitalWrite(rxCANLED, LOW);
+        delay(250);
+        digitalWrite(statusLED, LOW);
+        digitalWrite(rxCANLED, HIGH);
+        delay(250);
     }
 }
 
@@ -310,7 +502,55 @@ void CANNode::printLogLevel(Print* _logOutput, int logLevel)
 
 void CANNode::printSuffix(Print* _logOutput, int logLevel)
 {
-  _logOutput->print("");
+    _logOutput->print((char)4);
 }
 
-// ***************************************************
+File CANNode::initializeSD(const char *filename)
+{
+    Serial.print("Initializing SD card for logging...");
+    if (!SD.begin(BUILTIN_SDCARD))
+    {
+        Serial.println("card failed, or not present.");
+        foreverFlashInError();
+    }
+    else
+    {
+        Serial.println("card initialized.");
+    }
+    return fileExists(filename);
+}
+
+File CANNode::fileExists(const char *filename)
+{
+    Serial.println("Checking for SSSF.log file...");
+    if (!SD.exists(filename))
+    {
+        Serial.println("SSSF.log file not found. Creating new file...");
+    }
+    else
+    {
+        Serial.println("SSSF.log file found. Removing old file...");
+        SD.remove(filename);
+        Serial.println("SSSF.log file removed. Creating new file...");
+    }
+    return createFile(filename);
+}
+
+File CANNode::createFile(const char *filename)
+{
+    File file = SD.open(filename, FILE_WRITE_BEGIN);
+    if (file)
+    {
+        Serial.print("Creating ");
+        Serial.print(filename);
+        Serial.println("...");
+    }
+    else
+    {
+        Serial.print("Error creating ");
+        Serial.print(filename);
+        Serial.println("...");
+        foreverFlashInError();
+    }
+    return file;
+}

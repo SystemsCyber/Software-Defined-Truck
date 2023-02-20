@@ -322,7 +322,7 @@ class Broker(Wrap_HTTPRequestHandler):
 
 
 def main():
-    broker = Broker(2)
+    broker = Broker(5)
     broker.listen()
 
 

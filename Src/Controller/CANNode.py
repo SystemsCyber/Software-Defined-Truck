@@ -1,4 +1,9 @@
+from __future__ import annotations
+
 import logging
+import platform
+import re
+import subprocess
 import selectors as sel
 import socket as soc
 from ctypes import (Structure, Union, c_bool, c_int8, c_uint8, c_uint16,
@@ -6,12 +11,12 @@ from ctypes import (Structure, Union, c_bool, c_int8, c_uint8, c_uint16,
 from enum import Enum, auto
 from ipaddress import IPv4Address
 from types import SimpleNamespace
+from typing import List, Tuple, Type
 
-import netifaces
 from getmac import get_mac_address as gma
 
-from Environment import LogSetup
 from Time_Client import Time_Client
+from multiprocessing import Lock
 
 
 class FLAGS_FD(Structure):
@@ -133,7 +138,8 @@ class CANNode(object):
         self.__can_ip = IPv4Address
         self.__can_port = 0
         self.sel = sel.DefaultSelector()
-        self.time_client = Time_Client(self.sel)
+        self.sel_lock = Lock()
+        self.time_client = Time_Client(kwargs["ntp_servers"].split())
 
         self.mac = gma()
         self._sequence_number = 1
@@ -155,36 +161,74 @@ class CANNode(object):
         self.__can_sock.setblocking(False)
         self.__can_sock.bind(('', can_port))
 
-    def __create_group_info(self, ip: IPv4Address) -> bytes:
-        default_gw = netifaces.gateways()["default"][netifaces.AF_INET]
-        gw = IPv4Address(default_gw[0])
-        logging.info(f"Default IPv4 Gateway: {gw}")
-        device_addresses = soc.gethostbyname_ex(soc.gethostname())[2]
-        logging.info(f"Device interface addresses: {device_addresses}")
-        closest_ip = str
-        smallest_diff = 9999999999
-        for i in netifaces.ifaddresses(default_gw[1])[netifaces.AF_INET]:
-            _ip = IPv4Address(i["addr"])
-            diff = abs(int(gw) - int(_ip))
-            if (diff < smallest_diff) and (str(_ip) in device_addresses):
-                smallest_diff = diff
-                closest_ip = str(_ip)
-        logging.info(f"Closest IP found to default gateway: {closest_ip}")
-        logging.info("Multicast interface chosen: " + closest_ip)
-        iface = soc.inet_aton(closest_ip)
-        group = soc.inet_aton(str(ip))
+    
+    def __get_ip_addresses_and_gateway(self) -> Tuple[list[str], str]:
+        system = platform.system()
+        if system == "Linux":
+            command = "ip addr show"
+        elif system == "Windows":
+            command = "ipconfig /all"
+        else:
+            raise Exception("Unsupported operating system")
+        output = subprocess.run(command.split(), capture_output=True, text=True).stdout
+        ipv4_pattern = r"(?P<ip>(?:[0-9]{1,3}\.){3}[0-9]{1,3})"
+        ipv4_addresses = []
+        gateway = None
+        for line in output.split("\n"):
+            match = re.search(ipv4_pattern, line)
+            if match:
+                print(line)
+                ipv4_address = match.group("ip")
+                if system == "Linux" and "scope global" in line:
+                    ipv4_addresses.append(ipv4_address)
+                elif system == "Windows" and "IPv4 Address" in line:
+                    ipv4_addresses.append(ipv4_address)
+                elif system == "Windows" and "Default Gateway" in line:
+                    gateway = ipv4_address
+                elif system == "Linux" and "default via" in line:
+                    gateway = ipv4_address
+        if gateway is None:
+            raise Exception("Could not find gateway")
+        logging.info(f"Device gateway: {gateway}")
+        logging.info(f"Device interface IP addresses: {ipv4_addresses}")
+        return ipv4_addresses, gateway
+
+    def __get_closest_ip_address(self, ipv4_addresses: list[str], gateway: str) -> str:
+        closest_ip_address = None
+        closest_distance = None
+        gw = IPv4Address(gateway)
+        for ipv4_address in ipv4_addresses:
+            ip = IPv4Address(ipv4_address)
+            distance = abs(int(gw) - int(ip))
+            if closest_distance is None or distance < closest_distance:
+                closest_distance = distance
+                closest_ip_address = ipv4_address
+        logging.debug(
+            f"Distance between {closest_ip_address} and {gateway} is {closest_distance}")
+        if closest_ip_address is None:
+            raise Exception("Could not find closest IP address")
+        return closest_ip_address
+
+    def __create_group_info(self, can_ip: IPv4Address) -> Tuple[bytes,bytes]:
+        ipv4_addresses, gateway = self.__get_ip_addresses_and_gateway()
+        closest_ip_address = self.__get_closest_ip_address(ipv4_addresses, gateway)
+        logging.info(f"Multicast interface chosen: {closest_ip_address}")
+        iface = soc.inet_aton(closest_ip_address)
+        group = soc.inet_aton(str(can_ip))
         mreq = group + iface
         return iface, mreq
+            
 
     def start_session(self, _ip: IPv4Address, _port: int) -> None:
         self.time_client.setup()
         self.__can_ip = _ip
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
-        self.__init_socket(self.__can_port, self.__mreq, self.__iface)
+        self.__init_socket(self.__can_port, self.__mreq, self.__iface) # type: ignore
         can_data = SimpleNamespace(callback=self.read, message=None)
-        self.can_key = self.sel.register(
-            self.__can_sock, sel.EVENT_READ, can_data)
+        with self.sel_lock:
+            self.can_key = self.sel.register(
+                self.__can_sock, sel.EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self) -> bytes:
@@ -193,13 +237,14 @@ class CANNode(object):
         except OSError as oe:
             logging.debug("Occured in read")
             logging.error(oe)
+            return b''
 
     def packCAN(self, can_frame: CAN_message_t) -> WCANBlock:
         message = WCANBlock(
             self._sequence_number,
             False,
             False,
-            WCANFrame(can_frame)
+            WCANFrame(can_frame, CANFD_message_t())
         )
         self._sequence_number += 1
         return message
@@ -222,12 +267,12 @@ class CANNode(object):
             )
         except OSError as oe:
             logging.error(oe)
+            return 0
 
     def stop_session(self) -> None:
         self.__can_ip = IPv4Address
         self.__can_port = 0
         if self.session_status == self.SessionStatus.Active:
-            self.time_client.shutdown()
             logging.info("Shutting down CAN socket.")
             self.sel.unregister(self.__can_sock)
             self.__can_sock.setsockopt(
