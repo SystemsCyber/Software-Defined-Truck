@@ -25,8 +25,8 @@ private:
     int comHeadSize = 0;
 
     // For Testing
-    // unsigned int sendInterval = 16;
-    // unsigned int lastSend = 0;
+    unsigned int sendInterval = 30;
+    unsigned int lastSend = 0;
     // -----------
 
 public:
@@ -55,8 +55,8 @@ public:
     virtual bool setup();
     virtual void forwardingLoop(bool print = false);
 
-private:
     void write(struct CAN_message_t &canFrame);
+private:
     void write(struct CANFD_message_t &canFrame);
     void write(NetworkStats::NodeReport *healthReport);
 

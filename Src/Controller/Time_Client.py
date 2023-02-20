@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import selectors as sel
 import socket
@@ -6,8 +8,8 @@ import time
 from enum import Enum, auto
 from types import SimpleNamespace
 from typing import Tuple
-
-from ntplib import *
+from ntplib import * # type: ignore
+from threading import Lock, Event
 
 SOCKADDR = Tuple[str, int]
 NTPSERVER = Tuple[str, SOCKADDR]
@@ -21,16 +23,16 @@ class Status(Enum):
 
 
 class Time_Client(NTPClient):
-    def __init__(self, _sel: sel.DefaultSelector) -> None:
+    def __init__(self, ntp_servers: list[str]) -> None:
         super().__init__()
-        self._sel = _sel
+        self._sel = sel.DefaultSelector()
         self._is_setup = False
         self._ip_translated = True
         self._server = self.__get_addr_info(
-            ["dailyserver.", "time.nist.gov", "pool.ntp.org"])
+            [*ntp_servers, "time.nist.gov", "pool.ntp.org"])
         logging.info(f"Chosen NTP server: {self._server[0]}.")
 
-        self._polling_interval = 1
+        self._polling_interval = 3
         logging.info(
             f"Initial NTP polling interval: {2**self._polling_interval}s.")
         self._status = Status.NotSet
@@ -52,7 +54,7 @@ class Time_Client(NTPClient):
         for host in hosts:
             logging.info(f"Getting the IP for the NTP server {host}.")
             try:
-                return host, socket.getaddrinfo(host, port)[0][4]
+                return host, socket.getaddrinfo(host, port)[0][4] # type: ignore
             except socket.gaierror:
                 logging.error(f"The NTP server {host} is not available.")
         logging.error(
@@ -60,10 +62,11 @@ class Time_Client(NTPClient):
             f"Defaulting to {hosts[0]}:123."
         )
         self._ip_translated = False
-        return "dailyserver", ("dailyserver", 123)
+        return hosts[0], (hosts[0], 123)
 
     def setup(self) -> None:
         logging.info("Setting up NTP Socket.")
+        self._lock = Lock()
         self._sock = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self._sock.setblocking(False)
@@ -93,7 +96,7 @@ class Time_Client(NTPClient):
         query_packet = NTPPacket(
             mode=3,
             version=version,
-            tx_timestamp=system_to_ntp_time(time.time() + self._offset)
+            tx_timestamp=system_to_ntp_time(time.time() + self._offset) # type: ignore
         )
         try:
             sent = self._sock.sendto(query_packet.to_data(), ntp_server[1])
@@ -107,12 +110,12 @@ class Time_Client(NTPClient):
             self._status = Status.Sent
             self._last_sent = time.time()
         finally:
-            return sent
+            return sent # type: ignore
 
     def __set_peer_update(self, response: bytes, now: float) -> None:
         stats = NTPStats()
         stats.from_data(response)
-        stats.dest_timestamp = system_to_ntp_time(now)
+        stats.dest_timestamp = system_to_ntp_time(now) # type: ignore
         self._buffer[self._index]["Delay"] = stats.delay
         self._buffer[self._index]["Offset"] = stats.offset
         self._buffer[self._index]["Time"] = now
@@ -151,14 +154,15 @@ class Time_Client(NTPClient):
     def readNTPPacket(self, key: sel.SelectorKey) -> None:
         response_packet, addr = self._sock.recvfrom(256)
         if (addr[0] == self._server[1][0]) and (self._status == Status.Sent):
-            now = time.time()
-            self._status = Status.Received
-            self._last_update = now
-            self.__set_polling_interval()
+            with self._lock:
+                now = time.time()
+                self._status = Status.Received
+                self._last_update = now
+                self.__set_polling_interval()
 
-            self.__set_peer_update(response_packet, now + self._offset)
-            self._offset += self.__get_peer_update()
-            self._index = (self._index + 1) % 8
+                self.__set_peer_update(response_packet, now + self._offset)
+                self._offset += self.__get_peer_update()
+                self._index = (self._index + 1) % 8
         else:
             logging.error(
                 "Received NTP packet from a different server "
@@ -181,8 +185,22 @@ class Time_Client(NTPClient):
             self.__set_polling_interval()
             self._status = Status.NotSet
 
+    def stay_updated(self, stop: Event) -> None:
+        try:
+            while not stop.is_set():
+                self.update(time.time())
+                ce = self._sel.select(1)
+                for key, mask in ce:
+                    callback = key.data.callback
+                    callback(key)
+        finally:
+            self.shutdown()
+
     def time_ms(self) -> int:
-        return int((time.time() + self._offset) * 1000)
+        if not self._is_setup:
+            self.setup()
+        with self._lock:
+            return int((time.time() + self._offset) * 1000)
 
     def shutdown(self) -> None:
         logging.info("Shutting down NTP socket.")

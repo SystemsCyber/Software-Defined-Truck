@@ -10,39 +10,39 @@
 #include <Dns.h>
 #include <FlexCAN_T4.h>
 
-SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate):
-    CANNode(_can0Baudrate),
+SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate):
+    CANNode(_can0Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
-    HTTPClient(_attachedDevice, serverAddress),
+    HTTPClient(_config, serverAddress),
     timeClient(&Log)
     {}
 
-SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate):
-    SSSF(serverAddress.c_str(), _attachedDevice, _can0Baudrate)
+SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate):
+    SSSF(serverAddress.c_str(), _config, _can0Baudrate)
     {}
 
-SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate):
-    CANNode(_can0Baudrate),
+SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate):
+    CANNode(_can0Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
-    HTTPClient(_attachedDevice, serverAddress),
+    HTTPClient(_config, serverAddress),
     timeClient(&Log)
     {}
 
-SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
-    CANNode(_can0Baudrate, _can1Baudrate),
+SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+    CANNode(_can0Baudrate, _can1Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
-    HTTPClient(_attachedDevice, serverAddress),
+    HTTPClient(_config, serverAddress),
     timeClient(&Log)
     {}
 
-SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
-    SSSF(serverAddress.c_str(), _attachedDevice, _can0Baudrate, _can1Baudrate)
+SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+    SSSF(serverAddress.c_str(), _config, _can0Baudrate, _can1Baudrate)
     {}
 
-SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _attachedDevice, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
-    CANNode(_can0Baudrate, _can1Baudrate),
+SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
+    CANNode(_can0Baudrate, _can1Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
-    HTTPClient(_attachedDevice, serverAddress),
+    HTTPClient(_config, serverAddress),
     timeClient(&Log)
     {}
 
@@ -65,6 +65,14 @@ void SSSF::forwardingLoop(bool print)
 {
     timeClient.update();
     pollServer();
+    // struct CAN_message_t canFrame;
+    // if (can0.read(canFrame))
+    // {
+    //     // while (can0.read(canFrame)) {}
+    //     Serial.println(canFrame.id, HEX);
+    //     canFrame.id = 0x18F00485;
+    //     Serial.println(can0.write(canFrame));
+    // }
     if (sessionStatus == Active)
     {
         // For testing
@@ -90,22 +98,24 @@ void SSSF::forwardingLoop(bool print)
             {
                 networkHealth->update(msg.index, packetSize, msg.timestamp, msg.canFrame.sequenceNumber);
                 can0.write(msg.canFrame.can);
-                if (can1BaudRate) can1.write(msg.canFrame.can);
+                if (can1BaudRate > 0) can1.write(msg.canFrame.can);
             }
             else if (msg.type == 2)
             {
                 networkHealth->update(msg.index, packetSize, msg.timestamp, msg.frameNumber);
                 frameNumber = msg.frameNumber;
-                // Apply transformation
+                // // Apply transformation
                 // canFrame.mb = 0;
                 // canFrame.id = 0x18F00300 ^ 0x1FFFFFFF;
                 // canFrame.len = 8;
                 // canFrame.flags.extended = true;
                 // uint8_t throttle = uint8_t((msg.sensorFrame.signals[0] * 100.0) / 0.4);
                 // canFrame.buf[1] = throttle;
+                // canFrame.buf[6] = 255;
+                // canFrame.buf[7] = 255;
                 // write(canFrame);
                 // can0.write(canFrame);
-                // if (can1BaudRate) can1.write(canFrame);
+                // if (can1BaudRate > 0) can1.write(canFrame);
                 // -----------
             }
             else if (msg.type == 3)
@@ -224,11 +234,13 @@ void SSSF::pollServer()
 
 void SSSF::pollCANNetwork(struct CAN_message_t &canFrame)
 { // If messages build up in the queue this should be a while loop
-    if (can0BaudRate && can0.read(canFrame))
+    if ((can0BaudRate > 0) && can0.read(canFrame))
     {
+        digitalWrite(rxCANLED, rxCANLEDStatus);
+        rxCANLEDStatus = !rxCANLEDStatus;
         write(canFrame);
     }
-    if (can1BaudRate && can1.read(canFrame))
+    if ((can1BaudRate > 0) && can1.read(canFrame))
     {
         write(canFrame);
     }

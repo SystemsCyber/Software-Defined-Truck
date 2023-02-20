@@ -1,11 +1,12 @@
+from __future__ import annotations
 import logging
 import selectors as sel
 import struct
 from ctypes import (POINTER, Structure, Union, c_float, c_uint8, c_uint32,
-                    c_uint64, sizeof)
+                    c_uint64, sizeof, Array, c_byte, memmove)
 from ipaddress import IPv4Address
 from time import time
-from typing import List, Tuple
+from typing import List, Tuple, Type
 
 from CANNode import CANNode, WCANBlock
 
@@ -56,7 +57,7 @@ class COMMBlock(Structure):
 
 
 class Member_Node():
-    def __init__(self, _id=-1, _devices=None) -> None:
+    def __init__(self, _id=-1, _devices=[]) -> None:
         self.id = _id
         self.devices = _devices
         self.last_received_frame = 1
@@ -69,28 +70,27 @@ class SensorNode(CANNode):
         super().__init__(*args, **kwargs)
         self._id = -1
         self.index = 0
-        self.members: List[Member_Node] = []  # ID of member is index in array
+        self.members: list[Member_Node] = []  # ID of member is index in array
 
         self._max_retransmissions = _retrans
         self._max_retrans_notified = False
         self._attempts = 0
         self._timeout = None
-        self.timeout_additive = (1/_frame_rate)
+        self.timeout_additive = round((1/_frame_rate), 3)
         if _retrans > 0:
-            self.timeout_additive /= (_retrans)
+            self.timeout_additive = round((self.timeout_additive / _retrans), 3)
         logging.debug(f"Timeout additive: {self.timeout_additive}")
 
         self.frame_number = 0
-        self.comm_head_size = sizeof(COMMBlock) - sizeof(WCOMMFrame)
-        self._signal_offset = self.comm_head_size + 4
+        self._signal_offset = (sizeof(COMMBlock) - sizeof(WCOMMFrame)) + 4
         self.times_retrans = 0
 
     def start_session(self, ip: IPv4Address, port: int, request_data: dict) -> None:
         super().start_session(ip, port)
         self._id = request_data["ID"]
-        self.members = [Member_Node] * len(request_data["Devices"])
+        self.members = [Member_Node] * len(request_data["Devices"]) # type: ignore
         for member in request_data["Devices"]:
-            self.members[member["Index"]] = Member_Node(
+            self.members[member["Index"]] = Member_Node( # type: ignore
                 member["ID"], member["Devices"]
             )
 
@@ -117,24 +117,27 @@ class SensorNode(CANNode):
             self._attempts += 1
             self._timeout = time() + self.timeout_additive
             return super().write(*msg)
+        else:
+            return 0
 
-    def read(self) -> Tuple[COMMBlock, bytes]:
+    def read(self, buffer: Array[c_byte]) -> tuple[COMMBlock | None, int]:
         try:
-            buffer = super().read()
-            if buffer and len(buffer) >= sizeof(COMMBlock):
-                msg = COMMBlock.from_buffer_copy(buffer)
+            buf = super().read()
+            if buf and len(buf) >= sizeof(COMMBlock):
+                memmove(buffer, buf, len(buf))
+                msg = COMMBlock.from_buffer(buffer)
                 self.members[msg.index].last_received_frame = msg.frame_number
                 if msg.type == 1:
                     self.members[msg.index].last_seq_num = msg.frame.canFrame.sequence_number
                 if msg.frame_number == self.frame_number:
                     self._timeout = None
-                return msg, buffer
+                return msg, len(buf)
             else:
-                return (None, None)
+                return None, 0
         except (AttributeError, ValueError) as ae:
             logging.error("Received data from an out of band device.")
             logging.error(ae)
-            return (None, None)
+            return None, 0
 
     def __recvd_frame(self, member: Member_Node, now: float) -> bool:
         if member.last_received_frame != self.frame_number:
@@ -142,8 +145,9 @@ class SensorNode(CANNode):
                 self.times_retrans += 1
                 self._timeout = now + self.timeout_additive
                 self.can_key.data.callback = self.write
-                self.sel.modify(self.can_key.fileobj,
-                                sel.EVENT_WRITE, self.can_key.data)
+                with self.sel_lock:
+                    self.sel.modify(self.can_key.fileobj,
+                                    sel.EVENT_WRITE, self.can_key.data)
             elif not self._max_retrans_notified:
                 logging.error(
                     f"Have not received frame {self.frame_number} "

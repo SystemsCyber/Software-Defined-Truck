@@ -1,5 +1,10 @@
+from __future__ import annotations
+import logging
 import copy
-from ctypes import Structure, c_float, c_uint32
+import multiprocessing as mp
+from multiprocessing.synchronize import Event
+from multiprocessing.sharedctypes import RawArray, RawValue
+import ctypes as ct
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -7,6 +12,8 @@ from pandas import DataFrame
 
 from SensorNode import Member_Node
 from Time_Client import Time_Client
+from SensorNode import COMMBlock, WCOMMFrame
+from NetworkMatrix import NetworkMatrix
 
 
 @dataclass
@@ -15,15 +22,15 @@ class HealthBasics:
     last_sequence_number: int = 0
 
 
-class HealthCore(Structure):
+class HealthCore(ct.Structure):
     _pack_ = 4
     _fields_ = [
-        ("count", c_uint32),
-        ("min", c_float),
-        ("max", c_float),
-        ("mean", c_float),
-        ("variance", c_float),
-        ("sumOfSquaredDifferences", c_float)
+        ("count", ct.c_uint32),
+        ("min", ct.c_float),
+        ("max", ct.c_float),
+        ("mean", ct.c_float),
+        ("variance", ct.c_float),
+        ("sumOfSquaredDifferences", ct.c_float)
     ]
 
     def __repr__(self) -> str:
@@ -34,10 +41,10 @@ class HealthCore(Structure):
         )
 
 
-class NodeReport(Structure):
+class NodeReport(ct.Structure):
     _pack_ = 4
     _fields_ = [
-        ("packetLoss", c_float),
+        ("packetLoss", ct.c_float),
         ("latency", HealthCore),
         ("jitter", HealthCore),
         ("goodput", HealthCore)
@@ -54,22 +61,25 @@ class NodeReport(Structure):
 
 class NetworkStats:
     def __init__(self, _num_members: int, _time_client: Time_Client) -> None:
-        self.size = _num_members
-        self.time_client = _time_client
-        self.basics = [HealthBasics()] * _num_members
-        self.health_report = [NodeReport(
-            0.0,
-            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
-            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
-            HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0)
-        )] * _num_members
+        try:
+            self.size = _num_members
+            self.time_client = _time_client
+            self.basics = [HealthBasics() for _ in range(_num_members)]
+            self.health_report = (NodeReport * _num_members)()
+            for i in range(_num_members):
+                self.health_report[i].packetLoss = 0.0
+                ct.memset(ct.pointer(self.health_report[i].latency), 0, ct.sizeof(HealthCore))
+                ct.memset(ct.pointer(self.health_report[i].jitter), 0, ct.sizeof(HealthCore))
+                ct.memset(ct.pointer(self.health_report[i].goodput), 0, ct.sizeof(HealthCore))
+        except Exception as e:
+            logging.error(f'NetworkStats: {e}', exc_info=True)
 
     def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int):
         now = self.time_client.time_ms()
         delay = now - timestamp
         # if these numbers are zero then this is the first messages we've received
         if (self.basics[i].last_message_time != 0) and (self.basics[i].last_sequence_number != 0):
-            # print(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
+            # logging.debug(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
             ellapsedSeconds = (now - self.basics[i].last_message_time) / 1000.0
             if ellapsedSeconds == 0.0:
                 ellapsedSeconds = 0.0001  # Retransmission
@@ -92,12 +102,10 @@ class NetworkStats:
 
     def reset(self):
         for i in range(self.size):
-            self.health_report[i] = NodeReport(
-                0.0,
-                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
-                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
-                HealthCore(0, float('inf'), -float('inf'), 0.0, 0.0, 0.0),
-            )
+            self.health_report[i].packetLoss = 0.0
+            ct.memset(ct.pointer(self.health_report[i].latency), 0, ct.sizeof(HealthCore))
+            ct.memset(ct.pointer(self.health_report[i].jitter), 0, ct.sizeof(HealthCore))
+            ct.memset(ct.pointer(self.health_report[i].goodput), 0, ct.sizeof(HealthCore))
 
     def calculate(self, edge: HealthCore, n: float):
         # From: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
@@ -111,34 +119,40 @@ class NetworkStats:
         edge.variance = edge.sumOfSquaredDifferences / edge.count
 
 
-class HealthReport:
-    def __init__(self, _members: List[Member_Node]) -> None:
-        _num_members = len(_members)
-        self._members = _members
-        self.report = NodeReport * _num_members
-        zero_matrix = [[0.0] * _num_members] * _num_members
-        base_frame = DataFrame(
-            zero_matrix,
-            columns=self.__create_axis_names(),
-            index=self.__create_axis_names()
+class HealthCounts(ct.Structure):
+    _pack_ = 4
+    _fields_ = [
+        ("sim_frames", ct.c_uint32),
+        ("can_frames", ct.c_uint32),
+        ("dropped_sim_frames", ct.c_uint32),
+        ("dropped_can_frames", ct.c_uint32),
+    ]
+
+    def __repr__(self) -> str:
+        return (
+            f'\tSimulator Frame Count: {self.sim_frames}\n'
+            f'\tCAN Frame Count: {self.can_frames}\n'
+            f'\tDropped Simulator Frames: {self.dropped_sim_frames}\n'
+            f'\tDropped CAN Frames: {self.dropped_can_frames}\n'
         )
-        base_dict = {
-            "count": base_frame.copy(deep=True),
-            "min": base_frame.copy(deep=True),
-            "max": base_frame.copy(deep=True),
-            "mean": base_frame.copy(deep=True),
-            "variance": base_frame.copy(deep=True),
-            "sumOfSquaredDifferences": base_frame.copy(deep=True)
-        }
-        self.can_frames_per_device = [0] * _num_members
-        self.sim_frames = 0
-        self.can_frames = 0
-        self.dropped_sim_frames = 0
-        self.dropped_can_frames = 0
-        self.packet_loss = base_frame.copy(deep=True)
-        self.latency = copy.deepcopy(base_dict)
-        self.jitter = copy.deepcopy(base_dict)
-        self.goodput = copy.deepcopy(base_dict)
+
+
+
+class HealthReport:
+    def __init__(self, members: List[Member_Node]) -> None:
+        _num_members = len(members)
+        self._lock = mp.Lock()
+        self._members = members
+        self._rx_report_offset = ct.sizeof(COMMBlock) - ct.sizeof(WCOMMFrame)
+        self._rx_report_size = ct.sizeof(NodeReport) * _num_members
+        self.report = [RawArray(NodeReport, _num_members) for _ in range(_num_members)]
+        for i in range(_num_members):
+            ct.memset(ct.addressof(
+                self.report[i]), 0, ct.sizeof(self.report[i]))
+        self.counts = RawValue(HealthCounts, 0)
+        self.can_frames_per_device = RawArray(ct.c_uint32, [0] * _num_members)
+        self.labels = self.__create_axis_names()
+        self._matrix = NetworkMatrix(_num_members, self.labels)
 
     # From:
     # https://stackoverflow.com/questions/2837409/how-to-append-count-numbers-to-duplicates-in-a-list-in-python
@@ -168,29 +182,134 @@ class HealthReport:
         axis_names = list(self.__rename_duplicates(axis_names))
         return axis_names
 
-    def __update(self, measure: Dict[str, DataFrame], index: Tuple[int, int], reported: HealthCore) -> None:
-        measure["count"].iloc[index[0], index[1]] = reported.count
-        measure["min"].iloc[index[0], index[1]] = reported.min
-        measure["max"].iloc[index[0], index[1]] = reported.max
-        measure["mean"].iloc[index[0], index[1]] = reported.mean
-        measure["variance"].iloc[index[0], index[1]] = reported.variance
-        measure["sumOfSquaredDifferences"].iloc[index[0],
-                                                index[1]] = reported.sumOfSquaredDifferences
-
-    def update(self, index: int, report, last_msg_num: int):
-        if index == 0:
-            self.sim_frames = last_msg_num
-        else:
-            self.can_frames -= self.can_frames_per_device[index]
-            self.can_frames += last_msg_num
-            self.can_frames_per_device[index] = last_msg_num
-
-        for i in range(len(self._members)):
-            self.packet_loss.iloc[index, i] = report[i].packetLoss
-            self.__update(self.latency, (index, i), report[i].latency)
-            self.__update(self.jitter, (index, i), report[i].jitter)
-            self.__update(self.goodput, (index, i), report[i].goodput)
-            if i == 0:
-                self.dropped_sim_frames += report[i].packetLoss
+    def update(self, index: int, report_buff: ct.Array[ct.c_byte], last_msg_num: int):
+        with self._lock:
+            if index == 0:
+                self.counts.sim_frames = last_msg_num
             else:
-                self.dropped_can_frames += report[i].packetLoss
+                self.counts.can_frames -= self.can_frames_per_device[index]
+                self.counts.can_frames += last_msg_num
+                self.can_frames_per_device[index] = last_msg_num
+            if index == 0:
+                ct.memmove(
+                    self.report[index],
+                    report_buff,
+                    self._rx_report_size)
+            else:
+                ct.memmove(
+                    self.report[index],
+                    ct.addressof(report_buff) + self._rx_report_offset,
+                    self._rx_report_size)
+            # for i in range(len(self._members)):
+            #     for j in range(len(self._members)):
+            #         logging.debug(
+            #             f"After memmove:\n"
+            #             f"Node {i} Member{j}: \n"
+            #             f"packetLoss: {self.report[i][j].packetLoss}\n"
+            #             f"latency: {self.report[i][j].latency.mean}\n"
+            #             f"jitter: {self.report[i][j].jitter.mean}\n"
+            #             f"goodput: {self.report[i][j].goodput.mean}")
+
+    def start_display(
+        self,
+        stop_event: Event,
+        output: mp.Queue,
+        log_queue: mp.Queue,
+        log_level: int
+        ) -> None:
+        try:
+            self.matrix_proc = mp.Process(
+                target=self._matrix.animate,
+                args=(self._lock, stop_event, self.report, self.counts,
+                        output, log_queue, log_level),
+                daemon=True)
+            self.matrix_proc.start()
+        except Exception as e:
+            logging.error(e, exc_info=True)
+
+    def stop_display(self) -> None:
+        try:
+            if hasattr(self, "matrix_proc") and self.matrix_proc is not None:
+                self.matrix_proc.terminate()
+                self.matrix_proc.join(1)
+                self.matrix_proc.close()
+        except Exception as e:
+            logging.error(e, exc_info=True)
+
+
+# if __name__ == "__main__":
+#         ns = NetworkStats(6, Time_Client([""]))
+
+
+# if __name__ == "__main__":
+#     import time
+#     stop = mp.Event()
+#     log_queue = mp.Queue()
+#     log_level = logging.DEBUG
+#     hr = HealthReport([
+#         Member_Node(0, [{"Type": ["ECU", "Electronic Control Unit"]}]),
+#         Member_Node(1, [{"Type": ["ECU", "Electronic Control Unit"]}]),
+#         Member_Node(2, [{"Type": ["ECU", "Electronic Control Unit"]}]),
+#         Member_Node(3, [{"Type": ["ECU", "Electronic Control Unit"]}])])
+#     hr.start_display(stop, log_queue, log_level)
+#     time.sleep(10)
+#     hr.stop_display()
+#     while True:
+#         if not log_queue.empty():
+#             print(log_queue.get())
+#         else:
+#             break
+
+from SensorNode import Member_Node
+import numpy as np
+import ctypes as ct
+from time import sleep
+import queue
+
+def generate_random_members(num_members: int) -> list[Member_Node]:
+    members = []
+    for i in range(num_members):
+        members.append(Member_Node(i, [{"Type": "CAN", "ID": "0x123", "Name": "Test"}]))
+    return members
+
+
+if __name__ == "__main__":
+    can_timestamps = []
+    global last_timestamp
+    last_timestamp = 0
+    stop_event = mp.Event()
+    output = mp.Queue()
+    log_queue = mp.Queue()
+    health_report = HealthReport(generate_random_members(3))
+    health_report.start_display(stop_event, output, log_queue, logging.DEBUG)
+    report = (NodeReport * 3)()
+    buf = (ct.c_byte * (ct.sizeof(NodeReport) * 3))()
+    index = 0
+    msg_num = 0
+    while True:
+        try:
+            for i in range(3):
+                report[i].packetLoss = np.random.randint(0, 2)
+                report[i].latency.mean = np.random.randint(0, 10)
+                report[i].jitter.mean = np.random.randint(0, 10)
+                report[i].goodput.mean = np.random.randint(50000, 60000)
+            ct.memmove(buf, ct.addressof(report), ct.sizeof(report))
+            health_report.update(index, buf, msg_num)
+            index = (index + 1) % 3
+            msg_num += np.random.randint(0, 100)
+            # for i in range(3):
+            #     print(f"packetLoss: {report[i].packetLoss}")
+            #     print(f"latency: {report[i].latency.mean}")
+            #     print(f"jitter: {report[i].jitter.mean}")
+            #     print(f"goodput: {report[i].goodput.mean}")
+            sleep(0.33)
+            try:
+                print(output.get_nowait())
+                print(log_queue.get_nowait())
+            except queue.Empty:
+                pass
+
+        except KeyboardInterrupt:
+            break
+    stop_event.set()
+    health_report.stop_display()

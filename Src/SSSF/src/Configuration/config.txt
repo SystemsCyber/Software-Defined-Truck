@@ -1,5 +1,10 @@
 {
-    "serverIP":"192.168.56.1",
-    "serverPort":80,
-    "attachedDevice":"ECM_CM2150_200k"
+    "SSSFDevice": "SSS3",
+    "AttachedDevices": [{
+	"Type": ["ECM", "Engine Control Module"],
+	"Year": 2000,
+	"Model": "GenericModel",
+	"Make": "Cummins",
+	"SN": "d4c3b2a1"
+	}]
 }
