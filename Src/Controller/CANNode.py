@@ -244,7 +244,7 @@ class CANNode(object):
             self._sequence_number,
             False,
             False,
-            WCANFrame(can_frame, CANFD_message_t())
+            WCANFrame(can_frame)
         )
         self._sequence_number += 1
         return message
@@ -254,7 +254,7 @@ class CANNode(object):
             self._sequence_number,
             False,
             True,
-            WCANFrame(can_frame)
+            WCANFrame(CAN_message_t(), can_frame)
         )
         self._sequence_number += 1
         return message

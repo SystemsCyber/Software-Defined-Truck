@@ -142,7 +142,7 @@ def main(
         help="Simulator to use such as CARLA or None.",
         case_sensitive=False, show_default=True, show_choices=True),
     retransmissions: int = typer.Option(
-        2, "--retransmissions", "-r",
+        1, "--retransmissions", "-r",
         help=(
         'Number of attempts to retransit lost controller/SSSF messages. '
         'The number of retransmissions determines the interval that '

@@ -212,6 +212,7 @@ void CANNode::stopSession()
     sequenceNumber = 1;
     sessionStatus = Inactive;
     ignitionOff();
+    digitalWrite(rxCANLED, LOW);
     Log.noticeln("Waiting for next session.");
 }
 

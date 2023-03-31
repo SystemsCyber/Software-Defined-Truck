@@ -10,7 +10,7 @@
 Load config;
 SSSF *sssf;
 
-IPAddress ip(192,168,1,22);
+IPAddress ip(192,168,1,23);
 
 void setup() {
     // Open serial communications and wait for port to open:

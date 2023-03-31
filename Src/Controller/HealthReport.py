@@ -126,6 +126,7 @@ class HealthCounts(ct.Structure):
         ("can_frames", ct.c_uint32),
         ("dropped_sim_frames", ct.c_uint32),
         ("dropped_can_frames", ct.c_uint32),
+        ("sim_retrans", ct.c_uint32)
     ]
 
     def __repr__(self) -> str:
@@ -141,7 +142,7 @@ class HealthCounts(ct.Structure):
 class HealthReport:
     def __init__(self, members: List[Member_Node]) -> None:
         _num_members = len(members)
-        self._lock = mp.Lock()
+        self.lock = mp.Lock()
         self._members = members
         self._rx_report_offset = ct.sizeof(COMMBlock) - ct.sizeof(WCOMMFrame)
         self._rx_report_size = ct.sizeof(NodeReport) * _num_members
@@ -183,7 +184,7 @@ class HealthReport:
         return axis_names
 
     def update(self, index: int, report_buff: ct.Array[ct.c_byte], last_msg_num: int):
-        with self._lock:
+        with self.lock:
             if index == 0:
                 self.counts.sim_frames = last_msg_num
             else:
@@ -220,7 +221,7 @@ class HealthReport:
         try:
             self.matrix_proc = mp.Process(
                 target=self._matrix.animate,
-                args=(self._lock, stop_event, self.report, self.counts,
+                args=(self.lock, stop_event, self.report, self.counts,
                         output, log_queue, log_level),
                 daemon=True)
             self.matrix_proc.start()

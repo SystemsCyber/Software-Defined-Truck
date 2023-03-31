@@ -266,7 +266,7 @@ class NetworkMatrix:
             try:
                 self._output.put((TO.TOTAL_STATS, 
                     (self._counts.sim_frames, self._counts.dropped_sim_frames,
-                    # self._counts.sim_retrans,
+                    self._counts.sim_retrans,
                     self._counts.can_frames,
                     self._counts.dropped_can_frames)))
             except EOFError:

@@ -39,7 +39,7 @@ class Controller(SensorNode, HTTPClient):
         self._display_mode = kwargs["_display_mode"]
         self._display_totals = kwargs["_display_totals"]
         self._can_output_buffer = []
-        self._can_output_buffer_size = 10
+        self._can_output_buffer_size = 20
         self._cansend_re = re.compile(
             r'^(?P<id>[0-9A-Fa-f]{3,8})(?:#|(?P<flags>#[RF]\d?|[\da-fA-F]{0,15}##[0-9A-Fa-f])?)(?P<data>(?:\.?[0-9A-Fa-f]{0,2}){0,8})$')
 
@@ -113,6 +113,8 @@ class Controller(SensorNode, HTTPClient):
                         ct.cast(self.network_stats.health_report,
                         ct.POINTER(ct.c_byte * (self.network_stats.size * ct.sizeof(NodeReport))))[0],
                         self.frame_number)
+                    with self.health_report.lock:
+                        self.health_report.counts.sim_retrans = self.times_retrans
                     self.network_stats.reset()
                     self.can_key.data.callback = self.write
                     self.can_key.data.message = bytes(msg)
@@ -205,12 +207,21 @@ class Controller(SensorNode, HTTPClient):
             msg.buf[i] = ct.c_uint8(data[i])
         packed_msg = COMMBlock(
             self.index, self.frame_number, self.time_client.time_ms(), 1,
-            WCOMMFrame(self.packCAN(msg), WSenseBlock()))
+            WCOMMFrame(self.packCAN(msg)))
         self.can_key.data.callback = self.write
         self.can_key.data.message = bytes(packed_msg)
         with self.sel_lock:
             self.sel.modify(self.can_key.fileobj,
                             sel.EVENT_WRITE, self.can_key.data)
+        self._output.put((TO.CAN_MSG, [(
+            packed_msg.frame.canFrame.frame.can.can_id,
+            packed_msg.frame.canFrame.frame.can.len,
+            bytes(packed_msg.frame.canFrame.frame.can.buf).hex().upper())]))
+        if self._recording:
+            self._msg_queue.put((RT.CAN, (
+                self.time_client.time_ms(),
+                packed_msg.frame.canFrame.frame.can.can_id,
+                bytes(packed_msg.frame.canFrame.frame.can.buf).hex().upper())))
     
     def __stop_control_loops(self) -> None:
         try:

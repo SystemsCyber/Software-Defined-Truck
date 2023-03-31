@@ -132,9 +132,9 @@ class CANLayTUI(App):
 
     def __print_total_stats(self, msg) -> str:
         return (f"[b white]Simulator Messages:[/]\tSent: [green]{msg[0]}[/]\t\t"
-                f"Dropped: [red]{msg[1]}[/]\tRetransmissions: [yellow]N/A[/]\n"
-                f"[b white]CAN Messages:[/]\t\tSent: [green]{msg[2]}[/]\t\t"
-                f"Dropped: [red]{msg[3]}[/]")
+                f"Dropped: [red]{msg[1]}[/]\tRetransmissions: [yellow]{msg[2]}[/]\n"
+                f"[b white]CAN Messages:[/]\t\tSent: [green]{msg[3]}[/]\t\t"
+                f"Dropped: [red]{msg[4]}[/]")
 
     def __print_sim_msg(self, msg) -> str:
         return (f"[b white]Throttle:[/] {msg[0]:0<4.4}\t"
