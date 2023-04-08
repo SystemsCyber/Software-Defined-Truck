@@ -15,7 +15,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pandas import DataFrame
 
 from Environment import CANLayLogger
-from CANLayTUI import TUIOutput as TO
+from TUI import TUIOutput as TO
 
 
 class NetworkMatrix:
@@ -95,8 +95,8 @@ class NetworkMatrix:
             return (self.__update_matrix(self._predict.jitter,
                 axes, "rocket_r", "Jitter (msec)", 0, 10),)
         elif self.current_stat == "goodput":
-            return (self.__update_matrix(self._predict.goodput/1000.0,
-                axes, "rocket", "Goodput (Mb/s)", 0, 10),)
+            return (self.__update_matrix((self._predict.goodput * 8)/1000.0,
+                axes, "rocket", "Goodput (Kb/s)", 0, 10),)
         elif self.current_stat == "totals":
             self.cbar_ax.cla()
             return (self.__update_totals(self.ax),)
@@ -108,8 +108,8 @@ class NetworkMatrix:
             (self.ax1, self.cbar_ax1), "rocket_r", "Latency (msec)", 0, 10)
         ax2 = self.__update_matrix(self._predict.jitter,
             (self.ax2, self.cbar_ax2), "rocket_r", "Jitter (msec)", 0, 10)
-        ax3 = self.__update_matrix(self._predict.goodput/1000.0,
-            (self.ax3, self.cbar_ax3), "rocket", "Goodput (Mb/s)", 0, 10)
+        ax3 = self.__update_matrix((self._predict.goodput * 8)/1000.0,
+            (self.ax3, self.cbar_ax3), "rocket", "Goodput (Kb/s)", 0, 10)
         if self.display_totals:
             ax4 = self.__update_totals(self.ax4)
             return (ax, ax1, ax2, ax3, ax4)
@@ -242,15 +242,15 @@ class NetworkMatrix:
                 self._reports.packetLoss[index][i][k] = self._report[index][i].packetLoss
                 self._predict.packetLoss.iloc[index,i] = self.__ema(
                     self.__rotate(self._reports.packetLoss[index][i], k))
+                self._reports.goodput[index][i][k] = self._report[index][i].goodput
+                self._predict.goodput.iloc[index,i] = self.__ema(
+                    self.__rotate(self._reports.goodput[index][i], k))
                 self._reports.latency[index][i][k] = self._report[index][i].latency.mean
                 self._predict.latency.iloc[index,i] = self.__ema(
                     self.__rotate(self._reports.latency[index][i], k))
                 self._reports.jitter[index][i][k] = self._report[index][i].jitter.mean
                 self._predict.jitter.iloc[index,i] = self.__ema(
                     self.__rotate(self._reports.jitter[index][i], k))
-                self._reports.goodput[index][i][k] = self._report[index][i].goodput.mean
-                self._predict.goodput.iloc[index,i] = self.__ema(
-                    self.__rotate(self._reports.goodput[index][i], k))
             self._current_member += 1
             if self._current_member % self.num_members == 0:
                 self._current_member = 0

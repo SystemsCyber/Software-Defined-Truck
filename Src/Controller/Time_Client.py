@@ -32,7 +32,7 @@ class Time_Client(NTPClient):
             [*ntp_servers, "time.nist.gov", "pool.ntp.org"])
         logging.info(f"Chosen NTP server: {self._server[0]}.")
 
-        self._polling_interval = 3
+        self._polling_interval = 2
         logging.info(
             f"Initial NTP polling interval: {2**self._polling_interval}s.")
         self._status = Status.NotSet
@@ -49,6 +49,8 @@ class Time_Client(NTPClient):
         self._index = 0
         self._previous_clock_update = 0
         self._offset = 0
+        self._offset_ns = 0
+        self.is_synced = False
 
     def __get_addr_info(self, hosts: list, port="ntp") -> NTPSERVER:
         for host in hosts:
@@ -185,23 +187,39 @@ class Time_Client(NTPClient):
             self.__set_polling_interval()
             self._status = Status.NotSet
 
-    def stay_updated(self, stop: Event) -> None:
+    def get_synced(self, stop: Event) -> None:
         try:
-            while not stop.is_set():
+            while not stop.is_set() and not self.is_synced:
                 self.update(time.time())
                 ce = self._sel.select(1)
                 for key, mask in ce:
                     callback = key.data.callback
                     callback(key)
+                if self._offset < 0.5:
+                    self.is_synced = True
+                    break
         finally:
             self.shutdown()
+            self._offset_ns = int(self._offset * 1000000000) # convert to nanoseconds
 
     def time_ms(self) -> int:
         if not self._is_setup:
             self.setup()
-        with self._lock:
-            return int((time.time() + self._offset) * 1000)
-
+        if not self.is_synced:
+            with self._lock:
+                return int((time.time() + self._offset) * 1000)
+        else:
+            return (time.time_ns() + self._offset_ns) * 1000000
+        
+    def time_us(self) -> int:
+        if not self._is_setup:
+            self.setup()
+        if not self.is_synced:
+            with self._lock:
+                return int((time.time() + self._offset) * 1000000)
+        else:
+            return (time.time_ns() + self._offset_ns) * 1000
+        
     def shutdown(self) -> None:
         logging.info("Shutting down NTP socket.")
         self._sel.unregister(self._sock)

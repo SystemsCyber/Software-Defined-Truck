@@ -15,7 +15,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.widgets import (
-    Footer, Header, Input, Static, TextLog, Placeholder, Label)
+    Footer, Header, Input, Static, TextLog, Placeholder, Label, DataTable)
 
 class TUIOutput(Enum):
     OUTPUT = 0
@@ -49,12 +49,14 @@ class LiveView(Container):
         yield Static(id="simLogs", classes="simLogs", markup=True)
         # yield Placeholder(id="simLogs", classes="simLogs")
         yield Label(" CAN Messages", classes="liveViewLabel")
-        yield TextLog(id="canLogs", classes="canLogs", max_lines=500)
+        yield DataTable(id="canLogs", classes="canLogs")
         # yield Placeholder(id="canLogs", classes="canLogs")
+
+live_can_data = []
 
 class CANLayTUI(App):
 
-    CSS_PATH = "canlay.css"
+    CSS_PATH = "client.css"
     TITLE = "CANLay"
     BINDINGS = [
         Binding("ctrl+c,ctrl+q", "app.quit", "Quit", show=True, priority=True),
@@ -105,8 +107,7 @@ class CANLayTUI(App):
                 elif msg[0] == TUIOutput.DEVICES:
                     self.__print_devices(results, msg[1])
                 elif msg[0] == TUIOutput.CAN_MSG:
-                    self.query_one("#canLogs", TextLog).write(
-                        self.__print_can_msg(msg[1]))
+                    self.__print_can_msg(msg[1])
                 elif msg[0] == TUIOutput.SIM_MSG:
                     self.query_one("#simLogs", Static).update(
                         Text.from_markup(self.__print_sim_msg(msg[1])))
@@ -144,14 +145,15 @@ class CANLayTUI(App):
                 f"[b white]Reverse:[/] {msg[4]}\t"
                 f"[b white]Gear:[/] {msg[6]}")
 
-    def __print_can_msg(self, msg) -> str:
-        s = ""
-        msg_len = len(msg)
-        for i in range(msg_len):
-            s += f"{msg[i][0]:X} [{msg[i][1]}] {msg[i][2]}"
-            if i != msg_len - 1:
-                s += "\n"
-        return s
+    def __print_can_msg(self, msg):
+        for i in msg:
+            if i[0] in self.can_table._data.keys():
+                if i[1] != self.can_table._data[i[0]][self._keys[1]]: # if length doesn't match
+                    self.can_table.update_cell(i[0], self._keys[1], i[1])
+                if i[2] != self.can_table._data[i[0]][self._keys[2]]: # if data doesn't match
+                    self.can_table.update_cell(i[0], self._keys[2], i[2])
+            else:
+                self.can_table.add_row(*i[0:], key=i[0])
 
     def __print_devices(self, results: TextLog, devices: list) -> None:
         results.write(Rule("[green]Network Designer[/green]"))
@@ -192,6 +194,8 @@ class CANLayTUI(App):
         """Called when app starts."""
         # Give the input focus, so we can start typing straight away
         self.query_one(Input).focus()
+        self.can_table = self.query_one(DataTable)
+        self._keys = self.can_table.add_columns("ID", "Length", "Data")
         asyncio.create_task(self.monitor_output_queue())
         asyncio.create_task(self.monitor_log_queue())
 

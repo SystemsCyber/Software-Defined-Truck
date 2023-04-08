@@ -2,33 +2,34 @@
 #include <SensorNode/SensorNode.h>
 #include <CANNode/CANNode.h>
 
-int SensorNode::read(struct WSensorBlock *buffer)
+int SensorNode::unpackSensorBlock(struct WSensorBlock &sensorBlock, uint8_t *msgBuffer)
 {
-    uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
-    int recvdHeaders = CANNode::read(buf, 4);
-    if (recvdHeaders > 0)
+    // print address of msgBuffer in sensor node
+    int size = CANNode::read(msgBuffer, 1);
+    if (size > 0)
     {
-        numSignals = buffer->numSignals;
-        int readSize = numSignals * sizeof(float);
-        signals = new float[numSignals];
-        int recvdData = CANNode::read(reinterpret_cast<unsigned char*>(signals), readSize);
-        if (recvdData > 0)
+        memcpy(&sensorBlock.numSignals, msgBuffer, 1);
+        if (sensorBlock.numSignals > 0)
         {
-            buffer->signals = signals;
-            return recvdHeaders + recvdData;
-        }
-        else
-        {
-            numSignals = 0;
-            delete[] signals;
+            if (sensorBlock.numSignals > 16)
+                sensorBlock.numSignals = 16;
+            sensorBlock.signals = signals;
+            size_t readSize = sensorBlock.numSignals * sizeof(float);
+            size += CANNode::read(&msgBuffer[1], readSize);
+            if (size == (int)(1 + readSize))
+            {
+                memcpy(sensorBlock.signals, &msgBuffer[1], readSize);
+            }
         }
     }
-    return -1;
+    return size;
 }
 
-int SensorNode::write(struct WSensorBlock *sensorFrame)
+int SensorNode::packSensorBlock(struct WSensorBlock &sensorBlock, uint8_t *msgBuffer)
 {
-    return CANNode::write(reinterpret_cast<uint8_t *>(sensorFrame), sizeof(WSensorBlock));
+    memcpy(msgBuffer, &sensorBlock.numSignals, 1);
+    memcpy(&msgBuffer[1], sensorBlock.signals, sensorBlock.numSignals * sizeof(float));
+    return 1 + sensorBlock.numSignals * sizeof(float);
 }
 
 String SensorNode::dumpSensorBlock(struct WSensorBlock &senseBlock)

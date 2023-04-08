@@ -5,7 +5,8 @@
 #include <SensorNode/SensorNode.h>
 #include <HTTP/HTTPClient.h>
 #include <NetworkStats/NetworkStats.h>
-#include <TimeClient/TimeClient.h>
+// #include <TimeClient/TimeClient.h>
+#include <PTPClient/PTPClient.h>
 #include <EthernetUdp.h>
 #include <ArduinoJson.h>
 #include <IPAddress.h>
@@ -17,30 +18,34 @@ private:
     uint32_t id;
     uint32_t index;
     uint32_t frameNumber;
-    TimeClient timeClient;
-
+    PTPClient ptpClient;
+    uint64_t msgReceivedTime = 0;
+    
     NetworkStats *networkHealth;
 
-    int comBlockSize = 0;
-    int comHeadSize = 0;
+    int comPackedHeadSize = 14;
+    int reportSize = 0;
+    int comPackedMaxSize = 90u;
 
     // For Testing
     unsigned int sendInterval = 30;
     unsigned int lastSend = 0;
     // -----------
+    uint8_t *msgBuffer = nullptr;
 
 public:
     struct COMMBlock
     {
-        uint32_t index;
+        uint8_t index;
+        uint8_t type;
         uint32_t frameNumber;
         uint64_t timestamp;
-        uint8_t type;
         union
         {
             struct WSensorBlock sensorFrame;
             struct WCANBlock canFrame;
             NetworkStats::NodeReport *healthReport;
+            uint64_t timeFrame;
         };
     };
 
@@ -55,15 +60,19 @@ public:
     virtual bool setup();
     virtual void forwardingLoop(bool print = false);
 
-    void write(struct CAN_message_t &canFrame);
+    void write(struct CAN_message &canFrame);
 private:
-    void write(struct CANFD_message_t &canFrame);
+    void write(struct CANFD_message &canFrame);
     void write(NetworkStats::NodeReport *healthReport);
 
-    int readCOMMBlock(struct COMMBlock *buffer);
+    size_t packCOMMBlock(struct COMMBlock &commBlock);
+    int read();
+    int unpackCOMMBlock();
+
+    void sendDelayReq();
 
     void pollServer();
-    void pollCANNetwork(struct CAN_message_t &canFrame);
+    void pollCANNetwork();
 
     void start(struct Request *request);
     void stop();

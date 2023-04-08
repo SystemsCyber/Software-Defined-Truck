@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <CANNode/CANNode.h>
+#include <PTPClient/PTPClient.h>
 #include <NetworkStats/NetworkStats.h>
 #include <FlexCAN_T4.h>
 #include <TimeClient/TimeClient.h>
 
-NetworkStats::NetworkStats(size_t _size, TimeClient* _timeClient):
+NetworkStats::NetworkStats(size_t _size, PTPClient* _timeClient):
     timeClient(_timeClient),
     size(_size),
     Basics(new HealthBasics [_size]),
@@ -17,10 +18,9 @@ NetworkStats::~NetworkStats()
     delete[] Basics;
 }
 
-void NetworkStats::update(uint16_t i, int packetSize, uint64_t timestamp, uint32_t sequenceNumber)
+void NetworkStats::update(uint16_t i, int packetSize, uint64_t timestamp, uint32_t sequenceNumber, int64_t now)
 {
-    int64_t _now = timeClient->getEpochTimeMS();
-    int delay = _now - int64_t(timestamp);
+    int delay = int64_t(int64_t(now - timestamp) / 1000);
     // if these numbers are 0 this is the first message we've received
     if ((Basics[i].lastMessageTime != 0) && (Basics[i].lastSequenceNumber != 0))
     {
@@ -30,8 +30,6 @@ void NetworkStats::update(uint16_t i, int packetSize, uint64_t timestamp, uint32
         // Serial.print(_now);
         // Serial.print(" Diff: ");
         // Serial.println(delay);
-        float ellapsedSeconds = (_now - Basics[i].lastMessageTime) / 1000.0;
-
         calculate(HealthReport[i].latency, abs(delay));
         calculate(HealthReport[i].jitter, HealthReport[i].latency.variance);
         // If no packet loss then sequence number = last sequence number + 1
@@ -39,11 +37,10 @@ void NetworkStats::update(uint16_t i, int packetSize, uint64_t timestamp, uint32
         // If packetsLost is negative then this usually indicates duplicate or
         // out of order frame. Etherway not a lost packet.
         HealthReport[i].packetLoss += (packetsLost > 0) ? packetsLost : 0;
-
-        calculate(HealthReport[i].goodput, (packetSize * 8) / ellapsedSeconds);
+        HealthReport[i].goodput += packetSize;
     }
     
-    Basics[i].lastMessageTime = _now;
+    Basics[i].lastMessageTime = now;
     Basics[i].lastSequenceNumber = int64_t(sequenceNumber);
 }
 

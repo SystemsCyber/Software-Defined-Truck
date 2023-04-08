@@ -42,10 +42,6 @@ CANNode::CANNode(uint32_t _can0Baudrate, uint32_t _can1Baudrate, String _SSSFDev
 int CANNode::init()
 {
     Log.noticeln("Setting up CAN message sizes.");
-    canBlockSize = sizeof(WCANBlock);
-    canSize = sizeof(CAN_message_t);
-    canFDSize = sizeof(CANFD_message_t);
-    canHeadSize = canBlockSize - canFDSize;
     if (SSSFDevice.compareTo("SSS3") == 0)
     {
         pinMode(SSS3GreenLED, OUTPUT);
@@ -151,29 +147,51 @@ int CANNode::read(uint8_t *buffer, size_t size)
     return canSock.read(buffer, size);
 }
 
-int CANNode::read(struct WCANBlock *buffer)
+int CANNode::unpackCANBlock(struct WCANBlock &frame, uint8_t *msgBuffer)
 {
-    uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
-    int recvdHeaders = read(buf, canHeadSize);
-    if (recvdHeaders > 0)
+    int size = CANNode::read(msgBuffer, canBlockPackedSize);
+    if (size > 6)
     {
-        int recvdData = 0;
-        if (buffer->fd)
+        memcpy(&frame.sequenceNumber, msgBuffer, 4);
+        memcpy(&frame.fd, &msgBuffer[4], 1);
+        memcpy(&frame.needResponse, &msgBuffer[5], 1);
+        if (frame.fd)
         {
-            buf = reinterpret_cast<uint8_t*>(&buffer->canFD);
-            recvdData = read(buf, canFDSize);
+            memcpy(&frame.canFD.id, &msgBuffer[6], 4);
+            memcpy(&frame.canFD.len, &msgBuffer[10], 1);
+            memcpy(&frame.canFD.flags, &msgBuffer[11], 1);
+            memcpy(&frame.canFD.buf, &msgBuffer[12], frame.canFD.len);
         }
         else
         {
-            buf = reinterpret_cast<uint8_t*>(&buffer->can);
-            recvdData = read(buf, canSize);
-        }
-        if (recvdData > 0)
-        {
-            return recvdHeaders + recvdData;
+            memcpy(&frame.can.id, &msgBuffer[6], 4);
+            memcpy(&frame.can.len, &msgBuffer[10], 1);
+            memcpy(&frame.can.buf, &msgBuffer[11], frame.can.len);
         }
     }
-    return -1;
+    return size;
+}
+
+int CANNode::packCANBlock(struct WCANBlock &frame, uint8_t *msgBuffer)
+{
+    memcpy(msgBuffer, &frame.sequenceNumber, 4);
+    memcpy(&msgBuffer[4], &frame.fd, 1);
+    memcpy(&msgBuffer[5], &frame.needResponse, 1);
+    if (frame.fd)
+    {
+        memcpy(&msgBuffer[6], &frame.canFD.id, 4);
+        memcpy(&msgBuffer[10], &frame.canFD.len, 1);
+        memcpy(&msgBuffer[11], &frame.canFD.flags, 1);
+        memcpy(&msgBuffer[12], &frame.canFD.buf, frame.canFD.len);
+        return 12 + frame.canFD.len;
+    }
+    else
+    {
+        memcpy(&msgBuffer[6], &frame.can.id, 4);
+        memcpy(&msgBuffer[10], &frame.can.len, 1);
+        memcpy(&msgBuffer[11], &frame.can.buf, frame.can.len);
+        return 11 + frame.can.len;
+    }
 }
 
 int CANNode::beginPacket()
@@ -223,30 +241,25 @@ String CANNode::dumpCANBlock(struct WCANBlock &canBlock)
     msg += " FD: " + String(canBlock.fd) + "\n" + "Frame:\n";
     if (canBlock.fd)
     {
-        struct CANFD_message_t f = canBlock.canFD;
-        msg += "\tCAN ID: " + String(f.id) + " CAN Timestamp: " + String(f.timestamp) + " IDHit: " + String(f.idhit) + "\n";
-        msg += "\tbrs: " + String(f.brs) + " esi: " + String(f.esi) + " bus: " + String(f.bus) + "\n";
-        msg += "\tExtended: " + String(f.flags.extended) + " Overrun: " + String(f.flags.overrun);
-        msg += " Reserved: " + String(f.flags.reserved) + "\n";
+        struct CANFD_message f = canBlock.canFD;
+        msg += "\tCAN ID: " + String(f.id) + "\n";
         msg += "\tLength: " + String(f.len) + " Data: ";
         for (int i = 0; i < f.len; i++)
         {
             msg += String(f.buf[i]);
         }
-        msg += "\n\tmb: " + String(f.mb) + " bus: " + String(f.bus) + " seq: " + String(f.seq) + "\n";
+        msg += "\n";
     }
     else
     {
-        struct CAN_message_t f = canBlock.can;
-        msg += "\tCAN ID: " + String(f.id) + " CAN Timestamp: " + String(f.timestamp) + " IDHit: " + String(f.idhit) + "\n";
-        msg += "\tExtended: " + String(f.flags.extended) + " Remote: " + String(f.flags.remote);
-        msg += " Overrun: " + String(f.flags.overrun) + " Reserved: " + String(f.flags.reserved) + "\n";
+        struct CAN_message f = canBlock.can;
+        msg += "\tCAN ID: " + String(f.id) + "\n";
         msg += "\tLength: " + String(f.len) + " Data: ";
         for (int i = 0; i < f.len; i++)
         {
             msg += String(f.buf[i]);
         }
-        msg += "\n\tmb: " + String(f.mb) + " bus: " + String(f.bus) + " seq: " + String(f.seq) + "\n";
+        msg += "\n";
     }
     return msg;
 }

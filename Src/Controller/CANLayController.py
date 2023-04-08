@@ -5,70 +5,54 @@ import logging
 import selectors as sel
 import ctypes as ct
 from io import BytesIO
-from logging.handlers import QueueHandler
 import multiprocessing as mp
 from multiprocessing.connection import Client, Connection, Listener, PipeConnection
-from multiprocessing.sharedctypes import Synchronized
-from pprint import pprint
 from time import time, sleep
 from types import SimpleNamespace
 from typing import List
 
-from queue import Full
-from HealthReport import HealthReport, NetworkStats, NodeReport
-from NetworkMatrix import NetworkMatrix
-from HTTPClient import HTTPClient
-from CANLayTUI import TUIOutput as TO
-from rich.pretty import pprint as rpp
-from rich.prompt import Prompt
-from rich.table import Table
-from rich import print as rp
-from rich.rule import Rule
-from SensorNode import COMMBlock, SensorNode, WCOMMFrame, WSenseBlock
+from HealthReport import HealthReport
+from TUI import TUIOutput as TO
 from Environment import CANLayLogger
-from CANNode import CAN_message_t
+from CANNode import CAN_message
 from Recorder import Recorder
 from Recorder import RecordType as RT
 import re
+from NetworkManager import NetworkManager
 
 
-class Controller(SensorNode, HTTPClient):
+class Controller(NetworkManager):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._just_packed_frame = False
         self._display_mode = kwargs["_display_mode"]
         self._display_totals = kwargs["_display_totals"]
-        self._can_output_buffer = []
-        self._can_output_buffer_size = 20
         self._cansend_re = re.compile(
             r'^(?P<id>[0-9A-Fa-f]{3,8})(?:#|(?P<flags>#[RF]\d?|[\da-fA-F]{0,15}##[0-9A-Fa-f])?)(?P<data>(?:\.?[0-9A-Fa-f]{0,2}){0,8})$')
 
     def __listen(self) -> None:
-        while not self.close_connection and not self._stop.is_set():
+        while not self.close_connection and not self.stop_event.is_set():
             with self.sel_lock:
-                connection_events = self.sel.select(timeout=self.timeout_additive)
-            for key, mask in connection_events:
-                callback = key.data.callback
-                callback(key)
-            if self._just_packed_frame:
-                self._just_packed_frame = False
-            else:
-                self.check_members(time())
+                connection_events = self.sel.select(
+                    timeout=self.timeout_additive)
+                for key, mask in connection_events:
+                    callback = key.data.callback
+                    callback(key)
+            self.check_members(self.time_us() / 1000000)
 
     def __print_devices(self, available_devices: list) -> List[int]:
         # Discard any commands that have been sent to the controller
         try:
             if (self._command.poll()):
                 self._command.recv()
-            self._output.put((TO.DEVICES, available_devices))
-            self._output.put((TO.PROMPT,
-                            "Enter the numbers corresponding to the ECUs you "
-                            "would like to use (comma separated): "))
+            self.tui_output.put((TO.DEVICES, available_devices))
+            self.tui_output.put((TO.PROMPT,
+                                 "Enter the numbers corresponding to the ECUs you "
+                                 "would like to use (comma separated): "))
             answer = self._command.recv()  # Wait for user input
             input_list = str(answer).split(',')
             return [int(i.strip()) for i in input_list]
-        except (EOFError, BrokenPipeError):
-            self.__stop_control_loops()
+        except (EOFError, BrokenPipeError, ValueError):
+            self.stop_session()
             return []
 
     def __request_user_input(self, available: list) -> List[int]:
@@ -78,18 +62,18 @@ class Controller(SensorNode, HTTPClient):
             return []
         if set(requested).issubset(available_device_ids):
             if self.request_devices(requested, available):
-                self._output.put(
+                self.tui_output.put(
                     (TO.NOTIFY, "Devices successfully allocated."))
                 return requested
             else:
-                self._output.put((TO.ERROR,
-                                  "One or more of the requested devices are no longer "
-                                  "available. Please select new device(s)."))
+                self.tui_output.put((TO.ERROR,
+                                     "One or more of the requested devices are no longer "
+                                     "available. Please select new device(s)."))
                 return self.__provision_devices()
         else:
-            self._output.put((TO.ERROR,
-                              "One or more numbers entered do not correspond"
-                              " with the available devices. Please try again."))
+            self.tui_output.put((TO.ERROR,
+                                 "One or more numbers entered do not correspond"
+                                 " with the available devices. Please try again."))
             return self.__request_user_input(available)
 
     def __provision_devices(self) -> List[int]:
@@ -97,71 +81,33 @@ class Controller(SensorNode, HTTPClient):
         if len(available_devices) > 0:
             return self.__request_user_input(available_devices)
         else:
-            self._output.put((TO.DEVICES, []))
+            self.tui_output.put((TO.DEVICES, []))
             return []
-
-    def __request_health(self) -> None:
-        try:
-            while not self._stop.is_set():
-                # Wait until session is established, timeout after 1 second to
-                # check if stop event is set
-                if self._in_session.wait(1):
-                    msg = COMMBlock(self.index, self.frame_number,
-                                    int(time() * 1000), 3, WCOMMFrame())
-                    self.health_report.update(
-                        self.index,
-                        ct.cast(self.network_stats.health_report,
-                        ct.POINTER(ct.c_byte * (self.network_stats.size * ct.sizeof(NodeReport))))[0],
-                        self.frame_number)
-                    with self.health_report.lock:
-                        self.health_report.counts.sim_retrans = self.times_retrans
-                    self.network_stats.reset()
-                    self.can_key.data.callback = self.write
-                    self.can_key.data.message = bytes(msg)
-                    with self.sel_lock:
-                        self.sel.modify(self.can_key.fileobj,
-                                        sel.EVENT_WRITE, self.can_key.data)
-                    sleep(1)  # Wait 1 second before sending next health request
-        except Exception as e:
-            logging.debug(e, exc_info=True)
 
     def __accept_sim_conn(self, sim_sock: Listener) -> None:
         try:
             self._sim_conn = sim_sock.accept()
             with self.sel_lock:
                 self.sel.register(self._sim_conn, sel.EVENT_READ,
-                                  SimpleNamespace(callback=self.__write_signals))
+                                  SimpleNamespace(callback=self.read_signals))
+            logging.debug("Simulation connection accepted.")
         except OSError:
             logging.debug("Simulation socket closed.")
 
-    def __write_signals(self, key: sel.SelectorKey) -> None:
-        try:
-            signals = key.fileobj.recv()  # type: ignore
-        except EOFError:
-            logging.debug("Simulator IPC socket closed.")
-            self.__stop_control_loops()
-        else:
-            if signals:
-                self._output.put((TO.SIM_MSG, signals))
-                self.write(*signals)
-            else:
-                logging.debug("Simulator IPC socket closed.")
-                self.__stop_control_loops()
-
     def __monitor_commands(self) -> None:
-        while not self._stop.is_set():
+        while not self.stop_event.is_set():
             if self._command.poll(0.5):
                 try:
                     command: str = self._command.recv()
                 except EOFError:
                     logging.debug("Command IPC socket closed.")
-                    self.__stop_control_loops()
+                    self.stop_session()
                 else:
                     if command is not None:
                         self.__handle_commands(command.split())
                     else:
                         logging.debug("Command IPC socket closed.")
-                        self.__stop_control_loops()
+                        self.stop_session()
 
     def __handle_commands(self, command: list[str]) -> None:
         if command[0] == "cansend":
@@ -180,7 +126,8 @@ class Controller(SensorNode, HTTPClient):
                         length = 0
                         data = bytearray()
                     else:
-                        self._output.put((TO.ERROR, "FD Not yet supported."))
+                        self.tui_output.put(
+                            (TO.ERROR, "FD Not yet supported."))
                         return
                 if "data" in params.keys() and params["data"] is not None:
                     if "." in params["data"]:
@@ -191,48 +138,40 @@ class Controller(SensorNode, HTTPClient):
                         data = bytearray.fromhex(params["data"])
                         length = len(data)
             else:
-                self._output.put((TO.ERROR, "Invalid CAN frame."))
+                self.tui_output.put((TO.ERROR, "Invalid CAN frame."))
                 return
-            self.__send_can_message(id, length, data)
-            self._output.put((TO.NOTIFY, "CAN frame sent."))
-            return 
-                
-    def __send_can_message(self, id: int, length: int, data: bytearray) -> None:
-        msg = CAN_message_t()
-        msg.can_id = ct.c_uint32(id)
-        if length > 3:
-            msg.flags.extended = ct.c_bool(True)
-        msg.len = ct.c_uint8(length)
-        for i in range(length):
-            msg.buf[i] = ct.c_uint8(data[i])
-        packed_msg = COMMBlock(
-            self.index, self.frame_number, self.time_client.time_ms(), 1,
-            WCOMMFrame(self.packCAN(msg)))
-        self.can_key.data.callback = self.write
-        self.can_key.data.message = bytes(packed_msg)
-        with self.sel_lock:
-            self.sel.modify(self.can_key.fileobj,
-                            sel.EVENT_WRITE, self.can_key.data)
-        self._output.put((TO.CAN_MSG, [(
-            packed_msg.frame.canFrame.frame.can.can_id,
-            packed_msg.frame.canFrame.frame.can.len,
-            bytes(packed_msg.frame.canFrame.frame.can.buf).hex().upper())]))
-        if self._recording:
-            self._msg_queue.put((RT.CAN, (
-                self.time_client.time_ms(),
-                packed_msg.frame.canFrame.frame.can.can_id,
-                bytes(packed_msg.frame.canFrame.frame.can.buf).hex().upper())))
-    
-    def __stop_control_loops(self) -> None:
+            msg = CAN_message(ct.c_uint32(id), ct.c_uint8(length))
+            for i in range(length):
+                msg.buf[i] = ct.c_uint8(data[i])
+            self.can_key.data.callback = self.write_can
+            self.can_key.data.message = (False, False, msg) # need_response, fd, msg
+            with self.sel_lock:
+                self.sel.modify(self.can_key.fileobj,
+                                sel.EVENT_WRITE, self.can_key.data)
+            return
+
+    def __request_health_loop(self) -> None:
         try:
-            self._output.put((TO.STOP_SESSION, ""))
-        except (BrokenPipeError, Full):
-            pass
-        finally:
-            if not self._stop.is_set():
-                self._stop.set()
-            if self._in_session.is_set():
-                self._in_session.clear()
+            while not self.stop_event.is_set():
+                self.request_health()
+                sleep(1)  # Wait 1 second before sending next health request
+        except Exception as e:
+            logging.debug(e, exc_info=True)
+
+    def __send_sync_loop(self) -> None:
+        try:
+            init_count = 5
+            init_count_remaining = init_count
+            while not self.stop_event.is_set():
+                if self.in_session.wait(1):
+                    self.send_sync()
+                    if init_count >= 0:
+                        init_count_remaining -= 1
+                        sleep(0.2)
+                        continue
+                    sleep(1)
+        except Exception as e:
+            logging.debug(e, exc_info=True)
 
     def start(
             self,
@@ -244,28 +183,26 @@ class Controller(SensorNode, HTTPClient):
             log_level: int
     ) -> None:
         CANLayLogger.worker_configure(log_queue, log_level)
+        self.tui_output = output
+        self.stop_event = th.Event()
+        self.in_session = th.Event()
+        self.recorder_output = mp.Queue()
         self._record_filename = record_filename
-        self._recording = False
-        self._msg_queue = mp.Queue()
         self._command = command
-        self._output = output
         self._log_queue = log_queue
         self._log_level = log_level
-        self._stop = th.Event()
         self._stop_mp = mp.Event()
-        self._in_session = th.Event()
         sim_thread = th.Thread(target=self.__accept_sim_conn, args=(sim_sock,))
-        ntp_thread = th.Thread(target=self.time_client.stay_updated,
-                               args=(self._stop,))
-        health_thread = th.Thread(target=self.__request_health)
+        ptp_thread = th.Thread(target=self.__send_sync_loop)
+        health_thread = th.Thread(target=self.__request_health_loop)
         command_thread = th.Thread(target=self.__monitor_commands)
         try:
             sim_thread.start()
-            ntp_thread.start()
+            ptp_thread.start()
             health_thread.start()
-            self._output.put((TO.NOTIFY, "Connecting..."))
+            self.tui_output.put((TO.NOTIFY, "Connecting..."))
             if self.connect():
-                self._output.put((TO.NOTIFY, "Registering..."))
+                self.tui_output.put((TO.NOTIFY, "Registering..."))
                 if self.register():
                     if self.__provision_devices():
                         with self.sel_lock:
@@ -278,21 +215,21 @@ class Controller(SensorNode, HTTPClient):
                             self.do_POST()
                         self.__listen()
                 else:
-                    self._output.put((TO.ERROR, "Failed to register."))
+                    self.tui_output.put((TO.ERROR, "Failed to register."))
             else:
-                self._output.put((TO.ERROR, "Failed to connect."))
+                self.tui_output.put((TO.ERROR, "Failed to connect."))
         except Exception as e:
             logging.error(e, exc_info=True)
         finally:
             # Tell the user we are exiting
-            self._output.put((TO.NOTIFY, "Exiting..."))
+            self.tui_output.put((TO.NOTIFY, "Exiting..."))
             # Tell the Network Matrix to stop
             self._stop_mp.set()
             # If we haven't set these events, do it now
-            if not self._stop.is_set():
-                self._stop.set()
-            if self._in_session.is_set():
-                self._in_session.clear()
+            if not self.stop_event.is_set():
+                self.stop_event.set()
+            if self.in_session.is_set():
+                self.in_session.clear()
             else:
                 # The do_delete from the server should not close the application
                 pass
@@ -301,12 +238,12 @@ class Controller(SensorNode, HTTPClient):
                 self.health_report.stop_display()
             # Check if we setup the recording process, if so stop it
             if hasattr(self, "recorder"):
-                self._msg_queue.put(None)
+                self.recorder_output.put(None)
                 self.recorder.join()
                 self.recorder.close()
-                while(not self._msg_queue.empty()):
-                    self._msg_queue.get()
-            self._msg_queue.close()
+                while(not self.recorder_output.empty()):
+                    self.recorder_output.get()
+            self.recorder_output.close()
             # Check if we still have a connection with the simulator. If so,
             # close it.
             if hasattr(self, '_sim_conn'):
@@ -325,111 +262,55 @@ class Controller(SensorNode, HTTPClient):
             # If the threads are still running, wait for them to finish
             if sim_thread.is_alive():
                 sim_thread.join()
-            if ntp_thread.is_alive():
-                ntp_thread.join()
+            # if ntp_thread.is_alive():
+            #     ntp_thread.join()
+            if ptp_thread.is_alive():
+                ptp_thread.join()
             if command_thread.is_alive():
                 command_thread.join()
             if health_thread.is_alive():
                 health_thread.join()
             # If somehow we got here and the TUI is still up, tell it to exit
-            self._output.put((TO.EXIT, ""))
+            self.tui_output.put((TO.EXIT, ""))
             # Disconnect from the server
             self.stop()
             # Close remaining resources
-            while(not self._output.empty()):
-                self._output.get()
-            self._output.close()
+            while(not self.tui_output.empty()):
+                self.tui_output.get()
+            self.tui_output.close()
             log_queue.close()
 
     def do_POST(self):  # Equivalent of start
         try:
             ip, port, request_data = super().do_POST()
             if ip:
-                self._output.put((TO.NOTIFY, "Session established."))
+                self.tui_output.put((TO.NOTIFY, "Session established."))
                 logging.debug(request_data)
                 self.start_session(ip, port, request_data)
-                self.network_stats = NetworkStats(
-                    len(self.members), self.time_client)
                 self.health_report = HealthReport(self.members)
                 self.health_report.start_display(
-                    self._stop_mp, self._output, self._log_queue, self._log_level)
-                self.max_report_size = (ct.sizeof(COMMBlock) - ct.sizeof(WCOMMFrame)) + \
-                    (ct.sizeof(NodeReport) * len(self.members))
-                if self.max_report_size < ct.sizeof(COMMBlock):
-                    self.max_report_size = ct.sizeof(COMMBlock)
-                self._comm_buffer = (ct.c_byte * self.max_report_size)(0)
+                    self._stop_mp, self.tui_output, self._log_queue, self._log_level)
                 if len(self._record_filename) > 0:
                     recorder = Recorder(self._record_filename)
                     self.recorder = mp.Process(
                         target=recorder.start_recording,
-                        args=(self._msg_queue, self._stop_mp,
-                        self._log_queue, self._log_level))
+                        args=(self.recorder_output, self._stop_mp,
+                              self._log_queue, self._log_level))
                     self.recorder.start()
-                    self._recording = True
-                self._can_output_buffer_size *= len(self.members)
-                self._output.put((TO.START_SESSION, ""))
-                self._in_session.set()
+                    self.recording = True
+                self.in_session.set()
             else:
-                self._output.put(
+                self.tui_output.put(
                     (TO.ERROR, "Session could not be established."))
         except TypeError as te:
             logging.error(te)
 
     def do_DELETE(self):  # Equivalent of stop
-        self._output.put((TO.NOTIFY, "Stopping the session."))
+        self.tui_output.put((TO.NOTIFY, "Stopping the session."))
         if self.close_connection:
             super().do_DELETE()
         self.stop_session()
-        self._in_session.clear()
-
-    def write(self, *key) -> None:
-        if isinstance(key[0], sel.SelectorKey):
-            super().write(key[0].data.message)
-            key[0].data.callback = self.read
-            with self.sel_lock:
-                self.sel.modify(key[0].fileobj, sel.EVENT_READ, key[0].data)
-        elif self.session_status == self.SessionStatus.Active:
-            self.can_key.data.callback = self.write
-            self.can_key.data.message = self.packSensorData(*key)
-            if self._recording:
-                self._msg_queue.put((
-                    RT.SIM, (self.time_client.time_ms(), *key)))
-            with self.sel_lock:
-                self.sel.modify(self.can_key.fileobj,
-                                sel.EVENT_WRITE, self.can_key.data)
-            self._just_packed_frame = True
-
-    def read(self, key: sel.SelectorKey) -> None:
-        ct.memset(self._comm_buffer, 0, self.max_report_size)
-        msg, msg_len = super().read(self._comm_buffer)
-        if msg and msg.type == 1:
-            self.network_stats.update(msg.index, msg_len, msg.timestamp,
-                                      msg.frame.canFrame.sequence_number)
-            self._can_output_buffer.append((
-                msg.frame.canFrame.frame.can.can_id,
-                msg.frame.canFrame.frame.can.len,
-                bytes(msg.frame.canFrame.frame.can.buf).hex().upper()))
-            if len(self._can_output_buffer) > self._can_output_buffer_size:
-                self._output.put((TO.CAN_MSG, self._can_output_buffer.copy()))
-                self._can_output_buffer.clear()
-            if self._recording:
-                self._msg_queue.put((RT.CAN, (
-                    self.time_client.time_ms(),
-                    msg.frame.canFrame.frame.can.can_id,
-                    bytes(msg.frame.canFrame.frame.can.buf).hex().upper())))
-        elif msg and msg.type == 4:
-            # for i in range(len(self.members)):
-            #     m = NodeReport.from_buffer_copy(
-            #         self._comm_buffer, ((i * ct.sizeof(NodeReport)) + (ct.sizeof(COMMBlock) - ct.sizeof(WCOMMFrame))))
-            #     logging.debug(
-            #         f"Before memmove:\n"
-            #         f"Node {msg.index} Member{0}: \n"
-            #         f"packetLoss: {m.packetLoss}\n"
-            #         f"latency: {m.latency.mean}\n"
-            #         f"jitter: {m.jitter.mean}\n"
-            #         f"goodput: {m.goodput.mean}")
-            self.health_report.update(
-                msg.index, self._comm_buffer, self.members[msg.index].last_seq_num)
+        self.in_session.clear()
 
     def stop(self, notify_server=True):
         self.do_DELETE()

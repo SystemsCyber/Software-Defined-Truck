@@ -15,8 +15,8 @@ from enum import Enum
 from multiprocessing.connection import Listener
 
 import typer
-from CANLayTUI import CANLayTUI, TUIOutput
-from CANLayController import Controller
+from TUI import CANLayTUI, TUIOutput
+from CanlayController import Controller
 from Environment import CANLayLogger
 
 
@@ -161,13 +161,6 @@ def main(
             'IMPORTANT: mark as few PGNs as important as possible. Marking '
             'all PGNs as important would effectively double the network load.'),
         min=0, max=0xFFFFFF),
-    ntp_servers: str = typer.Option(
-        "", "--ntp-servers",
-        help=(
-            "A space separated list of NTP servers to use for time sync. If no "
-            "servers are provided or the provided servers cannot be reached "
-            "time.nist.gov and pool.ntp.org will be used."
-        )),
     filename: str = typer.Option(
         "", "--filename", "-f",
         help="The name of the file to save the can and simulator logs to."),
@@ -262,8 +255,8 @@ def main(
 
     # Setup Controller
     ctrl = Controller(
-        _retrans=retransmissions, _frame_rate=60, _server_ip=broker,
-        ntp_servers=ntp_servers, _display_mode=display_mode,
+        retrans=retransmissions, frame_rate=60, _server_ip=broker,
+        _display_mode=display_mode,
         _display_totals=display_totals)
     ctrl_thread = mp.Process(
         target=ctrl.start,
@@ -315,7 +308,7 @@ def main(
         log_queue.put_nowait(None)
         log_queue.close()
         # Wait for the log listener to finish shutting down
-        log_listener.join(1)
+        log_listener.join(2)
         log_listener.close()
         
 
