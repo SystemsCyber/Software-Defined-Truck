@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
-# import asyncio
-import threading as th
 import asyncio
 import ipaddress
 import logging
@@ -11,13 +9,17 @@ import os
 import random
 import socket
 import sys
+import threading as th
 from enum import Enum
 from multiprocessing.connection import Listener
+from pathlib import Path
 
 import typer
-from TUI import CANLayTUI, TUIOutput
-from CanlayController import Controller
-from Environment import CANLayLogger
+from Controller import Controller
+from TUI import CANLayTUI
+
+sys.path.insert(0, str(Path('../').resolve()))
+from CANLay.Environment import CANLayLogger, OutputType
 
 
 # This came from an example. Needed to have it for Windows with asyncio.
@@ -25,6 +27,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = typer.Typer()
+
 
 def choose_ipc_port() -> int:
     ports = [random.randrange(2**12, 2**16) for i in range(10)]
@@ -40,16 +43,18 @@ def choose_ipc_port() -> int:
         logging.error("Cannot find a free port. Exiting...")
         exit()
 
-def open_listening_conn() -> tuple[Listener, int]:
+
+def get_listening_port() -> int:
     try:
         sim_port = choose_ipc_port()
-        sim_sock = Listener(
+        _ = Listener(
             ('localhost', sim_port), authkey=mp.current_process().authkey)
-        return sim_sock, sim_port
+        return sim_port
     except OSError as e:
         logging.error(f"Error while choosing a port: {e}")
         logging.debug("Trying again...")
-        return open_listening_conn()
+        return get_listening_port()
+
 
 async def read_sim_logs(stream, cb):
     while True:
@@ -58,7 +63,8 @@ async def read_sim_logs(stream, cb):
         line = await stream.readline()
         if not line:
             break
-        cb((TUIOutput.OUTPUT, line.decode("utf-8").rstrip()))
+        cb((OutputType.OUTPUT, line.decode("utf-8").rstrip()))
+
 
 async def carla(
     sim_stop_event: asyncio.Event, host: str, port: int,
@@ -67,7 +73,7 @@ async def carla(
 ):
     ipc_pass = str(int.from_bytes(mp.current_process().authkey, "big"))
     carla_args = [
-        "--carla", host, "--port", str(port), "--res", resolution, 
+        "--carla", host, "--port", str(port), "--res", resolution,
         "--filter", filter, "--rolename", role_name, "--gamma", str(gamma),
         "--ipc_port", str(ipc_port), "--ipc_pass", ipc_pass
     ]
@@ -87,7 +93,7 @@ async def carla(
     # if await sim_stop_event.wait():
     #     carla_proc.kill()
     return await carla_proc.wait()
-        
+
 
 async def run_simulator(
     sim_stop_event: asyncio.Event, simulator: Simulator, host: str,
@@ -95,14 +101,14 @@ async def run_simulator(
     gamma: float, ipc_port: int, output
 ):
     if simulator == Simulator.CARLA:
-        return await carla(sim_stop_event, host, port, autopilot, resolution, 
-                            filter, role_name, gamma, ipc_port, output)
+        return await carla(sim_stop_event, host, port, autopilot, resolution,
+                           filter, role_name, gamma, ipc_port, output)
     if simulator == Simulator.NONE:
         return 0
     else:
         logging.error("Invalid simulator.")
         return 1
-    
+
 
 def check_server(host: str):
     """Checks that the host is a valid IP address or fully qualified domain name
@@ -229,55 +235,52 @@ def main(
         log_level = logging.DEBUG
     loop = asyncio.get_event_loop()
     mp.set_start_method('spawn')
-    # Setup TUI
-    # TUI General Output Queue
-    tui_output_queue = mp.Queue()
-    # TUI Logging Queue from the Log Listener to the TUI
-    tui_log_queue = mp.Queue()
-    # Connection between the TUI and the Controller
-    tui_conn, ctrl_conn = mp.Pipe()
-    # TUI
-    tui = CANLayTUI(tui_output_queue, tui_log_queue, tui_conn)
-
+    output = mp.Queue()
     # Set up logging
     # Central Log Queue for all processes
     log_queue = mp.Queue()
-    # Log Listener Process
-    log_listener = mp.Process(target=CANLayLogger.listen, args=(
-        log_queue, tui_log_queue, log_level))
-    log_listener.start()
+    log_output_queue = mp.Queue()
     # Configure Main Process Logging
     CANLayLogger.worker_configure(log_queue, log_level)
-
+    # Setup TUI
+    # Connection between the TUI and the Controller
+    tui_conn, ctrl_conn = mp.Pipe()
+    # TUI
+    tui = CANLayTUI(output, log_output_queue, tui_conn)
     # Setup Simulator
     # Connection between the simulator and the Controller
-    sim_sock, sim_port = open_listening_conn()
+    sim_port = get_listening_port()
 
+    sim = False
+    if simulator != Simulator.NONE:
+        sim = True
+
+    record = False
+    if len(filename) > 0:
+        record = True
     # Setup Controller
-    ctrl = Controller(
-        retrans=retransmissions, frame_rate=60, _server_ip=broker,
-        _display_mode=display_mode,
-        _display_totals=display_totals)
+    ctrl = Controller()
     ctrl_thread = mp.Process(
-        target=ctrl.start,
-        args=(sim_sock, ctrl_conn, tui_output_queue, filename,
-            log_queue, log_level),)
+        target=ctrl.run,
+        args=(broker, port, retransmissions, record, filename, 
+              log_level, ctrl_conn, output, log_queue, log_output_queue,
+              sim, sim_port, mp.current_process().authkey),)
 
     tui_task = loop.create_task(tui.run_async())
     sim_stop_event = asyncio.Event()
     sim_proc = loop.create_task(run_simulator(
-                simulator=simulator,
-                sim_stop_event=sim_stop_event,
-                host=carla_host,
-                port=carla_port,
-                autopilot=carla_autopilot,
-                resolution=carla_resolution,
-                filter=carla_filter,
-                role_name=carla_role_name,
-                gamma=carla_gamma,
-                ipc_port=sim_port,
-                output=tui_output_queue.put_nowait
-            ))
+        simulator=simulator,
+        sim_stop_event=sim_stop_event,
+        host=carla_host,
+        port=carla_port,
+        autopilot=carla_autopilot,
+        resolution=carla_resolution,
+        filter=carla_filter,
+        role_name=carla_role_name,
+        gamma=carla_gamma,
+        ipc_port=sim_port,
+        output=output.put_nowait
+    ))
     try:
         ctrl_thread.start()
         loop.run_until_complete(asyncio.gather(tui_task, sim_proc))
@@ -295,22 +298,10 @@ def main(
         ctrl_thread.join(6)
         ctrl_thread.terminate()
         ctrl_thread.close()
-        # Close the listener socket
-        sim_sock.close()
         # Stop waiting for simulator output
         sim_stop_event.set()
         if sim_proc:
-            sim_proc.cancel() # type: ignore
-        # Close the TUI resources
-        tui_output_queue.close()
-        tui_log_queue.close()
-        # Tell the log listener to shut down
-        log_queue.put_nowait(None)
-        log_queue.close()
-        # Wait for the log listener to finish shutting down
-        log_listener.join(2)
-        log_listener.close()
-        
+            sim_proc.cancel()  # type: ignore
 
 
 if __name__ == '__main__':

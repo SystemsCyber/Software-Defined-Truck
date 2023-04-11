@@ -3,20 +3,18 @@ from __future__ import annotations
 import logging
 import platform
 import re
-import subprocess
 import selectors as sel
 import socket as soc
-from ctypes import (Structure, Union, c_bool, c_int8, c_uint8, c_uint16,
-                    c_uint32, sizeof, memmove, addressof, byref, Array, c_byte)
+import subprocess
+from ctypes import Structure, Union, c_bool, c_uint8, c_uint32, memmove
 from enum import Enum, auto
 from ipaddress import IPv4Address
+from multiprocessing import RLock
+from time import perf_counter_ns, time_ns
 from types import SimpleNamespace
-from typing import List, Tuple, Type
+from typing import Tuple
 
 from getmac import get_mac_address as gma
-
-from multiprocessing import Lock, Event, RLock
-from time import time_ns, perf_counter_ns
 
 
 class CANFD_message(Structure):
@@ -94,34 +92,43 @@ class CANNode(object):
     def __init__(self, *args, **kwargs) -> None:
         self.__can_ip = IPv4Address
         self.__can_port = 0
-        self.sel = sel.DefaultSelector()
-        self.sel_lock = RLock()
-        self._recv_size = 0
-        self._recv_addr = None
+        self._sel = sel.DefaultSelector()
+        self._sel_lock = RLock()
         self.__inital_time = time_ns()
 
-        self.mac = gma()
+        self._mac = gma()
         self._sequence_number = 1
         self.session_status = self.SessionStatus.Inactive
-        self._can_block_packed_size = 76
-        self.mac = "00:0C:29:DE:AD:BE"  # For testing purposes
-        logging.debug(f"The testing MAC address is: {self.mac}")
-        self.sending_sync = False
-        self.sync_timestamp = 0
-        self.sync_sent_timestamp = 0
+        self._mac = "00:0C:29:DE:AD:BE"  # For testing purposes
+        logging.debug(f"The testing MAC address is: {self._mac}")
+        self._sending_sync = False
+        self._sync_timestamp = 0
+        self._sync_sent_timestamp = 0
 
-    def __init_socket(self, can_port: int, mreq: bytes, iface: bytes):
-        logging.info("Creating CANNode socket.")
-        self.__can_sock = soc.socket(
+    def __init_read_socket(self, can_port: int, mreq: bytes, iface: bytes):
+        logging.info("Creating CANNode read socket.")
+        self.__can_rsock = soc.socket(
             soc.AF_INET, soc.SOCK_DGRAM, soc.IPPROTO_UDP)
-        self.__can_sock.setsockopt(soc.SOL_SOCKET, soc.SO_REUSEADDR, 1)
-        self.__can_sock.setsockopt(
+        self.__can_rsock.setsockopt(soc.SOL_SOCKET, soc.SO_REUSEADDR, 1)
+        self.__can_rsock.setsockopt(
             soc.IPPROTO_IP, soc.IP_MULTICAST_LOOP, False)
-        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_TTL, 128)
-        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_IF, iface)
-        self.__can_sock.setsockopt(soc.IPPROTO_IP, soc.IP_ADD_MEMBERSHIP, mreq)
-        self.__can_sock.setblocking(False)
-        self.__can_sock.bind(('', can_port))
+        self.__can_rsock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_TTL, 128)
+        self.__can_rsock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_IF, iface)
+        self.__can_rsock.setsockopt(
+            soc.IPPROTO_IP, soc.IP_ADD_MEMBERSHIP, mreq)
+        self.__can_rsock.setblocking(False)
+        self.__can_rsock.bind(('', can_port))
+
+    def __init_write_socket(self, iface: bytes):
+        logging.info("Creating CANNode write socket.")
+        self.__can_wsock = soc.socket(
+            soc.AF_INET, soc.SOCK_DGRAM, soc.IPPROTO_UDP)
+        self.__can_wsock.setsockopt(soc.SOL_SOCKET, soc.SO_REUSEADDR, 1)
+        self.__can_wsock.setsockopt(
+            soc.IPPROTO_IP, soc.IP_MULTICAST_LOOP, False)
+        self.__can_wsock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_TTL, 128)
+        self.__can_wsock.setsockopt(soc.IPPROTO_IP, soc.IP_MULTICAST_IF, iface)
+        self.__can_wsock.setblocking(False)
 
     def __get_ip_addresses_and_gateway(self) -> Tuple[list[str], str]:
         system = platform.system()
@@ -139,7 +146,6 @@ class CANNode(object):
         for line in output.split("\n"):
             match = re.search(ipv4_pattern, line)
             if match:
-                print(line)
                 ipv4_address = match.group("ip")
                 if system == "Linux" and "scope global" in line:
                     ipv4_addresses.append(ipv4_address)
@@ -186,17 +192,18 @@ class CANNode(object):
         self.__str_can_ip = str(self.__can_ip)
         self.__can_port = _port
         self.__iface, self.__mreq = self.__create_group_info(self.__can_ip)
-        self.__init_socket(self.__can_port, self.__mreq,
-                           self.__iface)  # type: ignore
+        self.__init_read_socket(self.__can_port, self.__mreq,
+                                self.__iface)  # type: ignore
+        self.__init_write_socket(self.__iface)
         can_data = SimpleNamespace(callback=self.read, message=None)
-        with self.sel_lock:
-            self.can_key = self.sel.register(
-                self.__can_sock, sel.EVENT_READ, can_data)
+        with self._sel_lock:
+            self._can_key = self._sel.register(
+                self.__can_rsock, sel.EVENT_READ, can_data)
         self.session_status = self.SessionStatus.Active
 
     def read(self) -> bytes:
         try:
-            return self.__can_sock.recv(1024)
+            return self.__can_rsock.recv(1024)
         except OSError as oe:
             logging.debug("Occured in read")
             logging.error(oe)
@@ -221,13 +228,16 @@ class CANNode(object):
             frame.can_fd.flags = int.from_bytes(
                 buffer[offset:offset + 1], "little")
             offset += 1
-            memmove(frame.can_fd.buf, buffer[offset:offset + frame.can_fd.len], frame.can_fd.len)
+            memmove(frame.can_fd.buf,
+                    buffer[offset:offset + frame.can_fd.len], frame.can_fd.len)
         else:
-            frame.can.can_id = int.from_bytes(buffer[offset:offset + 4], "little")
+            frame.can.can_id = int.from_bytes(
+                buffer[offset:offset + 4], "little")
             offset += 4
             frame.can.len = int.from_bytes(buffer[offset:offset + 1], "little")
             offset += 1
-            memmove(frame.can.buf, buffer[offset:offset + frame.can.len], frame.can.len)
+            memmove(frame.can.buf,
+                    buffer[offset:offset + frame.can.len], frame.can.len)
 
     def pack_canblock(self, frame: WCANBlock, buffer: bytearray) -> None:
         buffer.extend(frame.sequence_number.to_bytes(4, "little"))
@@ -247,13 +257,13 @@ class CANNode(object):
 
     def write(self, message: bytes) -> int:
         try:
-            temp = self.__can_sock.sendto(
+            temp = self.__can_wsock.sendto(
                 message,
                 (self.__str_can_ip, self.__can_port)
             )
-            if self.sending_sync:
-                self.sync_sent_timestamp = self.time_us()
-                self.sending_sync = False
+            if self._sending_sync:
+                self._sync_sent_timestamp = self.time_us()
+                self._sending_sync = False
             return temp
         except OSError as oe:
             logging.error(oe)
@@ -264,11 +274,13 @@ class CANNode(object):
         self.__can_port = 0
         if self.session_status == self.SessionStatus.Active:
             logging.info("Shutting down CAN socket.")
-            self.sel.unregister(self.__can_sock)
-            self.__can_sock.setsockopt(
+            self._sel.unregister(self.__can_rsock)
+            self.__can_rsock.setsockopt(
                 soc.IPPROTO_IP, soc.IP_DROP_MEMBERSHIP, self.__mreq)
-            self.__can_sock.shutdown(soc.SHUT_RDWR)
-            self.__can_sock.close()
+            self.__can_rsock.shutdown(soc.SHUT_RDWR)
+            self.__can_wsock.shutdown(soc.SHUT_RDWR)
+            self.__can_rsock.close()
+            self.__can_wsock.close()
             self.session_status = self.SessionStatus.Inactive
 
     def time_us(self) -> int:

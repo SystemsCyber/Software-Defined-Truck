@@ -1,10 +1,10 @@
 import threading as th
-import time
+from CANLay.Environment import OutputType as OT
 import asyncio
 import multiprocessing as mp
 from multiprocessing.connection import PipeConnection
-from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
 from rich.pretty import pprint
 from rich import print as rp
@@ -16,19 +16,6 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.widgets import (
     Footer, Header, Input, Static, TextLog, Placeholder, Label, DataTable)
-
-class TUIOutput(Enum):
-    OUTPUT = 0
-    PROMPT = 1
-    NOTIFY = 2
-    ERROR = 3
-    DEVICES = 4
-    CAN_MSG = 5
-    SIM_MSG = 6
-    TOTAL_STATS = 7
-    START_SESSION = 8
-    STOP_SESSION = 9
-    EXIT = 8
 
 class CommandLine(Container):
     def compose(self) -> ComposeResult:
@@ -65,71 +52,83 @@ class CANLayTUI(App):
 
     def __init__(self,
         output_queue: mp.Queue,
-        log_queue: mp.Queue,
+        log_output_queue: mp.Queue,
         cmd_conn: PipeConnection,
         **kwargs):
         super().__init__(**kwargs)
         self.output_queue = output_queue
-        self.log_queue = log_queue
+        self.log_output_queue = log_output_queue
         self.cmd_conn = cmd_conn
         self._tui_stop = mp.Event()
         self._executors = ThreadPoolExecutor(max_workers=2)
         self._event_loop = asyncio.get_event_loop()
 
     async def monitor_log_queue(self) -> None:
+        logs: TextLog = self.query_one("#logViewer", TextLog)
         while not self._tui_stop.is_set():
             msg = await self._event_loop.run_in_executor(
-                self._executors, self.log_queue.get)
+                self._executors, self.log_output_queue.get)
             if msg is None:
                 break
             else:
-                self.query_one("#logViewer", TextLog).write(Text.from_markup(msg))
+                logs.write(Text.from_markup(msg))
 
     async def monitor_output_queue(self) -> None:
+        results: TextLog = self.query_one("#results", TextLog)
+        simlogs: Static = self.query_one("#simLogs", Static)
+        totalStats: Static = self.query_one("#totalStats", Static)
         while not self._tui_stop.is_set():
             msg = await self._event_loop.run_in_executor(
                 self._executors, self.output_queue.get)
             if msg is None:
                 break
             else:
-                results = self.query_one("#results", TextLog)
-                if msg[0] == TUIOutput.OUTPUT:
+                if msg[0] == OT.OUTPUT:
                     results.write(Text.from_markup(msg[1]))
-                elif msg[0] == TUIOutput.PROMPT:
+                elif msg[0] == OT.PROMPT:
                     results.write(Text.from_markup(
                         f"[b magenta]{msg[1]}[/b magenta]"))
-                elif msg[0] == TUIOutput.NOTIFY:
+                elif msg[0] == OT.NOTIFY:
                     results.write(Text.from_markup(
                         f"[b yellow]{msg[1]}[/b yellow]"))
-                elif msg[0] == TUIOutput.ERROR:
+                elif msg[0] == OT.ERROR:
                     results.write(Text.from_markup(
                         f"[b red]{msg[1]}[/b red]"))
-                elif msg[0] == TUIOutput.DEVICES:
+                elif msg[0] == OT.DEVICES:
                     self.__print_devices(results, msg[1])
-                elif msg[0] == TUIOutput.CAN_MSG:
+                elif msg[0] == OT.CAN_MSG:
                     self.__print_can_msg(msg[1])
-                elif msg[0] == TUIOutput.SIM_MSG:
-                    self.query_one("#simLogs", Static).update(
+                elif msg[0] == OT.SIM_MSG:
+                    simlogs.update(
                         Text.from_markup(self.__print_sim_msg(msg[1])))
-                elif msg[0] == TUIOutput.TOTAL_STATS:
-                    self.query_one("#totalStats", Static).update(
+                elif msg[0] == OT.TOTAL_STATS:
+                    totalStats.update(
                         Text.from_markup(self.__print_total_stats(msg[1])))
-                elif (msg[0] == TUIOutput.START_SESSION) or (msg[0] == TUIOutput.STOP_SESSION):
-                    results = self.query_one(Results)
+                elif (msg[0] == OT.START_SESSION) or (msg[0] == OT.STOP_SESSION):
+                    result = self.query_one(Results)
                     liveView = self.query_one(LiveView)
-                    if results.has_class("-in-session"):
-                        results.remove_class("-in-session")
+                    if result.has_class("-in-session"):
+                        result.remove_class("-in-session")
                     else:
                         results.add_class("-in-session")
                     if liveView.has_class("-hidden"):
                         liveView.remove_class("-hidden")
                     else:
                         liveView.add_class("-hidden")
-                elif msg[0] == TUIOutput.EXIT:
+                elif msg[0] == OT.EXIT:
                     await asyncio.sleep(5)
                     self.exit()
+                elif msg[0] == OT.BUFFERED_CAN_SIM:
+                    self.__print_buffered_can_sim(simlogs, msg[1])
                 else:
                     results.write(Text.from_markup(msg))
+
+    def __print_buffered_can_sim(self, simlogs: Static, buffer: list) -> None:
+        for msg in buffer:
+            if msg[0] == OT.SIM_MSG:
+                simlogs.update(Text.from_markup(self.__print_sim_msg(msg[1])))
+            elif msg[0] == OT.CAN_MSG:
+                self.__print_can_msg(msg[1])
 
     def __print_total_stats(self, msg) -> str:
         return (f"[b white]Simulator Messages:[/]\tSent: [green]{msg[0]}[/]\t\t"
@@ -138,22 +137,21 @@ class CANLayTUI(App):
                 f"Dropped: [red]{msg[4]}[/]")
 
     def __print_sim_msg(self, msg) -> str:
-        return (f"[b white]Throttle:[/] {msg[0]:0<4.4}\t"
-                f"[b white]Steering:[/] {msg[1]:0<4.4}\t"
-                f"[b white]Brake:[/] {int(msg[2])}\t"
-                f"[b white]Hand Brake:[/] {msg[3]}\t"
-                f"[b white]Reverse:[/] {msg[4]}\t"
-                f"[b white]Gear:[/] {msg[6]}")
+        return (f"[b white]Throttle:[/] {msg[1]:0<4.4}\t"
+                f"[b white]Steering:[/] {msg[2]:0<4.4}\t"
+                f"[b white]Brake:[/] {int(msg[3])}\t"
+                f"[b white]Hand Brake:[/] {msg[4]}\t"
+                f"[b white]Reverse:[/] {msg[5]}\t"
+                f"[b white]Gear:[/] {msg[7]}")
 
     def __print_can_msg(self, msg):
-        for i in msg:
-            if i[0] in self.can_table._data.keys():
-                if i[1] != self.can_table._data[i[0]][self._keys[1]]: # if length doesn't match
-                    self.can_table.update_cell(i[0], self._keys[1], i[1])
-                if i[2] != self.can_table._data[i[0]][self._keys[2]]: # if data doesn't match
-                    self.can_table.update_cell(i[0], self._keys[2], i[2])
-            else:
-                self.can_table.add_row(*i[0:], key=i[0])
+        if msg[1] in self.can_table._data.keys():
+            if msg[2] != self.can_table._data[msg[1]][self._keys[1]]: # if length doesn't match
+                self.can_table.update_cell(msg[1], self._keys[1], msg[2])
+            if msg[3] != self.can_table._data[msg[1]][self._keys[2]]: # if data doesn't match
+                self.can_table.update_cell(msg[1], self._keys[2], msg[3])
+        else:
+            self.can_table.add_row(*msg[1:], key=msg[1])
 
     def __print_devices(self, results: TextLog, devices: list) -> None:
         results.write(Rule("[green]Network Designer[/green]"))
@@ -222,7 +220,7 @@ class CANLayTUI(App):
         """Exit the app."""
         self._tui_stop.set()
         self.output_queue.put_nowait(None)
-        self.log_queue.put_nowait(None)
+        self.log_output_queue.put_nowait(None)
         self.cmd_conn.send(None)
         super().exit("Bye!")
 

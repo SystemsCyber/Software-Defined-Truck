@@ -1,25 +1,23 @@
 from __future__ import annotations
-import queue
-from time import sleep
-import numpy as np
-import logging
-import copy
-import multiprocessing as mp
-from multiprocessing.synchronize import Event
-from multiprocessing.sharedctypes import RawArray, RawValue
-import ctypes as ct
-import time
-from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
-from CANNode import Member_Node
-from Time_Client import Time_Client
-from NetworkMatrix import NetworkMatrix
+import ctypes as ct
+import logging
+import multiprocessing as mp
+import queue
+from dataclasses import dataclass
+from multiprocessing.sharedctypes import RawArray, RawValue
+from multiprocessing.synchronize import Event
+from time import sleep
+
+import numpy as np
+
+from .CANNode import Member_Node
+from .NetworkMatrix import NetworkMatrix
 
 
 @dataclass
 class HealthBasics:
-    last_message_time: float = 0.0
+    last_message_time: int = 0
     last_sequence_number: int = 0
 
 
@@ -63,8 +61,8 @@ class NodeReport(ct.Structure):
 class NetworkStats:
     def __init__(self, _num_members: int) -> None:
         try:
-            self.size = _num_members
-            self.basics = [HealthBasics() for _ in range(_num_members)]
+            self.__size = _num_members
+            self.__basics = [HealthBasics() for _ in range(_num_members)]
             self.health_report = (NodeReport * _num_members)()
             for i in range(_num_members):
                 self.health_report[i].packetLoss = 0
@@ -76,27 +74,27 @@ class NetworkStats:
         except Exception as e:
             logging.error(f'NetworkStats: {e}', exc_info=True)
 
-    def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int, now: int):
+    def update(self, i: int, packet_size: int, timestamp: int, sequence_number: int, now: int) -> None:
         delay = (now - timestamp) // 1000
         # if these numbers are zero then this is the first messages we've received
-        if (self.basics[i].last_message_time != 0) and (self.basics[i].last_sequence_number != 0):
+        if (self.__basics[i].last_message_time != 0) and (self.__basics[i].last_sequence_number != 0):
             # logging.debug(f'Controller Recv: {now} SSSF Send: {timestamp} Diff: {delay}')
             self.calculate(self.health_report[i].latency, abs(delay))
             self.calculate(
                 self.health_report[i].jitter, self.health_report[i].latency.variance)
             # If no packet loss then sequence number = last sequence number + 1
             packetsLost = sequence_number - \
-                (self.basics[i].last_sequence_number + 1)
+                (self.__basics[i].last_sequence_number + 1)
             # If packetsLost is negative then this usually indicates duplicate or
             # out of order frame.
             self.health_report[i].packetLoss += packetsLost if packetsLost > 0 else 0
             self.health_report[i].goodput += packet_size
 
-        self.basics[i].last_message_time = now
-        self.basics[i].last_sequence_number = sequence_number
+        self.__basics[i].last_message_time = now
+        self.__basics[i].last_sequence_number = sequence_number
 
-    def reset(self):
-        for i in range(self.size):
+    def reset(self) -> None:
+        for i in range(self.__size):
             self.health_report[i].packetLoss = 0
             self.health_report[i].goodput = 0
             ct.memset(ct.pointer(
@@ -134,22 +132,21 @@ class HealthCounts(ct.Structure):
             f'\tDropped CAN Frames: {self.dropped_can_frames}\n'
         )
 
+
 class HealthReport:
-    def __init__(self, members: List[Member_Node], report_offset=14) -> None:
+    def __init__(self, members: list[Member_Node], report_offset=14) -> None:
         _num_members = len(members)
         self.lock = mp.Lock()
-        self._members = members
-        self._rx_report_offset = report_offset
-        self._rx_report_size = ct.sizeof(NodeReport) * _num_members
+        self.__members = members
+        self.__rx_report_size = ct.sizeof(NodeReport) * _num_members
         self.report = [RawArray(NodeReport, _num_members)
                        for _ in range(_num_members)]
         for i in range(_num_members):
             ct.memset(ct.addressof(
                 self.report[i]), 0, ct.sizeof(self.report[i]))
         self.counts = RawValue(HealthCounts, 0)
-        self.can_frames_per_device = RawArray(ct.c_uint32, [0] * _num_members)
-        self.labels = self.__create_axis_names()
-        self._matrix = NetworkMatrix(_num_members, self.labels)
+        self.__can_frames_per_device = RawArray(ct.c_uint32, [0] * _num_members)
+        self._matrix = NetworkMatrix(_num_members, self.__create_axis_names())
 
     # From:
     # https://stackoverflow.com/questions/2837409/how-to-append-count-numbers-to-duplicates-in-a-list-in-python
@@ -165,7 +162,7 @@ class HealthReport:
 
     def __create_axis_names(self) -> list:
         axis_names = []
-        for i in self._members:
+        for i in self.__members:
             combined_device_name = ""
             if isinstance(i.devices[0], dict):
                 for j in i.devices:
@@ -179,15 +176,15 @@ class HealthReport:
         axis_names = list(self.__rename_duplicates(axis_names))
         return axis_names
 
-    def update(self, index: int, report_buff: ct.Array[NodeReport], last_msg_num: int):
+    def update(self, index: int, report_buff: ct.Array[NodeReport], last_msg_num: int) -> None:
         with self.lock:
             if index == 0:
                 self.counts.sim_frames = last_msg_num
             else:
-                self.counts.can_frames -= self.can_frames_per_device[index]
+                self.counts.can_frames -= self.__can_frames_per_device[index]
                 self.counts.can_frames += last_msg_num
-                self.can_frames_per_device[index] = last_msg_num
-            ct.memmove(self.report[index], report_buff, self._rx_report_size)
+                self.__can_frames_per_device[index] = last_msg_num
+            ct.memmove(self.report[index], report_buff, self.__rx_report_size)
             # for i in range(len(self._members)):
             #     for j in range(len(self._members)):
             #         logging.debug(
@@ -206,21 +203,21 @@ class HealthReport:
         log_level: int
     ) -> None:
         try:
-            self.matrix_proc = mp.Process(
+            self.__matrix_proc = mp.Process(
                 target=self._matrix.animate,
                 args=(self.lock, stop_event, self.report, self.counts,
                       output, log_queue, log_level),
                 daemon=True)
-            self.matrix_proc.start()
+            self.__matrix_proc.start()
         except Exception as e:
             logging.error(e, exc_info=True)
 
     def stop_display(self) -> None:
         try:
-            if hasattr(self, "matrix_proc") and self.matrix_proc is not None:
-                self.matrix_proc.terminate()
-                self.matrix_proc.join(1)
-                self.matrix_proc.close()
+            if hasattr(self, "matrix_proc") and self.__matrix_proc is not None:
+                self.__matrix_proc.terminate()
+                self.__matrix_proc.join(1)
+                self.__matrix_proc.close()
         except Exception as e:
             logging.error(e, exc_info=True)
 
@@ -263,11 +260,11 @@ if __name__ == "__main__":
     can_timestamps = []
     global last_timestamp
     last_timestamp = 0
-    stop_event = mp.Event()
+    # stop_event = mp.Event()
     output = mp.Queue()
     log_queue = mp.Queue()
     health_report = HealthReport(generate_random_members(3))
-    health_report.start_display(stop_event, output, log_queue, logging.DEBUG)
+    # health_report.start_display(stop_event, output, log_queue, logging.DEBUG)
     report = (NodeReport * 3)()
     buf = (ct.c_byte * (ct.sizeof(NodeReport) * 3))()
     index = 0
@@ -297,5 +294,5 @@ if __name__ == "__main__":
 
         except KeyboardInterrupt:
             break
-    stop_event.set()
+    # stop_event.set()
     health_report.stop_display()
