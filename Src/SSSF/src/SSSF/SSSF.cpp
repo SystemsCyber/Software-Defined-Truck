@@ -10,11 +10,18 @@
 #include <Dns.h>
 #include <FlexCAN_T4.h>
 
+#define DELAY_REQ_DELAY 65
+#define CAN_SEND_DELAY 85
+
+struct CAN_message_t canFrame;
+struct CANNode::CAN_message canMsg;
+struct SSSF::COMMBlock msg;
+
 SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate):
     CANNode(_can0Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
     HTTPClient(_config, serverAddress),
-    timeClient(&Log)
+    ptpClient(&Log)
     {}
 
 SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate):
@@ -25,14 +32,14 @@ SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _config, uint32_t _can
     CANNode(_can0Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
     HTTPClient(_config, serverAddress),
-    timeClient(&Log)
+    ptpClient(&Log)
     {}
 
 SSSF::SSSF(const char* serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
     CANNode(_can0Baudrate, _can1Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
     HTTPClient(_config, serverAddress),
-    timeClient(&Log)
+    ptpClient(&Log)
     {}
 
 SSSF::SSSF(String& serverAddress, DynamicJsonDocument& _config, uint32_t _can0Baudrate, uint32_t _can1Baudrate):
@@ -43,7 +50,7 @@ SSSF::SSSF(IPAddress& serverAddress, DynamicJsonDocument& _config, uint32_t _can
     CANNode(_can0Baudrate, _can1Baudrate, _config["SSSFDevice"].as<String>()),
     SensorNode(),
     HTTPClient(_config, serverAddress),
-    timeClient(&Log)
+    ptpClient(&Log)
     {}
 
 bool SSSF::setup()
@@ -51,10 +58,7 @@ bool SSSF::setup()
     if (init() && connect())
     {
         Log.noticeln("Setting up the Teensy\'s Real Time Clock.");
-        timeClient.setup();
         Log.noticeln("Setting up message sizes.");
-        comBlockSize = sizeof(COMMBlock);
-        comHeadSize = comBlockSize - sizeof(WCANBlock);
         Log.noticeln("Ready.");
         return true;
     }
@@ -63,7 +67,6 @@ bool SSSF::setup()
 
 void SSSF::forwardingLoop(bool print)
 {
-    timeClient.update();
     pollServer();
     // struct CAN_message_t canFrame;
     // if (can0.read(canFrame))
@@ -87,22 +90,24 @@ void SSSF::forwardingLoop(bool print)
         //     write(canFrame);
         // }
         // -----------
-        struct COMMBlock msg = {0};
-        struct CAN_message_t canFrame;
-        pollCANNetwork(canFrame);
-        int packetSize = readCOMMBlock(&msg);
+        pollCANNetwork();
+        int packetSize = read();
         if (packetSize > 0)
         {
             if (print) Serial.println(dumpCOMMBlock(msg));
             if (msg.type == 1)
             {
-                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.canFrame.sequenceNumber);
-                can0.write(msg.canFrame.can);
-                if (can1BaudRate > 0) can1.write(msg.canFrame.can);
+                memset(&canFrame, 0, sizeof(canFrame));
+                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.canFrame.sequenceNumber, msgReceivedTime);
+                canFrame.id = msg.canFrame.can.id;
+                canFrame.len = msg.canFrame.can.len;
+                memcpy(canFrame.buf, msg.canFrame.can.buf, msg.canFrame.can.len);
+                can0.write(canFrame);
+                if (can1BaudRate > 0) can1.write(canFrame);
             }
             else if (msg.type == 2)
             {
-                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.frameNumber);
+                networkHealth->update(msg.index, packetSize, msg.timestamp, msg.frameNumber, msgReceivedTime);
                 frameNumber = msg.frameNumber;
                 // // Apply transformation
                 // canFrame.mb = 0;
@@ -123,89 +128,153 @@ void SSSF::forwardingLoop(bool print)
                 write(networkHealth->HealthReport);
                 networkHealth->reset();
             }
-        }
-        if (numSignals > 0)
-        {
-            delete[] signals;
-            numSignals = 0;
+            else if (msg.type == 5)
+            {
+                ptpClient.syncUpdate(msg.timestamp, msgReceivedTime);
+            }
+            else if (msg.type == 6)
+            {
+                if (ptpClient.followUpUpdate(msg.timeFrame, msg.timestamp))
+                {
+                    sendDelayReq();
+                }
+            }
+            else if (msg.type == 8 && msg.index == index && 
+                        msg.timeFrame == ptpClient.delayReqTimestamp)
+            {
+                ptpClient.delayUpdate(msg.timestamp);
+            }
         }
     }
 }
 
-void SSSF::write(struct CAN_message_t &canFrame)
+void SSSF::write(struct CAN_message &canFrame)
 {
-    struct COMMBlock msg = {0};
+    memset(&msg, 0, sizeof(msg));
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = timeClient.getEpochTimeMS();
+    msg.timestamp = ptpClient.getEpochTimeUS() + CAN_SEND_DELAY;
     msg.type = 1;
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = false;
     msg.canFrame.needResponse = false;
-    memcpy(&msg.canFrame.can, &canFrame, canSize);
-    CANNode::write(reinterpret_cast<uint8_t*>(&msg), comBlockSize);
+    msg.canFrame.can.id = canFrame.id;
+    msg.canFrame.can.len = canFrame.len;
+    memcpy(msg.canFrame.can.buf, canFrame.buf, canFrame.len);
+    size_t size = packCOMMBlock(msg);
+    CANNode::write(msgBuffer, size);
     CANNode::endPacket();
 }
 
-void SSSF::write(struct CANFD_message_t &canFrame)
+void SSSF::write(struct CANFD_message &canFrame)
 {
-    struct COMMBlock msg = {0};
+    memset(&msg, 0, sizeof(msg));
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = timeClient.getEpochTimeMS();
+    msg.timestamp = ptpClient.getEpochTimeUS();
     msg.type = 1;
     CANNode::beginPacket(msg.canFrame);
     msg.canFrame.fd = true;
     msg.canFrame.needResponse = false;
-    memcpy(&msg.canFrame.canFD, &canFrame, canFDSize);
-    CANNode::write(reinterpret_cast<uint8_t*>(&msg), comBlockSize);
+    msg.canFrame.canFD.id = canFrame.id;
+    msg.canFrame.canFD.len = canFrame.len;
+    memcpy(msg.canFrame.canFD.buf, canFrame.buf, canFrame.len);
+    size_t size = packCOMMBlock(msg);
+    CANNode::write(msgBuffer, size);
     CANNode::endPacket();
 }
 
 void SSSF::write(NetworkStats::NodeReport *healthReport)
 {
-    struct COMMBlock msg = {0};
+    memset(&msg, 0, sizeof(msg));
     msg.index = index;
     msg.frameNumber = frameNumber;
-    msg.timestamp = timeClient.getEpochTimeMS();
+    msg.timestamp = ptpClient.getEpochTimeUS();
     msg.type = 4;
     CANNode::beginPacket();
-    int reportSize = networkHealth->size * sizeof(NetworkStats::NodeReport);
-    uint8_t report[comHeadSize + reportSize];
-    memcpy(report, &msg, comHeadSize);
-    memcpy(report + comHeadSize, healthReport, reportSize);
-    CANNode::write(report, comHeadSize + reportSize);
+    size_t size = packCOMMBlock(msg);
+    CANNode::write(msgBuffer, size);
     CANNode::endPacket(false);
 }
 
-int SSSF::readCOMMBlock(struct COMMBlock *buffer)
+size_t SSSF::packCOMMBlock(struct COMMBlock &msg)
+{
+    size_t size = 0;
+    memcpy(msgBuffer, &msg.index, 1);
+    memcpy(&msgBuffer[1], &msg.type, 1);
+    memcpy(&msgBuffer[2], &msg.frameNumber, 4);
+    memcpy(&msgBuffer[6], &msg.timestamp, 8);
+    size += comPackedHeadSize;
+    if (msg.type == 1)
+    {
+        size += packCANBlock(msg.canFrame, &msgBuffer[size]);
+    }
+    else if (msg.type == 2)
+    {
+        size += packSensorBlock(msg.sensorFrame, &msgBuffer[size]);
+    }
+    else if (msg.type == 4)
+    {
+        memcpy(&msgBuffer[size], networkHealth->HealthReport, reportSize);
+        size += reportSize;
+    }
+    return size;
+}
+
+int SSSF::read()
 {
     if (CANNode::parsePacket())
     {
-        uint8_t *buf = reinterpret_cast<uint8_t*>(buffer);
-        int recvdHeaders = CANNode::read(buf, comHeadSize);
-        if (recvdHeaders > 0)
-        {
-            int recvdData = 0;
-            if (buffer->type == 1)
-            {
-                recvdData = CANNode::read(&buffer->canFrame);
-            }
-            else if (buffer->type == 2)
-            {
-                recvdData = SensorNode::read(&buffer->sensorFrame);
-            }
-            else if (buffer->type == 3)
-            {
-                return recvdHeaders;
-            }
-            if (recvdData > 0)
-            {
-                return recvdHeaders + recvdData;
-            }
-        }
+        msgReceivedTime = ptpClient.getEpochTimeUS();
+        return unpackCOMMBlock();
     }
     return -1;
+}
+
+int SSSF::unpackCOMMBlock()
+{
+    int size = CANNode::read(msgBuffer, comPackedHeadSize);
+    if (size >= comPackedHeadSize)
+    {
+        memcpy(&msg.index, msgBuffer, 1);
+        memcpy(&msg.type, &msgBuffer[1], 1);
+        memcpy(&msg.frameNumber, &msgBuffer[2], 4);
+        memcpy(&msg.timestamp, &msgBuffer[6], 8);
+        if (msg.type == 1)
+        {
+            size += unpackCANBlock(msg.canFrame, &msgBuffer[comPackedHeadSize]);
+        }
+        else if (msg.type == 2)
+        {
+            size += unpackSensorBlock(msg.sensorFrame, &msgBuffer[comPackedHeadSize]);
+        }
+        else if (msg.type == 6 || msg.type == 8)
+        {
+            int num_size = CANNode::read(&msgBuffer[comPackedHeadSize], 8);
+            if (num_size == 8)
+            {
+                memcpy(&msg.timeFrame, &msgBuffer[comPackedHeadSize], 8);
+            }
+            size += num_size;
+        }
+        return size;
+    }
+    return -1;
+}
+
+void SSSF::sendDelayReq()
+{
+    memset(&msg, 0, sizeof(msg));
+    msg.index = index;
+    msg.frameNumber = frameNumber;
+    ptpClient.delayReqTimestamp = ptpClient.getEpochTimeUS()  + DELAY_REQ_DELAY;
+    msg.timestamp = ptpClient.delayReqTimestamp;
+    msg.type = 7;
+    CANNode::beginPacket();
+    size_t size = packCOMMBlock(msg);
+    CANNode::write(msgBuffer, size);
+    CANNode::endPacket(false);
+    ptpClient.transmit = ptpClient.getEpochTimeUS();
 }
 
 void SSSF::pollServer()
@@ -232,28 +301,37 @@ void SSSF::pollServer()
     }
 }
 
-void SSSF::pollCANNetwork(struct CAN_message_t &canFrame)
+void SSSF::pollCANNetwork()
 { // If messages build up in the queue this should be a while loop
     if ((can0BaudRate > 0) && can0.read(canFrame))
     {
+        canMsg.id = canFrame.id;
+        canMsg.len = canFrame.len;
+        memcpy(canMsg.buf, canFrame.buf, canFrame.len);
         digitalWrite(rxCANLED, rxCANLEDStatus);
         rxCANLEDStatus = !rxCANLEDStatus;
-        write(canFrame);
+        write(canMsg);
     }
     if ((can1BaudRate > 0) && can1.read(canFrame))
     {
-        write(canFrame);
+        canMsg.id = canFrame.id;
+        canMsg.len = canFrame.len;
+        memcpy(canMsg.buf, canFrame.buf, canFrame.len);
+        write(canMsg);
     }
 }
 
 void SSSF::start(struct Request *request)
 {
-    timeClient.session = true;
     id = request->json["ID"];
     index = request->json["Index"];
     size_t membersSize = request->json["Devices"].size();
+    reportSize = membersSize * sizeof(NetworkStats::NodeReport);
+    comPackedMaxSize = max(comPackedMaxSize, comPackedHeadSize + reportSize);
+    msgBuffer = new uint8_t[comPackedMaxSize]();
     frameNumber = 0;
-    networkHealth = new NetworkStats(membersSize, &timeClient);
+    ptpClient.start(membersSize, index);
+    networkHealth = new NetworkStats(membersSize, &ptpClient);
     String ip = request->json["IP"];
     if (CANNode::startSession(ip, request->json["Port"]))
     {
@@ -263,10 +341,12 @@ void SSSF::start(struct Request *request)
 
 void SSSF::stop()
 {
-    timeClient.session = false;
+    ptpClient.stop();
     id = 0;
     index = 0;
     delete networkHealth;
+    if (msgBuffer != nullptr)
+        delete[] msgBuffer;
     CANNode::stopSession();
 }
 

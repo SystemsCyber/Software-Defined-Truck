@@ -3,6 +3,7 @@
 *.pyc
 Carla
 Src/Controller/Logs/*
+Src/Client/Logs/*
 Src/Server/Logs/*
 !Src/Server/Logs/README.md
 !Src/Controller/Logs/README.md

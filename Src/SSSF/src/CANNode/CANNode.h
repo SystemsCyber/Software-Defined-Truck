@@ -31,8 +31,7 @@ private:
     IPAddress canIP;
     uint16_t canPort;
 
-    int canBlockSize = 0;
-    int canHeadSize = 0;
+    int canBlockPackedSize = 76u;
 
     const uint8_t SSS3GreenLED = 2;
     const uint8_t SSS3RedLED = 5;
@@ -51,9 +50,6 @@ protected:
     uint8_t rxCANLED = 0;
     uint8_t rxCANLEDStatus = LOW;
 
-    int canSize = 0;
-    int canFDSize = 0;
-
     int32_t can0BaudRate = -1;
     int32_t can1BaudRate = -1;
 
@@ -64,6 +60,22 @@ protected:
     String SSSFDevice;
 
 public:
+
+    struct CAN_message
+    {
+        uint32_t id;
+        uint8_t len;
+        uint8_t buf[8];
+    };
+
+    struct CANFD_message
+    {
+        uint32_t id;
+        uint8_t len;
+        uint8_t flags;
+        uint8_t buf[64];
+    };
+
     struct WCANBlock
     {
         uint32_t sequenceNumber;
@@ -71,8 +83,8 @@ public:
         bool fd;
         union
         {
-            struct CAN_message_t can;
-            struct CANFD_message_t canFD;
+            struct CAN_message can;
+            struct CANFD_message canFD;
         };
     };
     
@@ -84,7 +96,8 @@ public:
     virtual bool startSession(String _ip, uint16_t _port);
     virtual int parsePacket();
     virtual int read(uint8_t *buffer, size_t size);
-    virtual int read(struct WCANBlock *buffer);
+    int unpackCANBlock(struct WCANBlock &frame, uint8_t *msgBuffer);
+    int packCANBlock(struct WCANBlock &canBlock, uint8_t *msgBuffer);
     virtual int beginPacket();
     virtual int beginPacket(struct WCANBlock &canBlock);
     virtual int write(const uint8_t *buffer, size_t size);

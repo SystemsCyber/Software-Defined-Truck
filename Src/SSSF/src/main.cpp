@@ -10,11 +10,11 @@
 Load config;
 SSSF *sssf;
 
-IPAddress ip(192,168,1,22);
+IPAddress ip(192,168,1,23);
 
 void setup() {
     // Open serial communications and wait for port to open:
-    Serial.begin(9600);
+    Serial.begin(115200);
     while (!Serial) {
         // Proceed after 30 seconds even if theres no serial connection
         if (millis() > (uint32_t) 30000) {

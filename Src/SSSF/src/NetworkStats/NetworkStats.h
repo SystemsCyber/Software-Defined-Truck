@@ -6,13 +6,14 @@
 #include <limits>
 #include <FlexCAN_T4.h>
 #include <TimeClient/TimeClient.h>
+#include <PTPClient/PTPClient.h>
 
 class NetworkStats
 {
 private:
     float delta = 0;
     float delta2 = 0;
-    TimeClient* timeClient;
+    PTPClient* timeClient;
 
 public:
     struct HealthBasics
@@ -33,21 +34,20 @@ public:
 
     struct NodeReport
     {
-        float packetLoss = 0.0;
+        uint32_t packetLoss = 0;
+        uint32_t goodput = 0;
         struct HealthCore latency;
         struct HealthCore jitter;
-        struct HealthCore goodput;
     };
 
     size_t size = 0;
     struct HealthBasics *Basics;
     struct NodeReport *HealthReport;
 
-    NetworkStats(size_t _size, TimeClient* _timeClient);
+    NetworkStats(size_t _size, PTPClient* _timeClient);
     ~NetworkStats();
-    void update(uint16_t _index, int packetSize, uint64_t timestamp, uint32_t sequenceNumber);
+    void update(uint16_t _index, int packetSize, uint64_t timestamp, uint32_t sequenceNumber, int64_t now);
     void reset();
-    // TODO: Reset every health report keep last seen sequence number
 
 private:
     void calculate(struct HealthCore &edge, float n);

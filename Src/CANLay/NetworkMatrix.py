@@ -1,6 +1,7 @@
 from __future__ import annotations
-import logging
+
 import copy
+import logging
 import multiprocessing as mp
 from multiprocessing.synchronize import Event
 from time import sleep, time
@@ -14,54 +15,60 @@ from matplotlib.widgets import Button
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pandas import DataFrame
 
-from Environment import CANLayLogger
-from CANLayTUI import TUIOutput as TO
+from .Environment import CANLayLogger
+from .Environment import OutputType as OT
 
 
 class NetworkMatrix:
     def __init__(self, num_members: int, labels: list[str]) -> None:
-        self.current_stat = "packetLoss"
-        self.num_members = num_members
+        self.__current_stat = "packetLoss"
+        self.__num_members = num_members
         zero_matrix = [[0.0] * num_members] * num_members
         historical_matrix = [[[0.0] * 8] * num_members] * num_members
         # self._base_frame = DataFrame(zero_matrix, columns=list(reversed(labels)), index=labels)
-        self._base_frame = DataFrame(zero_matrix, columns=labels, index=labels)
-        self._reports = SimpleNamespace(
+        self.__base_frame = DataFrame(zero_matrix, columns=labels, index=labels)
+        self.__reports = SimpleNamespace(
             packetLoss=copy.deepcopy(historical_matrix),
             latency=copy.deepcopy(historical_matrix),
             jitter=copy.deepcopy(historical_matrix),
             goodput=copy.deepcopy(historical_matrix)
         )
-        self._predict = SimpleNamespace(
-            packetLoss= self._base_frame.copy(deep=True),
-            latency=self._base_frame.copy(deep=True),
-            jitter=self._base_frame.copy(deep=True),
-            goodput=self._base_frame.copy(deep=True)
+        self.__predict = SimpleNamespace(
+            packetLoss=self.__base_frame.copy(deep=True),
+            latency=self.__base_frame.copy(deep=True),
+            jitter=self.__base_frame.copy(deep=True),
+            goodput=self.__base_frame.copy(deep=True)
         )
-        self._current_rotation = 0
-        self._current_member = 0
+        self.__current_rotation = 0
+        self.__current_member = 0
 
     def __update_totals(self, ax):
         fs = 12
         ax.cla()
         ax.set_title("Totals", fontdict={
             'fontsize': 14, 'fontweight': 'bold'})
-        ax.set(xlim=(0, 1), ylim=(0, 1), xticklabels=[], yticklabels=[], xlabel=None, ylabel=None, aspect=1)
+        ax.set(xlim=(0, 1), ylim=(0, 1), xticklabels=[],
+               yticklabels=[], xlabel=None, ylabel=None, aspect=1)
         ax.set_axis_off()
         with self._lock:
             ax.text(0, .9, "Simulator", fontsize=fs, fontweight="bold")
             ax.text(.1, .79, "Count:", fontsize=fs)
-            ax.text(1, .79, f"{self._counts.sim_frames}", ha='right', fontsize=fs)
+            ax.text(1, .79, f"{self._counts.sim_frames}",
+                    ha='right', fontsize=fs)
             ax.text(.1, .68, "Dropped:", fontsize=fs)
-            ax.text(1, .68, f"{self._counts.dropped_sim_frames}", ha='right', fontsize=fs)
+            ax.text(1, .68, f"{self._counts.dropped_sim_frames}",
+                    ha='right', fontsize=fs)
             ax.text(.1, .57, "Retrans:", fontsize=fs)
-            ax.text(1, .57, f"{self._counts.sim_retrans}", ha='right', fontsize=fs)
+            ax.text(1, .57, f"{self._counts.sim_retrans}",
+                    ha='right', fontsize=fs)
 
             ax.text(0, .35, "CAN", fontsize=fs, fontweight="bold")
             ax.text(.1, .24, "Count:", fontsize=fs)
-            ax.text(1, .24, f"{self._counts.can_frames}", ha='right', fontsize=fs)
+            ax.text(1, .24, f"{self._counts.can_frames}",
+                    ha='right', fontsize=fs)
             ax.text(.1, .13, "Dropped:", fontsize=fs)
-            ax.text(1, .13, f"{self._counts.dropped_can_frames}", ha='right', fontsize=fs)
+            ax.text(1, .13, f"{self._counts.dropped_can_frames}",
+                    ha='right', fontsize=fs)
         return ax
 
     def __update_matrix(self, data, axes, cmap: str, title: str, vmin, vmax):
@@ -85,31 +92,31 @@ class NetworkMatrix:
 
     def __update_individual(self):
         axes = (self.ax, self.cbar_ax)
-        if self.current_stat == "packetLoss":
-            return (self.__update_matrix(self._predict.packetLoss,
-                axes, "rocket_r", "Packet Loss", 0, 10),)
-        elif self.current_stat == "latency":
-            return (self.__update_matrix(self._predict.latency,
-                axes, "rocket_r", "Latency (msec)", 0, 10),)
-        elif self.current_stat == "jitter":
-            return (self.__update_matrix(self._predict.jitter,
-                axes, "rocket_r", "Jitter (msec)", 0, 10),)
-        elif self.current_stat == "goodput":
-            return (self.__update_matrix(self._predict.goodput/1000.0,
-                axes, "rocket", "Goodput (Mb/s)", 0, 10),)
-        elif self.current_stat == "totals":
+        if self.__current_stat == "packetLoss":
+            return (self.__update_matrix(self.__predict.packetLoss,
+                                         axes, "rocket_r", "Packet Loss", 0, 10),)
+        elif self.__current_stat == "latency":
+            return (self.__update_matrix(self.__predict.latency,
+                                         axes, "rocket_r", "Latency (msec)", 0, 10),)
+        elif self.__current_stat == "jitter":
+            return (self.__update_matrix(self.__predict.jitter,
+                                         axes, "rocket_r", "Jitter (msec)", 0, 10),)
+        elif self.__current_stat == "goodput":
+            return (self.__update_matrix((self.__predict.goodput * 8)/1000.0,
+                                         axes, "rocket", "Goodput (Kb/s)", 0, 10),)
+        elif self.__current_stat == "totals":
             self.cbar_ax.cla()
             return (self.__update_totals(self.ax),)
 
     def __update_other(self):
-        ax = self.__update_matrix(self._predict.packetLoss,
-            (self.ax, self.cbar_ax), "rocket_r", "Packet Loss", 0, 10)
-        ax1 = self.__update_matrix(self._predict.latency,
-            (self.ax1, self.cbar_ax1), "rocket_r", "Latency (msec)", 0, 10)
-        ax2 = self.__update_matrix(self._predict.jitter,
-            (self.ax2, self.cbar_ax2), "rocket_r", "Jitter (msec)", 0, 10)
-        ax3 = self.__update_matrix(self._predict.goodput/1000.0,
-            (self.ax3, self.cbar_ax3), "rocket", "Goodput (Mb/s)", 0, 10)
+        ax = self.__update_matrix(self.__predict.packetLoss,
+                                  (self.ax, self.cbar_ax), "rocket_r", "Packet Loss", 0, 10)
+        ax1 = self.__update_matrix(self.__predict.latency,
+                                   (self.ax1, self.cbar_ax1), "rocket_r", "Latency (msec)", 0, 10)
+        ax2 = self.__update_matrix(self.__predict.jitter,
+                                   (self.ax2, self.cbar_ax2), "rocket_r", "Jitter (msec)", 0, 10)
+        ax3 = self.__update_matrix((self.__predict.goodput * 8)/1000.0,
+                                   (self.ax3, self.cbar_ax3), "rocket", "Goodput (Kb/s)", 0, 10)
         if self.display_totals:
             ax4 = self.__update_totals(self.ax4)
             return (ax, ax1, ax2, ax3, ax4)
@@ -117,25 +124,25 @@ class NetworkMatrix:
             return (ax, ax1, ax2, ax3)
 
     def __display_packet_loss(self, event):
-        self.current_stat = "packetLoss"
+        self.__current_stat = "packetLoss"
 
     def __display_latency(self, event):
-        self.current_stat = "latency"
+        self.__current_stat = "latency"
 
     def __display_jitter(self, event):
-        self.current_stat = "jitter"
+        self.__current_stat = "jitter"
 
     def __display_goodput(self, event):
-        self.current_stat = "goodput"
-    
+        self.__current_stat = "goodput"
+
     def __display_totals(self, event):
-        self.current_stat = "totals"
+        self.__current_stat = "totals"
 
     def __create_button(self, axes: Tuple, name: str, on_click) -> Button:
         ax = self.fig.add_axes(axes)
-        button = Button(ax, name) # type: ignore
+        button = Button(ax, name)  # type: ignore
         button.on_clicked(on_click)
-        button.label.set_fontsize(12) # type: ignore
+        button.label.set_fontsize(12)  # type: ignore
         return button
 
     def __create_cbar_ax(self, ax):
@@ -175,7 +182,8 @@ class NetworkMatrix:
         b = 0 if self.display_totals else 0.05
         grid_kws = {'hspace': 0.4}
         rows_cols = (5, 1) if self.display_totals else (4, 1)
-        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws) # type: ignore
+        self.fig, axes = plt.subplots(
+            *rows_cols, gridspec_kw=grid_kws)  # type: ignore
         axes: list[plt.Axes]
         self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
         self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
@@ -189,7 +197,8 @@ class NetworkMatrix:
         r = 0.98 if self.display_totals else 0.95
         grid_kws = {'wspace': 0.5}
         rows_cols = (1, 5) if self.display_totals else (1, 4)
-        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws) # type: ignore
+        self.fig, axes = plt.subplots(
+            *rows_cols, gridspec_kw=grid_kws)  # type: ignore
         axes: list[plt.Axes]
         self.ax, self.cbar_ax = (axes[0], self.__create_cbar_ax(axes[0]))
         self.ax1, self.cbar_ax1 = (axes[1], self.__create_cbar_ax(axes[1]))
@@ -205,12 +214,16 @@ class NetworkMatrix:
         lb = 0.05 if self.display_totals else 0.09
         grid_kws = {'wspace': 0.4, 'hspace': hspace}
         rows_cols = (2, 3) if self.display_totals else (2, 2)
-        self.fig, axes = plt.subplots(*rows_cols, gridspec_kw=grid_kws) # type: ignore
+        self.fig, axes = plt.subplots(
+            *rows_cols, gridspec_kw=grid_kws)  # type: ignore
         axes: list[list[plt.Axes]]
         self.ax, self.cbar_ax = (axes[0][0], self.__create_cbar_ax(axes[0][0]))
-        self.ax1, self.cbar_ax1 = (axes[0][1], self.__create_cbar_ax(axes[0][1]))
-        self.ax2, self.cbar_ax2 = (axes[1][0], self.__create_cbar_ax(axes[1][0]))
-        self.ax3, self.cbar_ax3 = (axes[1][1], self.__create_cbar_ax(axes[1][1]))
+        self.ax1, self.cbar_ax1 = (
+            axes[0][1], self.__create_cbar_ax(axes[0][1]))
+        self.ax2, self.cbar_ax2 = (
+            axes[1][0], self.__create_cbar_ax(axes[1][0]))
+        self.ax3, self.cbar_ax3 = (
+            axes[1][1], self.__create_cbar_ax(axes[1][1]))
         if self.display_totals:
             self.ax4 = axes[0][2]
             axes[1][2].set_axis_off()
@@ -233,28 +246,28 @@ class NetworkMatrix:
 
     def __update(self, frame):
         if self._stop_event.is_set():
-            self.anim.event_source.stop() # type: ignore
+            self.anim.event_source.stop()  # type: ignore
             return
         with self._lock:
-            index = self._current_member % self.num_members
-            k = self._current_rotation % 8
-            for i in range(self.num_members):
-                self._reports.packetLoss[index][i][k] = self._report[index][i].packetLoss
-                self._predict.packetLoss.iloc[index,i] = self.__ema(
-                    self.__rotate(self._reports.packetLoss[index][i], k))
-                self._reports.latency[index][i][k] = self._report[index][i].latency.mean
-                self._predict.latency.iloc[index,i] = self.__ema(
-                    self.__rotate(self._reports.latency[index][i], k))
-                self._reports.jitter[index][i][k] = self._report[index][i].jitter.mean
-                self._predict.jitter.iloc[index,i] = self.__ema(
-                    self.__rotate(self._reports.jitter[index][i], k))
-                self._reports.goodput[index][i][k] = self._report[index][i].goodput.mean
-                self._predict.goodput.iloc[index,i] = self.__ema(
-                    self.__rotate(self._reports.goodput[index][i], k))
-            self._current_member += 1
-            if self._current_member % self.num_members == 0:
-                self._current_member = 0
-                self._current_rotation += 1
+            index = self.__current_member % self.__num_members
+            k = self.__current_rotation % 8
+            for i in range(self.__num_members):
+                self.__reports.packetLoss[index][i][k] = self._report[index][i].packetLoss
+                self.__predict.packetLoss.iloc[index, i] = self.__ema(
+                    self.__rotate(self.__reports.packetLoss[index][i], k))
+                self.__reports.goodput[index][i][k] = self._report[index][i].goodput
+                self.__predict.goodput.iloc[index, i] = self.__ema(
+                    self.__rotate(self.__reports.goodput[index][i], k))
+                self.__reports.latency[index][i][k] = self._report[index][i].latency.mean
+                self.__predict.latency.iloc[index, i] = self.__ema(
+                    self.__rotate(self.__reports.latency[index][i], k))
+                self.__reports.jitter[index][i][k] = self._report[index][i].jitter.mean
+                self.__predict.jitter.iloc[index, i] = self.__ema(
+                    self.__rotate(self.__reports.jitter[index][i], k))
+            self.__current_member += 1
+            if self.__current_member % self.__num_members == 0:
+                self.__current_member = 0
+                self.__current_rotation += 1
             # for i in range(self.num_members):
             #     for j in range(self.num_members):
             #         logging.info(
@@ -264,13 +277,13 @@ class NetworkMatrix:
             #             f"jitter: {self._report[i][j].jitter.mean}\n"
             #             f"goodput: {self._report[i][j].goodput.mean}")
             try:
-                self._output.put((TO.TOTAL_STATS, 
-                    (self._counts.sim_frames, self._counts.dropped_sim_frames,
-                    # self._counts.sim_retrans,
-                    self._counts.can_frames,
-                    self._counts.dropped_can_frames)))
+                self._output.put((OT.TOTAL_STATS,
+                                  (self._counts.sim_frames, self._counts.dropped_sim_frames,
+                                   self._counts.sim_retrans,
+                                   self._counts.can_frames,
+                                   self._counts.dropped_can_frames)))
             except EOFError:
-                self.anim.event_source.stop() # type: ignore
+                self.anim.event_source.stop()  # type: ignore
                 return
         if self.display_mode == "individual":
             return self.__update_individual()
@@ -307,17 +320,17 @@ class NetworkMatrix:
     #         # ),
 
     def animate(
-            self,
-            lock,
-            stop_event: Event,
-            report,
-            counts,
-            output: mp.Queue,
-            log_queue: mp.Queue,
-            log_level: int,
-            display_mode="grouped",
-            display_totals=False
-        ):
+        self,
+        lock,
+        stop_event: Event,
+        report,
+        counts,
+        output: mp.Queue,
+        log_queue: mp.Queue,
+        log_level: int,
+        display_mode="grouped",
+        display_totals=False
+    ):
         # Matplotlib prints a LOT of debug messages
         if log_level == logging.DEBUG:
             log_level = logging.INFO
@@ -350,7 +363,7 @@ class NetworkMatrix:
             # self.last_can_frames = 0
             # self.ln = self.ax.plot([])[0]
             self.anim = animation.FuncAnimation(
-                self.fig, self.__update, frames=None, interval=1000/self.num_members, blit=True, repeat=False)
+                self.fig, self.__update, frames=None, interval=1000/self.__num_members, blit=True, repeat=False)
             # self.anim = animation.FuncAnimation(
             #     self.fig, self.__temp_update, frames=None, interval=1000, repeat=False)
             mng = plt.get_current_fig_manager()
@@ -361,8 +374,8 @@ class NetworkMatrix:
         except Exception as e:
             logging.error(e, exc_info=True)
         finally:
-            if self.anim.event_source: # type: ignore
-                self.anim.event_source.stop() # type: ignore
+            if self.anim.event_source:  # type: ignore
+                self.anim.event_source.stop()  # type: ignore
             plt.close(self.fig)
 
 

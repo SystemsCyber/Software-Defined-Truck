@@ -8,7 +8,7 @@ class SensorNode: public virtual CANNode
 {
 public:
     uint8_t numSignals = 0;
-    float *signals;
+    float signals[16] = {0.0};
 
     struct WSensorBlock
     {
@@ -17,8 +17,8 @@ public:
     };
 
     SensorNode(): CANNode() {};
-    virtual int read(struct WSensorBlock *buffer);
-    virtual int write(struct WSensorBlock *sensorFrame);
+    int unpackSensorBlock(struct WSensorBlock &signals, uint8_t *msgBuffer);
+    int packSensorBlock(struct WSensorBlock &signals, uint8_t *msgBuffer);
 
     String dumpSensorBlock(struct WSensorBlock &senseBlock);
 };
